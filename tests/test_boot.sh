@@ -42,8 +42,8 @@ cp "${PROJECT_ROOT}/lib"/*.sh "${TEST_HOME}/lib/"
 cp "${PROJECT_ROOT}/etc"/*.env "${TEST_HOME}/etc/"
 cp "${PROJECT_ROOT}/etc"/*.toml "${TEST_HOME}/etc/"
 
-# Create mock binaries that just sleep (to simulate running services)
-for bin in omniroute modelrelay pi hermes; do
+# Create mock binaries for services that ARE persistent
+for bin in omniroute modelrelay; do
     cat > "${TEST_HOME}/bin/${bin}" << 'EOF'
 #!/usr/bin/env sh
 # Mock service - prints startup message and sleeps
@@ -62,12 +62,11 @@ if [ "$1" = "-z" ]; then
     port=$3
     # Accept connections on ports we know about
     case "$port" in
-        20128|7352|8080|8081)
+        20128|7352)
             exit 0
             ;;
         *)
             exit 1
-            ;;
     esac
 fi
 exit 1
@@ -78,6 +77,10 @@ chmod +x "${TEST_HOME}/bin/nc"
 cat > "${TEST_HOME}/bin/curl" << 'EOF'
 #!/usr/bin/env sh
 # Mock curl - succeeds for health checks
+if echo "$*" | grep -q "/models"; then
+    echo '{"data":[]}'
+    exit 0
+fi
 if echo "$*" | grep -q "/health"; then
     echo '{"status":"ok"}'
     exit 0
@@ -85,6 +88,23 @@ fi
 exit 1
 EOF
 chmod +x "${TEST_HOME}/bin/curl"
+
+# Mock sqlite3 for OmniRoute preconfig
+cat > "${TEST_HOME}/bin/sqlite3" << 'EOF'
+#!/usr/bin/env sh
+exit 0
+EOF
+chmod +x "${TEST_HOME}/bin/sqlite3"
+
+# Mock hermes for mcp add
+cat > "${TEST_HOME}/bin/hermes" << 'EOF'
+#!/usr/bin/env sh
+if echo "$*" | grep -q "mcp add"; then
+    exit 0
+fi
+exit 1
+EOF
+chmod +x "${TEST_HOME}/bin/hermes"
 
 # Put our mock bin first in PATH
 export PATH="${TEST_HOME}/bin:${PATH}"
@@ -99,8 +119,8 @@ else
     exit 1
 fi
 
-# Check that PID files were created
-for service in omniroute modelrelay pi; do
+# Check that PID files were created for persistent services ONLY
+for service in omniroute modelrelay; do
     if [ -f "${TEST_HOME}/var/run/${service}.pid" ]; then
         log_info "PID file created for ${service}"
     else
@@ -109,23 +129,29 @@ for service in omniroute modelrelay pi; do
     fi
 done
 
-# Check Hermes not started (default off)
-if [ ! -f "${TEST_HOME}/var/run/hermes.pid" ]; then
-    log_info "Hermes not started (default off)"
+# Check Pi-Agent PID file NOT created (CLI tool now)
+if [ ! -f "${TEST_HOME}/var/run/pi.pid" ]; then
+    log_info "Pi-Agent PID file NOT created (CLI tool)"
 else
-    log_error "Hermes started unexpectedly"
+    log_error "Pi-Agent PID file should NOT exist (CLI tool)"
     exit 1
 fi
 
-# Test 2: boot.sh with MINIONS_HERMES=on
-echo ""
-echo "=== Test 2: boot.sh --dry-run with MINIONS_HERMES=on ==="
-MINIONS_HERMES=on sh "${TEST_HOME}/boot.sh" --dry-run 2>&1 | grep -q "hermes" && log_info "Hermes started when enabled" || log_error "Hermes not started when enabled"
-
-if [ -f "${TEST_HOME}/var/run/hermes.pid" ]; then
-    log_info "Hermes PID file created"
+# Check Hermes PID file NOT created (CLI tool now)
+if [ ! -f "${TEST_HOME}/var/run/hermes.pid" ]; then
+    log_info "Hermes PID file NOT created (CLI tool)"
 else
-    log_error "Hermes PID file missing"
+    log_error "Hermes PID file should NOT exist (CLI tool)"
+    exit 1
+fi
+
+# Test 2: boot.sh --dry-run with readiness marker
+echo ""
+echo "=== Test 2: Readiness marker ==="
+if [ -f "${TEST_HOME}/var/run/ready" ]; then
+    log_info "Readiness marker created"
+else
+    log_error "Readiness marker missing"
     exit 1
 fi
 
@@ -135,7 +161,7 @@ echo "=== Test 3: stop.sh ==="
 sh "${TEST_HOME}/stop.sh" 2>&1 | grep -q "All services stopped" && log_info "stop.sh runs successfully" || log_error "stop.sh failed"
 
 # Verify PID files removed
-for service in omniroute modelrelay pi hermes; do
+for service in omniroute modelrelay; do
     if [ ! -f "${TEST_HOME}/var/run/${service}.pid" ]; then
         log_info "PID file removed for ${service}"
     else
@@ -143,6 +169,14 @@ for service in omniroute modelrelay pi hermes; do
         exit 1
     fi
 done
+
+# Verify readiness marker removed
+if [ ! -f "${TEST_HOME}/var/run/ready" ]; then
+    log_info "Readiness marker removed"
+else
+    log_error "Readiness marker still exists"
+    exit 1
+fi
 
 # Test 4: status.sh
 echo ""
@@ -154,7 +188,9 @@ sh "${TEST_HOME}/boot.sh" --dry-run >/dev/null 2>&1
 output=$(sh "${TEST_HOME}/status.sh" 2>&1)
 echo "${output}" | grep -q "omniroute" && log_info "status.sh checks omniroute" || log_error "status.sh missing omniroute"
 echo "${output}" | grep -q "modelrelay" && log_info "status.sh checks modelrelay" || log_error "status.sh missing modelrelay"
-echo "${output}" | grep -q "pi-agent" && log_info "status.sh checks pi-agent" || log_error "status.sh missing pi-agent"
+echo "${output}" | grep -q "pi-agent" && log_info "status.sh checks pi-agent (CLI)" || log_error "status.sh missing pi-agent"
+echo "${output}" | grep -q "hermes" && log_info "status.sh checks hermes (CLI)" || log_error "status.sh missing hermes"
+echo "${output}" | grep -q "READY FOR FIRSTMATE DISPATCH" && log_info "status.sh shows READY" || log_error "status.sh missing READY"
 
 # Test 5: Verify config values are used
 echo ""
@@ -163,6 +199,12 @@ echo "=== Test 5: Config values from minions.env ==="
 grep -q "20128" "${TEST_HOME}/etc/minions.env" && log_info "OmniRoute port 20128 in config" || log_error "OmniRoute port not in config"
 grep -q "7352" "${TEST_HOME}/etc/minions.env" && log_info "ModelRelay port 7352 in config" || log_error "ModelRelay port not in config"
 grep -q "MINIONS_LLM_BASE_URL" "${TEST_HOME}/etc/minions.env" && log_info "MINIONS_LLM_BASE_URL in config" || log_error "MINIONS_LLM_BASE_URL not in config"
+
+# Test 6: OmniRoute preconfig runs in dry-run
+echo ""
+echo "=== Test 6: OmniRoute preconfig dry-run ==="
+output=$(sh "${TEST_HOME}/boot.sh" --dry-run 2>&1)
+echo "${output}" | grep -q "Preconfiguring OmniRoute" && log_info "Preconfig step runs" || log_warn "Preconfig step not found in output (may be fine in dry-run)"
 
 # Cleanup
 rm -rf "${TEST_HOME}"

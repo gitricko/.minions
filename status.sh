@@ -11,11 +11,6 @@ OMNIROUTE_HOST="127.0.0.1"
 OMNIROUTE_PORT="20128"
 MODELRELAY_HOST="127.0.0.1"
 MODELRELAY_PORT="7352"
-PI_RPC_HOST="127.0.0.1"
-PI_RPC_PORT="8080"
-HERMES_HOST="127.0.0.1"
-HERMES_GATEWAY_PORT="8081"
-MINIONS_HERMES="${MINIONS_HERMES:-off}"
 
 # Source config
 if [ -f "${MINIONS_HOME}/etc/minions.env" ]; then
@@ -63,23 +58,26 @@ echo "  modelrelay  (${MODELRELAY_HOST}:${MODELRELAY_PORT})"
 check_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" && echo "✅" || echo "❌"
 check_pid "modelrelay"
 
-# Check Hermes (if enabled)
-if [ "${MINIONS_HERMES:-off}" = "on" ]; then
-    echo "  hermes      (${HERMES_HOST}:${HERMES_GATEWAY_PORT})"
-    check_port "${HERMES_HOST}" "${HERMES_GATEWAY_PORT}" && echo "✅" || echo "❌"
-    check_pid "hermes"
+# Check Pi-Agent CLI
+echo "  pi-agent    CLI"
+if command -v pi >/dev/null 2>&1; then
+    echo "✅ ($(pi --version 2>&1 | head -1))"
+else
+    echo "❌"
 fi
 
-# Check Pi-Agent
-echo "  pi-agent    (${PI_RPC_HOST}:${PI_RPC_PORT})"
-check_port "${PI_RPC_HOST}" "${PI_RPC_PORT}" && echo "✅" || echo "❌"
-check_pid "pi"
+# Check Hermes CLI
+echo "  hermes      CLI"
+if command -v hermes >/dev/null 2>&1; then
+    echo "✅ ($(hermes --version 2>&1 | head -1))"
+else
+    echo "❌"
+fi
 
 # Check ready marker
+echo ""
 if [ -f "${MINIONS_HOME}/var/run/ready" ]; then
-    echo ""
     echo "  READY FOR FIRSTMATE DISPATCH ✅"
 else
-    echo ""
     echo "  NOT READY ❌"
 fi
