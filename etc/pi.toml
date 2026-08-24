@@ -1,0 +1,31 @@
+# Pi-Agent Configuration for .minions bootstrap
+# This file is read by Pi-Agent when started via boot.sh
+
+# RPC server configuration (for firstmate dispatch)
+[rpc]
+enabled = true
+host = "127.0.0.1"
+port = 8080
+# Health endpoint will be at http://host:port/health
+
+# LLM Provider Configuration
+[llm]
+# Base URL for OpenAI-compatible API (OmniRoute or ModelRelay)
+# Override via MINIONS_LLM_BASE_URL env var
+base_url = "http://localhost:20128/v1"
+# Model selection: "auto" lets the proxy choose, or specify a model ID
+model = "auto"
+# Optional API key (not needed for free tiers via OmniRoute/ModelRelay)
+api_key = ""
+
+# Agent behavior
+[agent]
+# Maximum conversation turns before summarization
+max_turns = 50
+# Working directory for agent operations
+workspace = "${MINIONS_HOME}/workspace"
+
+# Logging
+[logging]
+level = "info"
+file = "${MINIONS_HOME}/var/log/pi-agent.log"
