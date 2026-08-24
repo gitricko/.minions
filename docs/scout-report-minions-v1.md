@@ -1,222 +1,218 @@
-# Scout Report: .minions Bootstrap v1 — Implementation State Assessment
+# Scout Report: .minions Bootstrap v1 — Implementation Plan (v4 aligned)
 
-**Task:** `scout-report-on-minions-bootstrap-v1-implementat` (kind=scout, worktree `#2`)
-**Scope:** Assessment only — report, no PR, no push. (Read-only inspection of the sibling `fm` worktree `#1` where the prior crewmate's uncommitted work lives.)
-**Date assessed:** 2026-08-24
-**Overall verdict:** The scaffolding + dry-run/boot tests are in good shape and PASS, but the **real install path is broken** by a blocking `set -u` defect plus wrong download URLs. The work is **not PR-ready** until those are fixed and real-install coverage is added.
-
----
-
-## 1. What I did
-
-1. Mapped the repository topology across the three linked worktrees and the `fm/implement-v1-of-the-minions-bootstrap-system-bas` branch.
-2. Read every implementation file in the `fm` worktree (`#1`): `install.sh`, `boot.sh`, `stop.sh`, `status.sh`, `lib/*.sh` (8 files), `etc/*`, `tests/*`, `docs/requirements-research.md`.
-3. Copied the implementation into my own lab worktree (`#2`) and ran the test suites (`shellcheck`, `tests/test_install.sh`, `tests/test_boot.sh`).
-4. Ran a **real (non-dry-run) `boot.sh`** with mock services to validate the actual supervisor/pid/health/stop lifecycle end-to-end.
-5. Ran a **real `install.sh`** (sandboxed `HOME`/`MINIONS_HOME`) to validate the actual install/download path — this is where the blockers appear.
-6. Verified download URLs against upstream (nodejs.org, GitHub releases, npm) to confirm 200 vs 404.
-7. Checked git/branch/PR state (`git status`, `git log`, `gh pr list`).
-8. Passed the captain-hold-lifecycle completion gate for the open captain-level decisions surfaced below.
+**Status:** Planning complete — ready for phased implementation  
+**Branch:** `fm/save-minions-v1-implementation` (to be created from current worktree)  
+**Reference:** `hermes-codespace/.devcontainer/post-create-cmd.sh` + `start-hermes.sh` + `pi-config/`  
+**Date:** 2026-08-24  
 
 ---
 
-## 2. Files present and their state
+## Executive Summary
 
-All implementation files live as **uncommitted working-tree changes** in the `fm` worktree (`#1`), on branch `fm/implement-v1-of-the-minions-bootstrap-system-bas` whose only commit is the design proposal:
+The `.minions` project is a **portable, oh-my-zsh-style bootstrap** for a self-contained AI coding stack at `~/.minions`. It reimplements the two-phase bootstrap from `hermes-codespace`:
 
+| hermes-codespace | .minions |
+|------------------|----------|
+| `post-create-cmd.sh` (one-time install/bootstrap) | `install.sh` |
+| `start-hermes.sh` (runtime boot + repair + seed) | `boot.sh` |
+| `pi-config/` (tracked Pi LM config) | `etc/pi/` + symlinks |
+| `self-check.sh` (boot-time health) | `status.sh` |
+
+**v1 scope:** Linux (x86_64 + arm64) — Codespace + GitHub runner. macOS later.
+
+**Key decisions (resolved):**
+- Pi & Hermes = CLI tools only (not servers). Only OmniRoute + ModelRelay are persistent services.
+- Gateway + Dashboard = **FUTURE WORK** (dropped from v1).
+- Pi delivery = npm (`@earendil-works/pi-coding-agent`), not the broken Bun binary.
+- Port configurability = mandatory for dev safety (env-overridable ports).
+
+---
+
+## Phase Plan (Iterative, Test-Gated)
+
+| Phase | Goal | Entrypoint | Verification |
+|-------|------|------------|--------------|
+| **0** | Fix blockers in existing scaffolding | `lib/detect.sh`, `etc/versions.env` | `install.sh --dry-run` + real install in sandbox |
+| **1** | LLM Proxies (OmniRoute + ModelRelay) | `install.sh` → npm installs; `boot.sh` → bg + preconfig | `status.sh` ✅ both proxies healthy |
+| **2** | Hermes CLI (preinstall + config) | `install.sh` → uv venv + `hermes config set` block | `hermes --version` + `hermes config get` |
+| **3** | Pi-Agent (npm + extensions + config) | `install.sh` → npm + `pi-failover@hermes-impl` + mnemon Pi ext + symlinks | `pi --version` + `pi config` |
+| **4** | Mnemon (binary + seed import for both) | `install.sh` → mnemon binary + seed import | `mnemon status` (both stores) |
+| **5** | Full integration + CI | `install.sh` + `boot.sh` + `status.sh` | CI green on Codespace + GitHub runner Linux |
+
+---
+
+## Blocker Fixes (Phase 0 — from prior scout report)
+
+| # | Bug | Location | Fix |
+|---|-----|----------|-----|
+| B1 | Pi URL 404 (Bun) | `lib/detect.sh:69` | `npm i -g --ignore-scripts @earendil-works/pi-coding-agent` |
+| B2 | node/npm/uv prereq | `install.sh` | detect + vendor/install if missing |
+| B3 | uv URL 404 | `lib/detect.sh:54-64` | Map platform → Rust triple (`uv-x86_64-unknown-linux-gnu.tar.gz`) |
+| B4 | placeholder checksums | `etc/versions.env` | Pin real: Hermes v2026.8.13, OmniRoute 3.8.49, ModelRelay 1.18.0, Pi 0.84.2 |
+| B5 | readiness marker | `boot.sh` | `touch $MINIONS_HOME/var/run/ready` after healthy |
+| B6 | --daemon | — | **DROPPED** — `setsid … &` + return |
+| B7 | get_sha256 case | `lib/detect.sh:96` | uppercase component before `eval` |
+
+---
+
+## Implementation Details per Phase
+
+### Phase 1: LLM Proxies
+**install.sh:**
+- Detect Node.js ≥22.22.2 + npm; vendor if missing
+- `npm install -g --prefix $MINIONS_HOME/lib/omniroute omniroute@3.8.49`
+- `npm install -g --prefix $MINIONS_HOME/lib/modelrelay modelrelay@1.18.0`
+- Symlink `bin/omniroute` → `$MINIONS_HOME/lib/omniroute/bin/omniroute`
+- Symlink `bin/modelrelay` → `$MINIONS_HOME/lib/modelrelay/bin/modelrelay`
+
+**boot.sh:**
+- `setsid $MINIONS_HOME/bin/omniroute --no-open >> $MINIONS_HOME/var/log/omniroute.log 2>&1 &`
+- `setsid $MINIONS_HOME/bin/modelrelay >> $MINIONS_HOME/var/log/modelrelay.log 2>&1 &`
+- Wait for `/v1/models` → 200 on both ports (`$OMNIROUTE_PORT`, `$MODELRELAY_PORT`)
+- **OmniRoute preconfig:** sqlite `requireLogin=false`; create combo `auto-fastest` (strategy auto); PUT models + retry config; enable MCP; `hermes mcp add omniroute` (if Hermes installed)
+- `touch $MINIONS_HOME/var/run/ready`
+
+### Phase 2: Hermes CLI
+**install.sh:**
+- Install uv (Rust triple mapping, real checksum)
+- `uv venv $MINIONS_HOME/lib/hermes/venv --python 3.11`
+- `uv pip install --python $MINIONS_HOME/lib/hermes/venv/bin/python hermes-agent@v2026.8.13`
+- Symlink `bin/hermes` → `$MINIONS_HOME/lib/hermes/venv/bin/hermes`
+- **Hermes config set block** (reads `OMNIROUTE_PORT` / `MODELRELAY_PORT`):
+  ```bash
+  hermes config set model.default auto-fastest
+  hermes config set model.provider omniroute
+  hermes config set providers.omniroute.base_url http://localhost:${OMNIROUTE_PORT}/v1
+  hermes config set providers.omniroute.api_key no-key-needed
+  hermes config set providers.modelrelay.base_url http://localhost:${MODELRELAY_PORT}/v1
+  hermes config set providers.modelrelay.api_key no-key-needed
+  hermes config set fallback_providers.provider modelrelay
+  hermes config set fallback_providers.model auto-fastest
+  hermes config set auxiliary.title_generation.model auto-fastest
+  hermes config set auxiliary.title_generation.provider modelrelay
+  hermes config set auxiliary.vision.model auto-fastest
+  hermes config set auxiliary.vision.provider modelrelay
+  hermes config set auxiliary.compression.model auto-fastest
+  hermes config set auxiliary.compression.provider modelrelay
+  hermes config set approvals.mode off
+  hermes config set memory.memory_enabled true
+  hermes config set memory.user_profile_enabled true
+  hermes config set memory.provider mnemon
+  hermes config set agent.max_turns 120
+  hermes config set kanban.failure_limit 3
+  ```
+
+### Phase 3: Pi-Agent
+**install.sh:**
+- `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2`
+- Symlink `bin/pi` → npm global bin
+- `pi install git:github.com/gitricko/pi-failover@hermes-impl`
+- **Pi config symlinks:** `etc/pi/{models,settings}.json` → `~/.pi/agent/`
+  - `models.json`: `defaultProvider: omniroute`, `modelrelay` fallback chain
+  - `settings.json`: `defaultProvider: omniroute`, `defaultModel: auto-fastest`
+- **Mnemon Pi extension:** `mnemon setup --target pi --global --yes` (skill + TypeScript extension)
+
+### Phase 4: Mnemon
+**install.sh:**
+- Download mnemon binary (GitHub releases, real checksum) → `$MINIONS_HOME/bin/mnemon`
+- `mnemon import --dry-run $MINIONS_HOME/etc/seed.json` → validate → `mnemon import`
+- Pi mnemon already installed in Phase 3
+
+---
+
+## Port Configurability (Dev Safety)
+
+All scripts read these env vars (with defaults):
+
+```bash
+MINIONS_HOME=${MINIONS_HOME:-~/.minions}
+OMNIROUTE_PORT=${OMNIROUTE_PORT:-20128}
+MODELRELAY_PORT=${MODELRELAY_PORT:-7352}
+MINIONS_LLM_BASE_URL=${MINIONS_LLM_BASE_URL:-http://localhost:${OMNIROUTE_PORT}/v1}
 ```
-#1/.minions/  (worktree on fm/implement-v1-of-the-minions-bootstrap-system-bas, uncommitted)
-  install.sh              executable, set -eu, arg parse (--dry-run/--no-hermes/--minions-home)
-  boot.sh                 executable, set -eu, arg parse (--daemon/--dry-run)
-  stop.sh                 executable, set -eu
-  status.sh               executable, set -eu
-  lib/
-    detect.sh             OS/arch + get_download_url + get_sha256   ← contains 2 blocking bugs
-    download.sh           download_file (curl/wget, sha256 verify), extract_tarball, fix_macos_quarantine
-    node.sh               check_node_version, install_vendored_node, ensure_node
-    uv.sh                 check_uv, install_vendored_uv, ensure_uv    ← hits bug #1 at runtime
-    pi.sh                 install_pi, ensure_pi                       ← hits bug #1 + broken URL at runtime
-    hermes.sh             install_hermes (uv venv), ensure_hermes
-    npm_packages.sh       install_npm_package, ensure_omniroute, ensure_modelrelay
-    process.sh            start_service/stop_service/is_service_running/wait_for_port/wait_for_health
-  etc/
-    versions.env          version lockfile + checksums (all checksums are PLACEHOLDER_*)
-    minions.env           runtime config (MINIONS_* vars, ports, LLM base URL)
-    pi.toml               Pi-Agent RPC/LLM/agent config
-  tests/
-    test_install.sh       shellcheck dry-run + structure assertions
-    test_boot.sh          mock-services boot/stop/status lifecycle (dry-run focused)
-  bin/                    EMPTY  (design proposal §5 expects symlinks/shims here)
-  var/{run,log}            runtime dirs (created at install/boot time)
-  docs/requirements-research.md   committed (design proposal, the prior crewmate's artifact)
-  README.md                MODIFIED vs committed (rewritten to document the bootstrap)
-  LICENSE                  unchanged
+
+**Dev command:**
+```bash
+MINIONS_HOME=/tmp/minions-dev \
+OMNIROUTE_PORT=20129 \
+MODELRELAY_PORT=7353 \
+./install.sh && ./boot.sh
 ```
 
-**Complete vs. not:** The four shell entrypoints + 8 lib modules + 3 config files + design proposal + 2 tests = complete and internally consistent for v1 scope. **Missing vs. the design proposal §5** (aspirational, not in v1): `update.sh`, `etc/omniroute.env`, `etc/modelrelay.env`, `etc/hermes.env`, per-component `bin/` shims/symlinks (bin/ is empty), and `bin/fm-decision-hold.sh`. These are documented gaps, not regressions.
+---
+
+## Process Safety Rules
+
+- Never `pkill -f hermes` or `pkill -f pi` — use PID files or port-specific checks
+- Dev instance = `MINIONS_HOME=/tmp/minions-dev`, ports 20129/7353
+- Host stack = `MINIONS_HOME=~/.minions`, ports 20128/7352
+- CI/test scripts scope kills to dev ports only
 
 ---
 
-## 3. Test results
+## Mnemon for Pi
 
-### shellcheck (all implementation scripts) — PASS
-`shellcheck -x` on `install.sh boot.sh stop.sh status.sh lib/*.sh` → **no errors, no warnings**. Only info-level SC2015 hints (`A && B || C`) exist in the two test files themselves (not linted by the suite), and they don't fail the suite.
+From `mnemon setup --target pi --global --yes`:
+- **Skill:** `/home/codespace/.pi/agent/skills/mnemon/SKILL.md`
+- **Extension:** `/home/codespace/.pi/agent/extensions/mnemon.ts` (hooks: `resources_discover`, `before_agent_start`, `agent_end`, `session_before_compact`)
+- **Prompts:** `/home/codespace/.mnemon/prompt/` (guide.md, skill.md)
 
-### tests/test_install.sh — PASS (exit 0)
-All 3 sub-tests green: shellcheck (12 scripts), `install.sh --dry-run` (dir structure + config copies + lib copies), script permissions/shebangs.
-
-### tests/test_boot.sh — PASS (exit 0)
-All 5 sub-tests green: dry-run READY print, pid files, Hermes-default-off, Hermes-on, stop.sh, status.sh, config-port assertions.
-
-### Real (non-dry-run) boot/stop/status lifecycle — PASS
-Ran `boot.sh` (not dry-run) with mock `omniroute`/`modelrelay`/`pi`/`hermes`/`nc`/`curl` binaries. Observed: correct startup order (omniroute→modelrelay→(hermes opt-in)→pi), pid files track **real** PIDs (all `alive=yes`), `status.sh` reports correct ✅ PIDs/ports, `stop.sh` TERM-then-clean removes pid files, no processes remain after stop. `boot.sh` exits 0 and prints `READY FOR FIRSTMATE DISPATCH`.
-
-**Caveat:** the test suite only exercises `boot.sh`/`install.sh` in `--dry-run`. There is **no real (non-dry-run) install or boot integration test** and **no network/mock test for `install.sh`** — which is exactly why the real install bugs below are invisible to the current tests.
+This is the pattern to replicate in `.minions/install.sh`.
 
 ---
 
-## 4. Blocking bug: real `install.sh` aborts immediately (set -u)
+## Seed.json Content
 
-Running a real install (sandboxed `HOME`/`MINIONS_HOME`) aborts before downloading anything:
-
-```
-[INFO] Platform: linux-x64
-[INFO] Creating directory structure at .../.minions
-[INFO] Copying config templates...
-[INFO] Installing prerequisites...
-System Node.js v24.14.0 meets requirement (>= 22.22.2)
-uv not found, installing vendored uv...
-install.sh: 1: eval: uv_SHA256_LINUX_X64: parameter not set        ← ABORT (exit 2)
-```
-
-**Root cause — `lib/detect.sh`, `get_sha256()` (line 96):**
-```sh
-var_name="${component}_SHA256_${platform_upper}"   # component is passed lowercase ("uv")
-eval "echo \${${var_name}}"                        # → ${uv_SHA256_LINUX_X64} (lowercase)
-```
-But `etc/versions.env` defines **uppercase** names: `UV_SHA256_LINUX_X64`, `NODE_SHA256_LINUX_X64`, `PI_SHA256_LINUX_X64`, `HERMES_SHA256_LINUX_X64`. So the constructed variable name never exists → under the script's `set -u`/`set -e`, `eval` hits an unbound variable and aborts. This breaks `install_vendored_node`, `install_vendored_uv`, and `install_pi` (the first one reached is uv).
-
-**Reproduced in isolation:** sourcing `versions.env` then `get_sha256 uv "$UV_VERSION"` under `set -u` prints `lib/detect.sh: line 98: uv_SHA256_LINUX_X64: unbound variable` and returns empty. `${UV_SHA256_LINUX_X64:-<UNSET>}` = `<UNSET>`; `${uv_SHA256_LINUX_X64:-<UNSET>}` = `PLACEHOLDER_UV_LINUX_X64_SHA256` — confirming the case mismatch.
-
-**Dry-run hides it:** `install.sh --dry-run` overrides `install_vendored_node`/`install_vendored_uv`/`install_pi`/`install_npm_package` with no-op stubs *before* calling `ensure_*`, so the real `get_sha256` path is never exercised by the tests.
-
-**Scratch fix (applied in my lab worktree `#2`, NOT shipped — scout is report-only):** uppercase the component before building the name:
-```sh
-component_upper=$(echo "${component}" | tr '[:lower:]' '[:upper:]')
-var_name="${component_upper}_SHA256_${platform_upper}"
-```
-After this fix, the install proceeds past the crash and reaches the download stage (then hits the next blocker below). Re-running `tests/test_install.sh` + `tests/test_boot.sh` after the edit → still pass (exit 0); `shellcheck -x lib/detect.sh` → clean.
+Mirror `hermes-codespace/.devcontainer/mnemon/seed.json` but for .minions stack:
+- Architecture facts (this plan)
+- Version pins
+- Key decisions (D1–D4 resolved)
+- Blocker list + fixes
+- Port configurability rules
+- Process safety rules
 
 ---
 
-## 5. Blocking bug: wrong download URLs (404)
+## CI Strategy
 
-Even with the `get_sha256` fix, the real install cannot fetch components:
+| Runner | Test |
+|--------|------|
+| Codespace Linux | `./install.sh && ./boot.sh && ./status.sh` (env ports) |
+| GitHub runner Linux (ubuntu-latest) | Same, with vendored Node/uv |
 
-### 5a. uv URL 404 (`lib/detect.sh` lines 54/57/60/63)
-`get_download_url` builds `https://github.com/astral-sh/uv/releases/download/${version}/uv-${PLATFORM}.tar.gz` → `uv-linux-x64.tar.gz`.
-- `curl -sIL .../uv-linux-x64.tar.gz` → **HTTP/2 404**.
-- Correct asset: `uv-x86_64-unknown-linux-gnu.tar.gz` → **HTTP/2 200** (verified).
-The uv release asset naming is `uv-<target>.tar.gz` where the target is the Rust triple (`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`), not `linux-x64`. `get_download_url` has no platform→target mapping for uv.
-
-### 5b. Pi-Agent binary URL 404 (`lib/detect.sh` line 69)
-`install_pi` → `https://github.com/earendil-works/pi/releases/download/pi-coding-agent%400.84.2/pi-linux-x64` → **HTTP/2 404**. The `earendil-works/pi` GitHub release tagged `pi-coding-agent@0.84.2` is not publicly reachable from this sandbox (release page redirects to sign-in; API rate-limited). The npm package `@earendel-works/pi-coding-agent` (latest `0.84.2`) **does** resolve from npm. `install.sh` only implements the standalone-binary path for Pi (no npm fallback), so Pi install is broken in v1.
-
-### 5c. Node URL correct
-`https://nodejs.org/dist/v22.22.2/node-v22.22.2-linux-x64.tar.xz` → **HTTP/2 200**. (And `ensure_node` is skipped entirely on hosts with Node ≥22.22.2, e.g. this box's `v24.14.0`.)
-
-### 5d. Checksums are all placeholders
-Every `*_SHA256_*` in `versions.env` is `PLACEHOLDER_*`, and `download_file` skips placeholders (`case PLACEHOLDER*)`). So checksum verification is effectively a no-op for all vendored downloads — a supply-chain gap the design proposal §7.4 explicitly warns about.
+Path-filtered: full build only for `install.sh`/`boot.sh`/`lib/`/`etc/` changes; lint for docs.
 
 ---
 
-## 6. Correctness inconsistency: boot readiness marker
+## Handoff Checklist (for next agent)
 
-`boot.sh` prints `READY FOR FIRSTMATE DISPATCH` (line 204) but **never writes the `var/run/ready` marker** that `status.sh` checks:
-- `boot.sh`: grep for `ready` → no match (no `touch var/run/ready`).
-- `status.sh:79` → `if [ -f "${MINIONS_HOME}/var/run/ready" ]` → prints `READY FOR FIRSTMATE DISPATCH ✅` / `NOT READY ❌`.
-- `stop.sh:24` → `rm -f "${MINIONS_HOME}/var/run/ready"` (expects the marker to exist).
-
-Observed live: a successful real boot showed `status.sh` printing `NOT READY ❌` because the marker was never created. **Fix:** `boot.sh` should `touch "${MINIONS_HOME}/var/run/ready"` right before/after the final READY print (and `stop.sh` already cleans it). The proposal §6 step 7 / §7.7 ("readiness-based, not just process-based") calls for this.
-
-Other boot.sh nit: `--daemon` is parsed (shifted) but never acted upon, and `MINIONS_DAEMON` (in `etc/minions.env`) is never read by `boot.sh`. Not blocking, but a gap vs. proposal §3.3/§4.
-
----
-
-## 7. What needs work before a PR is ready
-
-| # | Issue | Type | Fix |
-|---|-------|------|-----|
-| 1 | `get_sha256` variable-name case mismatch aborts install (uv) | **Blocking, runtime** | Uppercase component before `eval` (see §4 scratch fix). |
-| 2 | uv download URL `uv-${PLATFORM}` 404s | **Blocking, runtime** | Map platform→Rust triple target (`uv-x86_64-unknown-linux-gnu.tar.gz`, etc.). |
-| 3 | Pi-Agent binary URL 404 (release not public) | **Blocking, runtime** | Use npm `@earendel-works/pi-coding-agent` with `--ignore-scripts` (exists, recommended by proposal §2.2 §5 D4), or restore a real binary asset URL. `install.sh` has no npm fallback for Pi. |
-| 4 | All checksums are `PLACEHOLDER_*` → verification is a no-op | Supply-chain risk (proposal §7.4) | Pin real SHA256s per version/platform. |
-| 5 | `boot.sh` never creates `var/run/ready` marker | **Correctness** | `touch` the marker on readiness; honors `status.sh`/`stop.sh` contract. |
-| 6 | `--daemon`/ `MINIONS_DAEMON` not implemented | Feature gap | Implement daemon detach per proposal §4/§3.3. |
-| 7 | No real (non-dry-run) install/boot integration test | Test coverage | Add a network-mocked `install.sh` test and a real `boot.sh` (mock-services) test so bugs #1–#3/#5 can't hide. |
-| 8 | Design-proposal §5 extras absent (`update.sh`, per-component `*.env`, `bin/` shims) | Scope gap | Decide v1 scope; either implement or trim the proposal. |
-
-**Repro to validate fixes:** a real `install.sh` in a sandboxed `HOME`/`MINIONS_HOME` is the right CI target — the current suite can't see these bugs.
+- [ ] Phase 0 blockers fixed (`lib/detect.sh`, `etc/versions.env`)
+- [ ] Phase 1: OmniRoute + ModelRelay install + boot + preconfig + readiness
+- [ ] Phase 2: Hermes CLI preinstall + config block
+- [ ] Phase 3: Pi-Agent npm + extensions + config symlinks
+- [ ] Phase 4: Mnemon binary + seed import (both)
+- [ ] Phase 5: Full integration test + CI green
+- [ ] All docs updated (README, this report, PLAN-v4.md)
+- [ ] PR opened against `main` with squash commits per phase
 
 ---
 
-## 8. Git / branch / PR state
+## Files to Create / Update
 
-- **Remote:** `origin` = `https://github.com/gitricko/.minions`; a local `no-mistakes` remote exists.
-- **Branch:** local `fm/implement-v1-of-the-minions-bootstrap-system-bas` (no upstream configured → **not pushed**).
-- **Commits:** the branch's only commit is `31866a1 Add design proposal for portable .minions system` — which is **already on `origin/main`** (remote tip == branch tip). The commit that exists locally-and-on-origin is the design proposal + modified README.
-- **The implementation is NOT committed.** `git status` in `#1` shows it entirely as uncommitted working-tree changes (`?? boot.sh`, `?? etc/`, `?? install.sh`, `?? lib/`, `?? status.sh`, `?? stop.sh`, `?? tests/`, `M README.md`). **There is no commit containing the implementation**, so there is nothing yet to push.
-- **No PR exists:** `gh pr list` → empty. Task brief says work was "interrupted before creating a PR" — consistent: the implementation never reached a commit.
-- **Bottom line (Q4):** There is a local `fm/` branch name and a design-proposal commit on origin/main, but **no commit/PR carries the implementation**. To ship: commit `boot.sh/stop.sh/status.sh/install.sh`, `lib/`, `etc/`, `tests/`, and the README change onto the `fm/` branch, push to origin, then open a PR. The blocking bugs (#1–#5) should be fixed (and covered by a real install test) before that PR.
-
----
-
-## 9. Evidence index (commands run)
-
-- `git status` / `git log --oneline -20` / `git branch -a` / `git ls-tree -r --name-only fm/implement-v1-of-the-minions-bootstrap-system-bas` → topology (§2, §8).
-- `shellcheck -x install.sh boot.sh stop.sh status.sh lib/*.sh` → clean (§3).
-- `sh tests/test_install.sh` → exit 0, all PASS (§3).
-- `sh tests/test_boot.sh` → exit 0, all PASS (§3).
-- Real `install.sh` in sandbox (`HOME`/​`MINIONS_HOME` = mktemp): aborts `uv_SHA256_LINUX_X64: parameter not set` exit 2 (§4); after scratch `get_sha256` fix → proceeds to download, then `curl: (22) ... 404` on uv (§5a).
-- Isolated repro: `get_sha256 uv "$UV_VERSION"` under `set -u` → `unbound variable` (§4).
-- `curl -sIL …/uv-linux-x64.tar.gz` → 404; `…/uv-x86_64-unknown-linux-gnu.tar.gz` → 200 (§5a).
-- `curl -sIL …/pi-0.84.2/pi-linux-x64` → 404; npm `@earendel-works/pi-coding-agent` `latest=0.84.2` (§5b).
-- `curl -sIL …/node-v22.22.2-linux-x64.tar.xz` → 200 (§5c).
-- Real `boot.sh` (mock services, non-dry-run): pid files track real PIDs; `status.sh` reports ✅; `stop.sh` cleans up; only `var/run/ready` mismatch (§6).
-- `gh pr list` → empty; `git for-each-ref`/`git log` → fm local-only, no upstream (§8).
+| File | Purpose |
+|------|---------|
+| `README.md` | Project vision + quickstart + phases (this commit) |
+| `docs/scout-report-minions-v1.md` | This file (updated to reflect v4 plan) |
+| `docs/IMPLEMENTATION-PLAN.md` | Detailed phase breakdown (this commit) |
+| `docs/PLAN-v4.md` | Markdown export of Lavish board v4 (this commit) |
+| `etc/versions.env` | Real version pins + checksums |
+| `lib/detect.sh` | B1/B3/B7 fixes |
+| `install.sh` | Full implementation per phases |
+| `boot.sh` | Full implementation + `--doctor` |
+| `stop.sh` / `status.sh` | Updated for readiness marker |
+| `tests/` | Real install/boot integration tests (network-mocked) |
+| `.github/workflows/ci.yml` | CI pipeline |
 
 ---
 
-## 10. Open captain decisions (carried to a held task — see §11)
-
-Per the design proposal §8, these remain unresolved and belong to the captain. My investigation confirms they are still open and (for D4) freshly urgent:
-
-- **D1 — Pi-Agent dispatch transport.** stdio vs. localhost HTTP RPC port vs. unix socket. Determines what "ready for firstmate dispatch" means and how firstmate connects to Pi's `rpc-entry`. Proposal recommends a localhost HTTP RPC port in `pi.toml`. (Not verifiable without a real Pi binary; my mock `pi` was a `sleep` stub.)
-- **D2 — Proxy default.** OmniRoute (default per proposal) vs. ModelRelay vs. user-picked as Pi's `MINIONS_LLM_BASE_URL`.
-- **D3 — Hermes gateway default.** Start `hermes gateway` by default? Proposal: opt-in via `MINIONS_HERMES=on`.
-- **D4 — Pi-Agent delivery form (urgent).** `install.sh` currently downloads a standalone Pi binary whose release URL 404s / is not publicly reachable. Options: (a) ship npm `@earendel-works/pi-coding-agent@0.84.2` with `--ignore-scripts` (exists; proposal §2.2 §5 recommends the npm-or-binary path), or (b) restore a valid standalone-binary asset URL. This is blocking for v1 install completeness.
-
-These four are consolidated into one captain-held task (`minions-bootstrap-v1-decisions`) per the captain-hold-lifecycle policy ("a multi-question review is one held task pointing at its report").
-
----
-
-## 11. Completion gate (captain-hold-lifecycle)
-
-Per `.agents/skills/captain-hold-lifecycle/SKILL.md`, this investigation surfaces genuine unresolved captain choices (§10), so `complete --none` is not an honest attestation. I held them as a single durable captain task and ran the gate:
-
-- `fm-captain-hold.sh hold minions-bootstrap-v1-decisions --origin scout-report-on-minions-bootstrap-v1-implementat ...` → created + captain-held.
-- Status line appended to `…/scout-report-on-minions-bootstrap-v1-implementat.status`:
-  `needs-decision [key=minions-bootstrap-v1-decisions]: minions bootstrap v1 captain calls D1-D4 (Pi transport, proxy default, Hermes mode, Pi delivery form); D4 urgent (Pi binary URL 404). See report §10.`
-- `fm-captain-hold.sh complete scout-report-on-minions-bootstrap-v1-implementat minions-bootstrap-v1-decisions` → verified the task durable, unioned into origin metadata, transferred the open keyed decision to the durable holder (status close: `captain-held [key=minions-bootstrap-v1-decisions]: tracked by minions-bootstrap-v1-decisions`).
-- `fm-captain-hold.sh verify scout-report-on-minions-bootstrap-v1-implementat` → `verified: … captain-call inventory` (decisions_reviewed=1 in origin `.meta`; no open keyed decision remains in the status fold).
-
-**Status is therefore `needs-decision`** (not `done`): the report deliverable is complete and written, but the task awaits the captain's choices before the work can be promoted to ship. Per scout rule 6, I stop here and let firstmate relay the call.
-
----
-
-## 12. Bottom line (answers to the requested questions)
-
-1. **Files that exist & look complete:** `install.sh`, `boot.sh`, `stop.sh`, `status.sh`, `lib/` (8 modules), `etc/` (3 configs), `tests/` (2 suites), `docs/requirements-research.md`, README. Structurally complete for v1; `bin/` is empty and proposal §5 extras (`update.sh`, per-component env, shims) are intentionally absent.
-2. **Needs work before PR:** fix the 3 blocking install bugs (`get_sha256` case, uv URL, Pi URL/delivery), the readiness-marker gap, pin real checksums, implement `--daemon`, and add a real (non-dry-run, network-mocked) install+boot integration test.
-3. **Remaining test failures:** **None** — the existing suites (`test_install.sh`, `test_boot.sh`, shellcheck) all PASS (exit 0). But they only cover dry-run paths, so bug count = 0 from tests vs. 4 blocking bugs from a real install.
-4. **Branch/commit to push:** local branch `fm/implement-v1-of-the-minions-bootstrap-system-bas` exists but holds only the design-proposal commit (already on `origin/main`); **the implementation itself is uncommitted** and **no PR exists**. Nothing is yet pushed that contains the implementation.
+*Captain: v4 plan is approved. Ready to commit to branch and begin Phase 0.*
