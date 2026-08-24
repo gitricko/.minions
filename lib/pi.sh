@@ -1,30 +1,33 @@
 #!/usr/bin/env sh
-# lib/pi.sh - Pi-Agent installation
+# lib/pi.sh - Pi-Agent installation (via npm)
 
-# Install Pi-Agent standalone binary
+# Install Pi-Agent via npm
 # Usage: install_pi <version> <install_dir>
 install_pi() {
     version=$1
     install_dir=$2
 
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/lib/detect.sh"
-    detect_platform
+    echo "Installing Pi-Agent ${version} via npm..."
 
-    url=$(get_download_url pi "${version}")
-    sha256=$(get_sha256 pi "${version}")
+    # Use npm to install globally with --ignore-scripts
+    # The binary will be in the npm global bin directory
+    npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${version}"
 
-    binary_path="${install_dir}/pi"
+    # Find where npm installed it
+    pi_binary=$(command -v pi)
+    if [ -z "${pi_binary}" ]; then
+        echo "Pi-Agent binary not found after npm install" >&2
+        return 1
+    fi
 
-    echo "Downloading Pi-Agent ${version} for ${PLATFORM}..."
-    download_file "${url}" "${binary_path}" "${sha256}"
-
-    make_executable "${binary_path}"
+    # Create symlink in our install_dir
+    mkdir -p "${install_dir}"
+    ln -sf "${pi_binary}" "${install_dir}/pi"
 
     # Fix macOS quarantine
-    fix_macos_quarantine "${binary_path}"
+    fix_macos_quarantine "${install_dir}/pi"
 
-    echo "Pi-Agent ${version} installed to ${binary_path}"
+    echo "Pi-Agent ${version} installed (npm) and linked to ${install_dir}/pi"
 }
 
 # Ensure Pi-Agent is available
@@ -34,7 +37,7 @@ ensure_pi() {
         return 0
     fi
 
-    echo "Pi-Agent not found, installing..."
+    echo "Pi-Agent not found, installing via npm..."
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/versions.env"
     mkdir -p "${MINIONS_HOME}/lib/pi"

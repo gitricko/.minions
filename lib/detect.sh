@@ -48,25 +48,33 @@ get_download_url() {
             echo "https://nodejs.org/dist/v${version}/node-v${version}-${PLATFORM}.tar.xz"
             ;;
         uv)
-            # uv uses different naming
+            # uv uses Rust triple naming (not PLATFORM)
+            # Map PLATFORM to Rust target triple
             case "${PLATFORM}" in
                 linux-x64)
-                    echo "https://github.com/astral-sh/uv/releases/download/${version}/uv-${PLATFORM}.tar.gz"
+                    uv_target="x86_64-unknown-linux-gnu"
                     ;;
                 linux-arm64)
-                    echo "https://github.com/astral-sh/uv/releases/download/${version}/uv-${PLATFORM}.tar.gz"
+                    uv_target="aarch64-unknown-linux-gnu"
                     ;;
                 macos-x64)
-                    echo "https://github.com/astral-sh/uv/releases/download/${version}/uv-${PLATFORM}.tar.gz"
+                    uv_target="x86_64-apple-darwin"
                     ;;
                 macos-arm64)
-                    echo "https://github.com/astral-sh/uv/releases/download/${version}/uv-${PLATFORM}.tar.gz"
+                    uv_target="aarch64-apple-darwin"
+                    ;;
+                *)
+                    echo "Unsupported platform for uv: ${PLATFORM}" >&2
+                    return 1
                     ;;
             esac
+            echo "https://github.com/astral-sh/uv/releases/download/${version}/uv-${uv_target}.tar.gz"
             ;;
         pi)
-            # Pi-Agent standalone binary from GitHub releases
-            echo "https://github.com/earendil-works/pi/releases/download/pi-coding-agent%40${version}/pi-${PLATFORM}"
+            # Pi-Agent is now installed via npm (not standalone binary)
+            # This function is kept for compatibility but returns empty for pi
+            # Actual install is in lib/pi.sh using npm
+            echo ""
             ;;
         hermes)
             # Hermes installer - we don't download directly, we use their installer script
@@ -93,7 +101,9 @@ get_sha256() {
 
     # Convert platform to variable format (e.g., linux-x64 -> LINUX_X64)
     platform_upper=$(echo "${PLATFORM}" | tr '[:lower:]-' '[:upper:]_')
-    var_name="${component}_SHA256_${platform_upper}"
+    # Uppercase component to match versions.env naming (UV_SHA256_, NODE_SHA256_, etc.)
+    component_upper=$(echo "${component}" | tr '[:lower:]' '[:upper:]')
+    var_name="${component_upper}_SHA256_${platform_upper}"
     # shellcheck disable=SC2086
     eval "echo \${${var_name}}"
 }

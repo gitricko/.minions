@@ -1,15 +1,15 @@
 #!/usr/bin/env sh
-# .minions boot script - starts the full stack
+# .minions boot.sh - starts the LLM proxy stack
 #
 # Boot sequence:
-#   1. OmniRoute (port 20128) - LLM proxy
-#   2. ModelRelay (port 7352) - LLM proxy (alternative)
-#   3. Hermes gateway (optional, if MINIONS_HERMES=on)
-#   4. Pi-Agent RPC mode (reads port from etc/pi.toml)
+#   1. OmniRoute (port OMNIROUTE_PORT) - LLM proxy
+#   2. ModelRelay (port MODELRELAY_PORT) - LLM proxy (alternative)
+#   3. OmniRoute preconfiguration (login off, auto-fastest combo, MCP)
 #
-# Then polls health endpoints and prints "READY FOR FIRSTMATE DISPATCH"
+# Pi-Agent and Hermes are CLI tools (invoked on demand), not servers.
+# No --daemon flag - services are backgrounded with setsid and boot returns.
 #
-# Usage: boot.sh [--daemon] [--dry-run]
+# Usage: boot.sh [--doctor]
 
 set -e
 set -u
@@ -17,23 +17,20 @@ set -u
 # Defaults
 MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
 DRY_RUN=0
+DOCTOR=0
 
 # Default config values (overridden by etc/minions.env)
 OMNIROUTE_HOST="127.0.0.1"
 OMNIROUTE_PORT="20128"
 MODELRELAY_HOST="127.0.0.1"
 MODELRELAY_PORT="7352"
-PI_RPC_HOST="127.0.0.1"
-PI_RPC_PORT="8080"
-HERMES_HOST="127.0.0.1"
-HERMES_GATEWAY_PORT="8081"
-MINIONS_HERMES="${MINIONS_HERMES:-off}"
-MINIONS_LLM_BASE_URL="http://localhost:20128/v1"
+export MINIONS_LLM_BASE_URL="http://localhost:20128/v1"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
-        --daemon)
+        --doctor)
+            DOCTOR=1
             shift
             ;;
         --dry-run)
@@ -41,7 +38,9 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: boot.sh [--daemon] [--dry-run]"
+            echo "Usage: boot.sh [--doctor] [--dry-run]"
+            echo "  --doctor    Repair a broken component"
+            echo "  --dry-run   Print actions without executing"
             exit 0
             ;;
         *)
@@ -106,7 +105,6 @@ fi
 # Re-derive composite URLs after sourcing config
 OMNIROUTE_BASE_URL="http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
 MODELRELAY_BASE_URL="http://${MODELRELAY_HOST}:${MODELRELAY_PORT}/v1"
-PI_RPC_BASE_URL="http://${PI_RPC_HOST}:${PI_RPC_PORT}"
 
 # Ensure PATH includes our bins
 export PATH="${MINIONS_HOME}/bin:${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/uv:${PATH}"
@@ -120,14 +118,16 @@ boot_log="${MINIONS_HOME}/var/log/boot.log"
     echo "=== boot.sh started at $(date) ==="
     echo "MINIONS_HOME=${MINIONS_HOME}"
     echo "DRY_RUN=${DRY_RUN}"
-    echo "MINIONS_HERMES=${MINIONS_HERMES:-off}"
+    echo "DOCTOR=${DOCTOR}"
+    echo "OMNIROUTE_PORT=${OMNIROUTE_PORT}"
+    echo "MODELRELAY_PORT=${MODELRELAY_PORT}"
 } >> "${boot_log}" 2>&1
 
 echo ""
 log_info "Starting .minions stack..."
 echo ""
 
-# Step 1: OmniRoute (port 20128)
+# Step 1: OmniRoute
 log_info "Starting OmniRoute (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})..."
 start_service "omniroute" \
     "${MINIONS_HOME}/bin/omniroute" \
@@ -137,7 +137,7 @@ start_service "omniroute" \
 
 wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 15 "omniroute"
 
-# Step 2: ModelRelay (port 7352)
+# Step 2: ModelRelay
 log_info "Starting ModelRelay (${MODELRELAY_HOST}:${MODELRELAY_PORT})..."
 start_service "modelrelay" \
     "${MINIONS_HOME}/bin/modelrelay" \
@@ -147,58 +147,30 @@ start_service "modelrelay" \
 
 wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
 
-# Step 3: Hermes gateway (optional)
-if [ "${MINIONS_HERMES:-off}" = "on" ]; then
-    log_info "Starting Hermes gateway (${HERMES_HOST}:${HERMES_GATEWAY_PORT})..."
-    start_service "hermes" \
-        "${MINIONS_HOME}/bin/hermes" \
-        gateway \
-        --host "${HERMES_HOST}" \
-        --port "${HERMES_GATEWAY_PORT}" \
-        >> "${boot_log}" 2>&1 || log_error "Failed to start Hermes"
+# Step 3: Wait for OmniRoute health (needed for preconfig)
+log_info "Waiting for OmniRoute health..."
+wait_for_health "${OMNIROUTE_BASE_URL}/models" 30 "omniroute"
 
-    wait_for_port "${HERMES_HOST}" "${HERMES_GATEWAY_PORT}" 15 "hermes"
-else
-    log_info "Skipping Hermes (set MINIONS_HERMES=on to enable)"
+# Step 4: OmniRoute preconfiguration
+if [ "${DRY_RUN}" -eq 0 ]; then
+    log_info "Preconfiguring OmniRoute..."
+    # shellcheck disable=SC1091
+    . "${LIB_DIR}/omniroute.sh"
+    omniroute_preconfigure "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" >> "${boot_log}" 2>&1 || log_warn "OmniRoute preconfig had issues (non-fatal)"
 fi
 
-# Step 4: Pi-Agent in RPC mode
-log_info "Starting Pi-Agent (RPC mode on ${PI_RPC_HOST}:${PI_RPC_PORT})..."
-# Read Pi RPC port from pi.toml if available
-if [ -f "${MINIONS_HOME}/etc/pi.toml" ] && command -v grep >/dev/null 2>&1; then
-    # Parse port from [rpc] port = XXX
-    toml_port=$(grep -A5 '^\[rpc\]' "${MINIONS_HOME}/etc/pi.toml" 2>/dev/null | grep 'port' | head -1 | sed 's/.*= *//; s/"//g; s/ //g')
-    if [ -n "${toml_port}" ]; then
-        PI_RPC_PORT="${toml_port}"
-        PI_RPC_BASE_URL="http://${PI_RPC_HOST}:${PI_RPC_PORT}"
-    fi
-fi
+# Step 5: Readiness marker
+touch "${MINIONS_HOME}/var/run/ready"
 
-# Determine base URL for Pi-Agent to use
-PI_BASE_URL="${MINIONS_LLM_BASE_URL:-http://localhost:20128/v1}"
-
-start_service "pi" \
-    "${MINIONS_HOME}/bin/pi" \
-    --rpc \
-    --rpc-host "${PI_RPC_HOST}" \
-    --rpc-port "${PI_RPC_PORT}" \
-    --base-url "${PI_BASE_URL}" \
-    --config "${MINIONS_HOME}/etc/pi.toml" \
-    >> "${boot_log}" 2>&1 || log_error "Failed to start Pi-Agent"
-
-wait_for_health "http://${PI_RPC_HOST}:${PI_RPC_PORT}/health" 15 "pi-agent"
-
-# Step 5: Print READY message
+# Step 6: Print READY message
 echo ""
 echo "=============================================="
 echo "  .minions stack is UP"
 echo ""
-echo "  ✅ omniroute   ${OMNIROUTE_BASE_URL}"
-echo "  ✅ modelrelay  ${MODELRELAY_BASE_URL}"
-if [ "${MINIONS_HERMES:-off}" = "on" ]; then
-    echo "  ✅ hermes      http://${HERMES_HOST}:${HERMES_GATEWAY_PORT}"
-fi
-echo "  ✅ pi-agent    ${PI_RPC_BASE_URL}"
+echo "  ✅ omniroute    ${OMNIROUTE_BASE_URL}"
+echo "  ✅ modelrelay   ${MODELRELAY_BASE_URL}"
+echo "  ✅ pi-agent     CLI ready (invoked on demand)"
+echo "  ✅ hermes       CLI ready (preinstalled)"
 echo "=============================================="
 echo ""
 echo "READY FOR FIRSTMATE DISPATCH"
