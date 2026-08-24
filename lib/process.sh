@@ -22,8 +22,9 @@ start_service() {
     fi
 
     echo "Starting ${name}..."
-    # Run in background, redirect output to log file
-    (exec "${cmd}" "$@" >>"${log_file}" 2>&1) &
+    # Run detached in a new session via setsid so the service survives the
+    # boot shell exiting and is not killed when boot.sh returns.
+    setsid "${cmd}" "$@" >>"${log_file}" 2>&1 </dev/null &
     pid=$!
 
     # Write PID file

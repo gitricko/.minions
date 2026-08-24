@@ -19,12 +19,12 @@ MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
 DRY_RUN=0
 DOCTOR=0
 
-# Default config values (overridden by etc/minions.env)
-OMNIROUTE_HOST="127.0.0.1"
-OMNIROUTE_PORT="20128"
-MODELRELAY_HOST="127.0.0.1"
-MODELRELAY_PORT="7352"
-export MINIONS_LLM_BASE_URL="http://localhost:20128/v1"
+# Default config values (all env-overridable; minions.env may refine them)
+OMNIROUTE_HOST="${OMNIROUTE_HOST:-127.0.0.1}"
+OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
+MODELRELAY_HOST="${MODELRELAY_HOST:-127.0.0.1}"
+MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
+export MINIONS_LLM_BASE_URL="http://localhost:${OMNIROUTE_PORT}/v1"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
