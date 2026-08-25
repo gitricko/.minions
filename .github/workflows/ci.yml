@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run install tests
+        run: |
+          set -e
+          bash tests/test_install.sh
+
+      - name: Run boot tests
+        run: |
+          set -e
+          bash tests/test_boot.sh
+
+  # Future: add lint job (shellcheck, etc.) when we have more scripts
