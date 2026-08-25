@@ -41,6 +41,7 @@ You'll see:
   ✅ modelrelay   http://localhost:7352/v1
   ✅ pi-agent     CLI ready (invoked on demand)
   ✅ hermes       CLI ready (preinstalled)
+  ✅ mnemon       memory layer ready
 
   READY FOR FIRSTMATE DISPATCH
 ==============================================
@@ -54,8 +55,9 @@ You'll see:
 |-----------|------|----------|-----------|
 | **OmniRoute** | persistent service | `setsid omniroute --no-open &` + preconfig | ✅ npm OK |
 | **ModelRelay** | persistent service | `setsid modelrelay &` | ✅ npm OK |
-| **Pi-Agent** | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ⚠ npm (B1) |
-| **Hermes** | CLI tool | preinstalled; used as CLI | ⚠ checksum (B4) |
+| **Pi-Agent** | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ✅ npm OK |
+| **Hermes** | CLI tool | preinstalled; used as CLI | ✅ git install OK |
+| **Mnemon** | memory layer | binary + seed import + extensions | ✅ available |
 
 > **Note:** Pi & Hermes are **not servers unless launched**. Only the two LLM proxies are persistent.  
 > **Gateway + Dashboard dropped from v1** — you never use them; deferred to future work.
@@ -105,9 +107,10 @@ All configuration lives in `~/.minions/etc/`:
 |------|---------|
 | `versions.env` | Pinned component versions (lockfile) + real SHA256 checksums |
 | `minions.env` | Runtime config (ports, proxy choice, log level) |
-| `pi/` | Pi-Agent config (symlinked to `~/.pi/agent/`) — `models.json`, `settings.json` |
+| `pi/` | Pi-Agent config (symlinked to `~/.pi/`) — `models.json`, `settings.json` |
 | `omniroute/` | OmniRoute preconfig state (sqlite, combo) |
-| `seed.json` | Mnemon seed data for import |
+| `mnemon-seed-pi.json` | Mnemon seed data for Pi-Agent |
+| `mnemon-seed-hermes.json` | Mnemon seed data for Hermes |
 
 Key environment variables (in `minions.env` / shell):
 
@@ -136,7 +139,7 @@ MINIONS_HERMES=off                   # Gateway disabled in v1 (future work)
 │   ├── node.sh         # Node.js ≥22.22.2 vendoring
 │   ├── uv.sh           # uv vendoring (Rust triple mapping)
 │   ├── pi.sh           # Pi-Agent install (npm @earendil-works/pi-coding-agent)
-│   ├── hermes.sh       # Hermes install (uv venv)
+│   ├── hermes.sh       # Hermes install (official git install script)
 │   ├── npm_packages.sh # OmniRoute + ModelRelay (npm -g --prefix)
 │   ├── omniroute.sh    # OmniRoute preconfig (login off, combo, MCP)
 │   ├── mnemon.sh       # Mnemon binary + seed import
@@ -175,8 +178,8 @@ The installer handles everything else:
 |-----------|------------------|
 | **OmniRoute** | wait `/v1/models`→200; sqlite `requireLogin=false`; create combo `auto-fastest` (strategy auto); PUT models + retry config; enable MCP; `hermes mcp add omniroute` |
 | **Hermes** | `hermes config set`: model.default=auto-fastest, provider=omniroute, base_url `localhost:${OR_PORT}/v1`, modelrelay base_url `localhost:${MR_PORT}/v1`, fallback=modelrelay, approvals off, memory=mnemon, agent.max_turns=120, kanban.failure_limit=3 |
-| **Pi** | install `pi-failover@hermes-impl` ext; symlink tracked `etc/pi/{models,settings}.json` → `~/.pi/agent/` (`defaultProvider: omniroute`, `modelrelay` fallback); install mnemon Pi extension (skill + TypeScript extension) |
-| **Mnemon** | install binary; seed import from `etc/seed.json` (dry-run validate → import) |
+| **Pi** | install `pi-failover` ext; symlink tracked `etc/pi/{models,settings}.json` → `~/.pi/` (`defaultProvider: omniroute`, `modelrelay` fallback); install mnemon Pi extension (skill + TypeScript extension) |
+| **Mnemon** | install binary; seed import from `etc/mnemon-seed-*.json` (dry-run validate → import) |
 
 All preconfiguration reads `OMNIROUTE_PORT` / `MODELRELAY_PORT` / `MINIONS_HOME` so it targets the right instance.
 
@@ -235,14 +238,14 @@ Run tests:
 
 ## Implementation Phases
 
-| Phase | Scope | Test Gate |
-|-------|-------|-----------|
-| **0** | Fix blockers B1–B7 in `lib/detect.sh` + `etc/versions.env` | real install dry-run |
-| **1** | LLM Proxies: `install.sh` installs OmniRoute + ModelRelay via npm; `boot.sh` backgrounds + preconfigures them; readiness marker | `boot.sh` → status.sh ✅ |
-| **2** | Hermes CLI: preinstall via uv; `install.sh` runs `hermes config set` block; `boot.sh` does NOT start gateway | `hermes --version` + `hermes config get` ✅ |
-| **3** | Pi-Agent: npm install + `pi-failover@hermes-impl` + mnemon Pi extension + config symlinks | `pi --version` + `pi config` ✅ |
-| **4** | Mnemon: binary + seed import (both Hermes + Pi) | `mnemon status` ✅ |
-| **5** | Full integration test (network-mocked) + CI on Codespace + GitHub runner Linux | CI green |
+| Phase | Scope | Test Gate | Status |
+|-------|-------|-----------|--------|
+| **0** | Fix blockers B1–B7 in `lib/detect.sh` + `etc/versions.env` | real install dry-run | ✅ **DONE** |
+| **1** | LLM Proxies: `install.sh` installs OmniRoute + ModelRelay via npm; `boot.sh` backgrounds + preconfigures them; readiness marker | `boot.sh` → status.sh ✅ | ✅ **DONE** |
+| **2** | Hermes CLI: preinstall via official git install script; `install.sh` runs `hermes config set` block; `boot.sh` does NOT start gateway | `hermes --version` + `hermes config get` ✅ | ✅ **DONE** |
+| **3** | Pi-Agent: npm install + `pi-failover` ext + mnemon Pi extension + config symlinks | `pi --version` + `pi config` ✅ | ✅ **DONE** |
+| **4** | Mnemon: binary + seed import (both Hermes + Pi) | `mnemon status` ✅ | ✅ **DONE** |
+| **5** | Full integration test + CI + docs | CI green | 🔄 **IN PROGRESS** |
 
 ---
 
