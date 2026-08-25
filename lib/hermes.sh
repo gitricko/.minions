@@ -12,9 +12,13 @@ install_hermes() {
     # But their installer writes to ~/.hermes and modifies shell rc files
     # Better approach: use uv to install hermes-agent into our own venv
 
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/lib/uv.sh"
-    ensure_uv
+    # Ensure uv is available (system or vendored)
+    if ! command -v uv >/dev/null 2>&1; then
+        # shellcheck disable=SC1091
+        . "${MINIONS_HOME}/lib/uv.sh"
+        ensure_uv
+        export PATH="${MINIONS_HOME}/lib/uv:${PATH}"
+    fi
 
     # Use uv to create a venv and install hermes-agent
     hermes_venv="${install_dir}/venv"
@@ -24,7 +28,7 @@ install_hermes() {
 
     echo "Installing hermes-agent ${version}..."
     # Use uv pip to install from PyPI (exact version)
-    "${hermes_venv}/bin/uv" pip install "hermes-agent==${version}" --index-url https://pypi.org/simple
+    uv pip install "hermes-agent==${version}" --index-url https://pypi.org/simple
 
     # Create a wrapper script
     cat > "${install_dir}/hermes" << 'EOF'
