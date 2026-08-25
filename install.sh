@@ -89,6 +89,8 @@ fi
 . "${LIB_DIR}/hermes.sh"
 # shellcheck disable=SC1091
 . "${LIB_DIR}/npm_packages.sh"
+# shellcheck disable=SC1091
+. "${LIB_DIR}/mnemon.sh"
 
 # Detect platform
 if ! detect_platform; then
@@ -137,6 +139,19 @@ if [ "${DRY_RUN}" -eq 1 ]; then
         mkdir -p "$3"
         touch "$3/$4"
         chmod +x "$3/$4"
+    }
+    install_mnemon() {
+        log_dry "Would install Mnemon to $1"
+        mkdir -p "$1"
+        touch "$1/mnemon"
+        chmod +x "$1/mnemon"
+    }
+    ensure_mnemon() {
+        log_dry "Would ensure Mnemon"
+        install_mnemon "${MINIONS_HOME}/lib/mnemon"
+    }
+    setup_mnemon_all() {
+        log_dry "Would setup Mnemon for all targets in $1"
     }
 fi
 
@@ -188,6 +203,11 @@ if [ "${INSTALL_HERMES}" -eq 1 ]; then
     ensure_hermes
 fi
 
+# Step 4.5: Setup Mnemon (seed import for hermes/pi)
+log_info "Setting up Mnemon (memory layer)..."
+ensure_mnemon "${MINIONS_HOME}"
+setup_mnemon_all "${MINIONS_HOME}"
+
 # Step 5: Set up PATH snippet
 # shellcheck disable=SC2016
 PATH_SNIPPET='
@@ -217,6 +237,7 @@ echo "    - ModelRelay:  ${MINIONS_HOME}/lib/modelrelay/modelrelay (version ${MO
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     echo "    - Hermes:      ${MINIONS_HOME}/lib/hermes/hermes (version ${HERMES_VERSION:-unknown})"
 fi
+echo "    - Mnemon:      ${MINIONS_HOME}/lib/mnemon/mnemon (if available)"
 echo ""
 echo "  Next step: run '${MINIONS_HOME}/boot.sh' to start the stack"
 if [ -t 1 ]; then

@@ -1,0 +1,40 @@
+{
+  "schema_version": "1",
+  "insights": [
+    {
+      "text": "Hermes Agent is the AI assistant for .minions, installed via official git install script (v2026.8.13)",
+      "category": "fact",
+      "importance": 5,
+      "entities": ["hermes-agent", "minions", "install"],
+      "tags": ["ai-assistant", "installation"]
+    },
+    {
+      "text": "Hermes preconfiguration: auto-fastest model combo, MCP enabled, omniroute login-off",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["hermes-agent", "auto-fastest", "mcp", "omniroute"],
+      "tags": ["preconfig", "model-combo", "mcp"]
+    },
+    {
+      "text": "Hermes config: ~/.hermes/config.yaml (managed by hermes config commands)",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["hermes-agent", "config.yaml", "minions"],
+      "tags": ["config", "preconfiguration"]
+    },
+    {
+      "text": "Hermes uses MINIONS_LLM_BASE_URL=http://localhost:20128/v1 (OmniRoute) by default",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["hermes-agent", "llm-base-url", "omniroute"],
+      "tags": ["llm-proxy", "configuration"]
+    },
+    {
+      "text": "Hermes is a CLI tool, not a daemon. Gateway/dashboard deferred to future work.",
+      "category": "preference",
+      "importance": 5,
+      "entities": ["hermes-agent", "cli", "gateway", "dashboard"],
+      "tags": ["architecture", "cli", "future-work"]
+    }
+  ]
+}
