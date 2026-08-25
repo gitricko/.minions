@@ -128,13 +128,13 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         exit 1
     fi
 
-    # Verify binaries exist and run
+    # Verify binaries exist and run (with timeout)
     for bin in omniroute modelrelay pi hermes; do
         if [ -x "${REAL_HOME}/bin/${bin}" ]; then
-            if "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
+            if timeout 10s "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
                 log_info "${bin} installed and --version works"
             else
-                log_warn "${bin} installed but --version failed (may need runtime deps)"
+                log_warn "${bin} installed but --version failed or timed out"
             fi
         else
             log_error "${bin} not found in ${REAL_HOME}/bin"
