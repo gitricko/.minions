@@ -106,6 +106,22 @@ exit 1
 EOF
 chmod +x "${TEST_HOME}/bin/hermes"
 
+# Mock pi for CLI tool test
+cat > "${TEST_HOME}/bin/pi" << 'EOF'
+#!/usr/bin/env sh
+if echo "$*" | grep -q "extensions"; then
+    echo "pi-failover"
+    exit 0
+fi
+if echo "$*" | grep -q "version"; then
+    echo "pi-agent 0.84.2"
+    exit 0
+fi
+echo "Mock pi invoked with: $*"
+exit 0
+EOF
+chmod +x "${TEST_HOME}/bin/pi"
+
 # Put our mock bin first in PATH
 export PATH="${TEST_HOME}/bin:${PATH}"
 
@@ -205,6 +221,31 @@ echo ""
 echo "=== Test 6: OmniRoute preconfig dry-run ==="
 output=$(sh "${TEST_HOME}/boot.sh" --dry-run 2>&1)
 echo "${output}" | grep -q "Preconfiguring OmniRoute" && log_info "Preconfig step runs" || log_warn "Preconfig step not found in output (may be fine in dry-run)"
+
+# Test 7: Pi-Agent can be invoked with config
+echo ""
+echo "=== Test 7: Pi-Agent CLI with config ==="
+if sh "${TEST_HOME}/boot.sh" --dry-run 2>&1 | grep -q "pi-agent.*CLI ready"; then
+    log_info "boot.sh shows pi-agent CLI ready"
+else
+    log_error "boot.sh missing pi-agent CLI ready"
+    exit 1
+fi
+
+# Verify pi extensions command works
+if "${TEST_HOME}/bin/pi" extensions list 2>&1 | grep -q "pi-failover"; then
+    log_info "pi extensions list shows pi-failover"
+else
+    log_warn "pi extensions list may not show pi-failover in dry-run"
+fi
+
+# Verify pi --version works
+if "${TEST_HOME}/bin/pi" --version 2>&1 | grep -q "0.84.2"; then
+    log_info "pi --version works"
+else
+    log_error "pi --version failed"
+    exit 1
+fi
 
 # Cleanup
 rm -rf "${TEST_HOME}"
