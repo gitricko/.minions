@@ -1,0 +1,40 @@
+{
+  "schema_version": "1",
+  "insights": [
+    {
+      "text": "Pi-Agent is the primary coding agent for .minions, installed via npm @earendel-works/pi-coding-agent",
+      "category": "fact",
+      "importance": 5,
+      "entities": ["pi-agent", "minions", "npm"],
+      "tags": ["coding-agent", "configuration"]
+    },
+    {
+      "text": "Pi-Agent uses pi-failover extension for model failover between OmniRoute and ModelRelay",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["pi-agent", "pi-failover", "omniroute", "modelrelay"],
+      "tags": ["extension", "failover", "llm-proxy"]
+    },
+    {
+      "text": "Pi-Agent config: pi.toml at ~/.pi/pi.toml (symlinked from MINIONS_HOME/etc/pi.toml)",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["pi-agent", "pi.toml", "minions"],
+      "tags": ["config", "symlink"]
+    },
+    {
+      "text": "Pi-Agent ports: OMNIROUTE_PORT=20128, MODELRELAY_PORT=7352, MINIONS_LLM_BASE_URL=http://localhost:20128/v1",
+      "category": "fact",
+      "importance": 4,
+      "entities": ["pi-agent", "ports", "omniroute", "modelrelay"],
+      "tags": ["ports", "configuration"]
+    },
+    {
+      "text": "Pi-Agent is a CLI tool, not a daemon. Invoked on demand by user or automation.",
+      "category": "preference",
+      "importance": 5,
+      "entities": ["pi-agent", "cli", "daemon"],
+      "tags": ["architecture", "cli"]
+    }
+  ]
+}

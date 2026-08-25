@@ -81,7 +81,7 @@ for cfg in versions.env minions.env pi.toml; do
 done
 
 # Verify lib scripts copied
-for lib in detect.sh download.sh node.sh uv.sh pi.sh hermes.sh npm_packages.sh process.sh; do
+for lib in detect.sh download.sh node.sh uv.sh pi.sh hermes.sh npm_packages.sh process.sh mnemon.sh; do
     if [ -f "${TEST_HOME}/lib/${lib}" ]; then
         log_info "lib/${lib} copied"
     else
