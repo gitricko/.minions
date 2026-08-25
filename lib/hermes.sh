@@ -27,8 +27,8 @@ install_hermes() {
     HERMES_HOME_OVERRIDE="${install_dir}/home"
     mkdir -p "${HERMES_HOME_OVERRIDE}"
 
-    # The installer writes to ~/.hermes by default; we redirect via HOME
-    HOME="${HERMES_HOME_OVERRIDE}" sh "${tmp_script}" || {
+    # The installer uses bash-specific syntax; run with bash not sh
+    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" || {
         echo "ERROR: Hermes install script failed" >&2
         rm -f "${tmp_script}"
         return 1
