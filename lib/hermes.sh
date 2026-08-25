@@ -27,8 +27,8 @@ install_hermes() {
     uv venv "${hermes_venv}" --python 3.11
 
     echo "Installing hermes-agent ${version}..."
-    # Use uv pip to install from PyPI (exact version)
-    uv pip install "hermes-agent==${version}" --index-url https://pypi.org/simple
+    # Use uv pip to install into the venv we just created
+    uv pip install --python "${hermes_venv}/bin/python" "hermes-agent==${version}" --index-url https://pypi.org/simple
 
     # Create a wrapper script
     cat > "${install_dir}/hermes" << 'EOF'
