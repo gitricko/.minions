@@ -15,6 +15,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+          cache: 'npm'
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
       - name: Run install tests
         run: |
           set -e
@@ -25,4 +34,29 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
-  # Future: add lint job (shellcheck, etc.) when we have more scripts
+  real-install:
+    name: Real Install (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+          cache: 'npm'
+
+      - name: Install uv (for Hermes)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run real install test
+        env:
+          CI_REAL_INSTALL: 1
+        run: |
+          set -e
+          bash tests/test_install.sh
