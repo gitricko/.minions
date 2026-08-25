@@ -143,6 +143,15 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         fi
     done
 
+    # Verify Pi config symlinks
+    for cfg in pi.toml models.json settings.json; do
+        if [ -L "${HOME}/.pi/${cfg}" ]; then
+            log_info "Pi config symlink ${cfg} created"
+        else
+            log_warn "Pi config symlink ${cfg} not found (may not exist in etc/)"
+        fi
+    done
+
     rm -rf "${REAL_HOME}"
 fi
 

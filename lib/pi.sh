@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# lib/pi.sh - Pi-Agent installation (via npm)
+# lib/pi.sh - Pi-Agent installation and configuration
 
 # Install Pi-Agent via npm
 # Usage: install_pi <version> <install_dir>
@@ -9,9 +9,8 @@ install_pi() {
 
     echo "Installing Pi-Agent ${version} via npm..."
 
-    # Use npm to install globally with --ignore-scripts
-    # The binary will be in the npm global bin directory
-    npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${version}"
+    # Use npm to install globally (no --ignore-scripts - breaks binary linking)
+    npm install -g "@earendil-works/pi-coding-agent@${version}"
 
     # Find where npm installed it
     pi_binary=$(command -v pi)
@@ -30,8 +29,74 @@ install_pi() {
     echo "Pi-Agent ${version} installed (npm) and linked to ${install_dir}/pi"
 }
 
+# Install pi-failover extension
+# Usage: install_pi_failover_ext <install_dir>
+install_pi_failover_ext() {
+    install_dir=$1
+
+    echo "Installing pi-failover extension..."
+    
+    # Use pi to install the extension
+    if "${install_dir}/pi" extensions install pi-failover 2>/dev/null; then
+        echo "pi-failover extension installed"
+    else
+        echo "WARNING: pi-failover extension install failed (may not exist yet)" >&2
+    fi
+}
+
+# Setup Mnemon Pi plugin
+# Usage: setup_mnemon_pi
+setup_mnemon_pi() {
+    echo "Setting up Mnemon Pi plugin..."
+
+    # Check if mnemon is available
+    if ! command -v mnemon >/dev/null 2>&1; then
+        echo "Mnemon not found, skipping Pi plugin setup" >&2
+        return 0
+    fi
+
+    # Run mnemon setup for pi target
+    if mnemon setup --target pi --global --yes 2>/dev/null; then
+        echo "Mnemon Pi plugin setup complete"
+    else
+        echo "WARNING: Mnemon Pi plugin setup failed" >&2
+    fi
+}
+
+# Create Pi config symlinks
+# Usage: create_pi_symlinks <minions_home>
+create_pi_symlinks() {
+    minions_home=$1
+
+    echo "Creating Pi config symlinks..."
+
+    # Ensure ~/.pi directory exists
+    mkdir -p "${HOME}/.pi"
+
+    # Symlink pi.toml
+    if [ -f "${minions_home}/etc/pi.toml" ]; then
+        ln -sf "${minions_home}/etc/pi.toml" "${HOME}/.pi/pi.toml"
+        echo "Symlinked pi.toml"
+    else
+        echo "WARNING: ${minions_home}/etc/pi.toml not found" >&2
+    fi
+
+    # Symlink models.json if it exists
+    if [ -f "${minions_home}/etc/models.json" ]; then
+        ln -sf "${minions_home}/etc/models.json" "${HOME}/.pi/models.json"
+        echo "Symlinked models.json"
+    fi
+
+    # Symlink settings.json if it exists
+    if [ -f "${minions_home}/etc/settings.json" ]; then
+        ln -sf "${minions_home}/etc/settings.json" "${HOME}/.pi/settings.json"
+        echo "Symlinked settings.json"
+    fi
+}
+
 # Ensure Pi-Agent is available
 ensure_pi() {
+    # shellcheck disable=SC2153
     if [ -x "${MINIONS_HOME}/lib/pi/pi" ]; then
         echo "Pi-Agent found at ${MINIONS_HOME}/lib/pi/pi"
         return 0
@@ -45,4 +110,9 @@ ensure_pi() {
 
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/pi/pi" "${MINIONS_HOME}/bin/pi"
+
+    # Run config steps
+    install_pi_failover_ext "${MINIONS_HOME}/lib/pi"
+    setup_mnemon_pi
+    create_pi_symlinks "${MINIONS_HOME}"
 }
