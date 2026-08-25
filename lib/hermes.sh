@@ -18,12 +18,12 @@ install_hermes() {
 
     # Use uv to create a venv and install hermes-agent
     hermes_venv="${install_dir}/venv"
-    
+
     echo "Creating Hermes virtual environment..."
     uv venv "${hermes_venv}" --python 3.11
 
     echo "Installing hermes-agent ${version}..."
-    # Use uv pip to install from GitHub (exact version)
+    # Use uv pip to install from PyPI (exact version)
     "${hermes_venv}/bin/uv" pip install "hermes-agent==${version}" --index-url https://pypi.org/simple
 
     # Create a wrapper script
@@ -37,7 +37,40 @@ EOF
     # Fix macOS quarantine
     fix_macos_quarantine "${install_dir}"
 
-    echo "Hermes ${version} installed to ${install_dir}"
+    # Verify the binary works
+    if "${install_dir}/hermes" --version >/dev/null 2>&1; then
+        echo "Hermes ${version} installed and verified at ${install_dir}"
+    else
+        echo "WARNING: Hermes installed but binary verification failed" >&2
+    fi
+
+    # Preconfigure Hermes (if requested)
+    if [ "${MINIONS_HERMES_PRECONFIG:-0}" -eq 1 ]; then
+        hermes_preconfigure
+    fi
+}
+
+# Preconfigure Hermes after install
+# Sets up: auto-fastest model combo, MCP, omniroute login off, gateway/dashboard
+hermes_preconfigure() {
+    echo "Preconfiguring Hermes..."
+
+    # Ensure HERMES config dir exists
+    mkdir -p "${HOME}/.hermes"
+
+    # Set auto-fastest model combo (uses OmniRoute by default)
+    hermes config set model.provider auto-fastest 2>/dev/null || true
+
+    # Enable MCP
+    hermes config set mcp.enabled true 2>/dev/null || true
+
+    # Disable OmniRoute login requirement (mirrors start-hermes.sh)
+    hermes config set omniroute.login_required false 2>/dev/null || true
+
+    # Register OmniRoute as MCP server
+    hermes mcp add omniroute --command omniroute --args --mcp 2>/dev/null || true
+
+    echo "Hermes preconfig complete"
 }
 
 # Ensure Hermes is available
