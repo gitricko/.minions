@@ -13,14 +13,13 @@ install_npm_package() {
     . "${MINIONS_HOME}/lib/node.sh"
     ensure_node "22.22.2"
 
-    # Use npm with --ignore-scripts and custom prefix
+    # Use npm with custom prefix (NO --ignore-scripts - breaks binary linking)
     npm_prefix="${install_dir}/npm"
     mkdir -p "${npm_prefix}"
 
     echo "Installing ${package}@${version}..."
     npm install -g "${package}@${version}" \
         --prefix "${npm_prefix}" \
-        --ignore-scripts \
         --no-audit \
         --no-fund \
         --loglevel error
@@ -37,7 +36,12 @@ exec "${npm_prefix}/bin/${bin_name}" "\$@"
 EOF
     make_executable "${install_dir}/${bin_name}"
 
-    echo "${package}@${version} installed to ${install_dir}"
+    # Verify the binary works
+    if "${install_dir}/${bin_name}" --version >/dev/null 2>&1; then
+        echo "${package}@${version} installed and verified at ${install_dir}"
+    else
+        echo "WARNING: ${package} installed but binary verification failed" >&2
+    fi
 }
 
 # Ensure OmniRoute is available

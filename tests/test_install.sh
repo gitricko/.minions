@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # tests/test_install.sh - Tests for install.sh
-# Runs shellcheck and dry-run simulation
+# Runs shellcheck, dry-run simulation, and (optionally) real install if CI_REAL_INSTALL=1
 
 set -e
 set -u
@@ -22,7 +22,7 @@ else
 fi
 
 log_info() { echo "${GREEN}[PASS]${NC} $*"; }
-log_error() { echo "${RED}[FAIL]${NC} $*"; }
+log_error() { echo "${RED}[FAIL]${NC} $*" >&2; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
 # Test 1: shellcheck all shell scripts
@@ -71,26 +71,14 @@ for dir in lib etc var/run var/log bin workspace var/cache; do
 done
 
 # Verify config files copied
-if [ -f "${TEST_HOME}/etc/versions.env" ]; then
-    log_info "versions.env copied"
-else
-    log_error "versions.env not copied"
-    exit 1
-fi
-
-if [ -f "${TEST_HOME}/etc/minions.env" ]; then
-    log_info "minions.env copied"
-else
-    log_error "minions.env not copied"
-    exit 1
-fi
-
-if [ -f "${TEST_HOME}/etc/pi.toml" ]; then
-    log_info "pi.toml copied"
-else
-    log_error "pi.toml not copied"
-    exit 1
-fi
+for cfg in versions.env minions.env pi.toml; do
+    if [ -f "${TEST_HOME}/etc/${cfg}" ]; then
+        log_info "${cfg} copied"
+    else
+        log_error "${cfg} not copied"
+        exit 1
+    fi
+done
 
 # Verify lib scripts copied
 for lib in detect.sh download.sh node.sh uv.sh pi.sh hermes.sh npm_packages.sh process.sh; do
@@ -123,6 +111,40 @@ for lib in lib/*.sh; do
         head -1 "${PROJECT_ROOT}/${lib}" | grep -q "^#!/usr/bin/env sh" && log_info "${lib} has correct shebang" || log_error "${lib} missing shebang"
     fi
 done
+
+# Test 4: Real install (only if CI_REAL_INSTALL=1)
+if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
+    echo ""
+    echo "=== Test 4: Real install (CI_REAL_INSTALL=1) ==="
+    REAL_HOME=$(mktemp -d)
+    export MINIONS_HOME="${REAL_HOME}"
+
+    echo "Running real install (this downloads packages)..."
+    if sh "${PROJECT_ROOT}/install.sh" --minions-home "${REAL_HOME}"; then
+        log_info "install.sh completed without errors"
+    else
+        log_error "install.sh failed during real install"
+        rm -rf "${REAL_HOME}"
+        exit 1
+    fi
+
+    # Verify binaries exist and run (with timeout)
+    for bin in omniroute modelrelay pi hermes; do
+        if [ -x "${REAL_HOME}/bin/${bin}" ]; then
+            if timeout 10s "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
+                log_info "${bin} installed and --version works"
+            else
+                log_warn "${bin} installed but --version failed or timed out"
+            fi
+        else
+            log_error "${bin} not found in ${REAL_HOME}/bin"
+            rm -rf "${REAL_HOME}"
+            exit 1
+        fi
+    done
+
+    rm -rf "${REAL_HOME}"
+fi
 
 echo ""
 echo "=== All install tests passed ==="
