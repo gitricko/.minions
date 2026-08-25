@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.22.2'
-          cache: 'npm'
 
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -46,7 +45,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.22.2'
-          cache: 'npm'
 
       - name: Install uv (for Hermes)
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
