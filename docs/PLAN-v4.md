@@ -23,8 +23,9 @@ v4 folds in all captain feedback: Linux-first scope, CLI-only components, precon
 |-----------|------|----------|-----------|
 | OmniRoute | persistent service | `setsid omniroute --no-open &` + preconfig | ✅ npm OK |
 | ModelRelay | persistent service | `setsid modelrelay &` | ✅ npm OK |
-| Pi-Agent | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ⚠ npm (B1) |
-| Hermes | CLI tool | preinstalled; used as CLI | ⚠ checksum (B4) |
+| Pi-Agent | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ✅ npm OK |
+| Hermes | CLI tool | preinstalled; used as CLI | ✅ git install OK |
+| Mnemon | memory layer | binary + seed import + extensions | ✅ available |
 
 > **Note:** Pi & Hermes are **not servers unless launched**. Only the two LLM proxies are persistent.  
 > **Gateway + Dashboard dropped from v1** — you never use them; deferred to future work.
@@ -50,9 +51,9 @@ Mirroring `post-create-cmd.sh` + `start-hermes.sh`, **install + boot must precon
 |-----------|-----------------------------------|-------------------|
 | **OmniRoute** | wait `/v1/models`→200; set `requireLogin=false` (sqlite); create combo `auto-fastest` (strategy auto); PUT models + retry config; enable MCP; `hermes mcp add omniroute` | `boot.sh` + `lib/omniroute.sh` |
 | **Hermes** | `hermes config set`: model.default=auto-fastest, provider=omniroute, base_url `localhost:${OR_PORT}/v1`, modelrelay base_url `localhost:${MR_PORT}/v1`, fallback=modelrelay, approvals off, memory=mnemon, agent.max_turns=120, kanban.failure_limit=3 | `install.sh` (first-run only) |
-| **Pi** | install `pi-failover@hermes-impl` ext; symlink tracked `etc/pi/{models,settings}.json` → `~/.pi/agent/` (`defaultProvider: omniroute`, `modelrelay` fallback) | `install.sh` + `boot.sh` (repair guard) |
-| **Mnemon (Hermes)** | install binary; seed import from `etc/seed.json` (dry-run validate → import); **install hermes-plugin-mnemon** → gives Hermes `mnemon_remember`/`mnemon_recall` tools | `install.sh` + `start-hermes.sh` pattern |
-| **Mnemon (Pi)** | **NEW:** figure out Pi-agent mnemon integration — likely a Pi extension or direct mnemon CLI usage in Pi's config/hooks. Mirror Hermes pattern where possible. | `install.sh` (Pi section) |
+| **Pi** | install `pi-failover` ext; symlink tracked `etc/pi/{models,settings}.json` → `~/.pi/` (`defaultProvider: omniroute`, `modelrelay` fallback); install mnemon Pi extension (skill + TypeScript extension) | `install.sh` + `boot.sh` (repair guard) |
+| **Mnemon (Hermes)** | install binary; seed import from `etc/mnemon-seed-hermes.json` (dry-run validate → import) | `install.sh` |
+| **Mnemon (Pi)** | install binary; seed import from `etc/mnemon-seed-pi.json`; `mnemon setup --target pi --global --yes` | `install.sh` (Pi section) |
 
 > All preconfiguration must read ports from env (§5) so it targets the right instance.
 
@@ -123,13 +124,13 @@ flowchart LR
 
 ---
 
-## 9 · Blockers — REVISED (B1–B7)
+## 9 · Blockers — REVISED (B1–B7) — **ALL FIXED**
 
 | # | Blocker | Fix |
 |---|---------|-----|
-| B1 | Pi URL 404 (Bun) | `lib/detect.sh:69` → `npm i -g --ignore-scripts @earendil-works/pi-coding-agent` |
+| B1 | Pi URL 404 (Bun) | `lib/pi.sh` → `npm i -g @earendil-works/pi-coding-agent` (no `--ignore-scripts`) |
 | B2 | node/npm/uv prereq | `install.sh` detect + vendor/install if missing |
-| B3 | uv URL 404 | `lib/detect.sh:54-64` Rust triple (uv-x86_64-unknown-linux-gnu.tar.gz) |
+| B3 | uv URL 404 | `lib/uv.sh` → Rust triple (uv-x86_64-unknown-linux-gnu.tar.gz) |
 | B4 | placeholder checksums | `etc/versions.env` pin: Hermes v2026.8.13, OmniRoute 3.8.49, ModelRelay 1.18.0, Pi 0.84.2 |
 | B5 | readiness marker | `boot.sh`: `touch $MINIONS_HOME/var/run/ready` after healthy |
 | B6 | --daemon | **DROPPED** — setsid + return |
@@ -142,25 +143,22 @@ flowchart LR
 - **CI:** install + retest on Codespace Linux + GitHub runner Linux. Portable bash, Linux-only assertions. Use env ports (§5) so CI doesn't clobber host stack.
 - **Future work (explicitly deferred):** macOS support, Hermes gateway/dashboard, Telegram.
 
-**Implementation order:**
-1. **install.sh** = mirror post-create (prereqs, npm installs, hermes config set, pi/mnemon symlinks+seed, **Pi mnemon provider**)
-2. **boot.sh** = mirror start-hermes (bg proxies + omniroute preconfig, readiness marker, return; optional `--doctor`)
-3. **lib/detect.sh** fixes B1/B3/B7
-4. **etc/versions.env** pin real (B4)
-5. Real install test (network-mocked) + open PR
+**Implementation order (COMPLETED):**
+1. ✅ **install.sh** = mirror post-create (prereqs, npm installs, hermes config set, pi/mnemon symlinks+seed, Pi mnemon provider)
+2. ✅ **boot.sh** = mirror start-hermes (bg proxies + omniroute preconfig, readiness marker, return; optional `--doctor`)
+3. ✅ **lib/detect.sh** fixes B1/B3/B7
+4. ✅ **etc/versions.env** pin real (B4)
+5. ✅ Real install test (network-mocked) + open PR
+6. ✅ **All phases merged to main** (PRs #3, #4, #5, #6, #7)
 
 ---
 
-## 11 · Open Questions
+## 11 · Open Questions — RESOLVED
 
-1. **Pi-agent mnemon provider** — Hermes uses `hermes-plugin-mnemon` (gitricko/hermes-plugin-mnemon) which exposes `mnemon_remember`/`mnemon_recall` as tools. What's the Pi equivalent?
-   - Option A: Pi extension that wraps mnemon CLI
-   - Option B: Direct mnemon CLI calls in Pi's config/hooks
-   - Option C: Pi uses Hermes as mnemon provider via RPC (if Hermes gateway runs)
-   - Need to research / prototype
+1. **Pi-agent mnemon provider** — RESOLVED: `mnemon setup --target pi --global --yes` installs skill + TypeScript extension. Works like Hermes pattern.
 
-2. **Seed.json content** — what goes in `.minions/etc/seed.json`? Mirror hermes-codespace's `.devcontainer/mnemon/seed.json` but for the .minions stack.
+2. **Seed.json content** — RESOLVED: Split into `etc/mnemon-seed-pi.json` and `etc/mnemon-seed-hermes.json` for clarity. Each has 5 insights covering architecture, versions, decisions, blockers, ports.
 
 ---
 
-*Captain: v4 reflects all feedback. Review in VS Code — adjust here or say "sync to README + scout report".*
+*Captain: v4 implementation is COMPLETE. All phases merged to main. CI green on both test and real-install jobs. Ready for production use.*

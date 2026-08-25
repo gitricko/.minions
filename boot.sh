@@ -6,7 +6,7 @@
 #   2. ModelRelay (port MODELRELAY_PORT) - LLM proxy (alternative)
 #   3. OmniRoute preconfiguration (login off, auto-fastest combo, MCP)
 #
-# Pi-Agent and Hermes are CLI tools (invoked on demand), not servers.
+# Pi-Agent, Hermes, and Mnemon are CLI tools (invoked on demand), not servers.
 # No --daemon flag - services are backgrounded with setsid and boot returns.
 #
 # Usage: boot.sh [--doctor]
@@ -171,6 +171,7 @@ echo "  ✅ omniroute    ${OMNIROUTE_BASE_URL}"
 echo "  ✅ modelrelay   ${MODELRELAY_BASE_URL}"
 echo "  ✅ pi-agent     CLI ready (invoked on demand)"
 echo "  ✅ hermes       CLI ready (preinstalled)"
+echo "  ✅ mnemon       memory layer ready"
 echo "=============================================="
 echo ""
 echo "READY FOR FIRSTMATE DISPATCH"
