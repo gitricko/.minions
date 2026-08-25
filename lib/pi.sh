@@ -9,24 +9,56 @@ install_pi() {
 
     echo "Installing Pi-Agent ${version} via npm..."
 
-    # Use npm to install globally (no --ignore-scripts - breaks binary linking)
-    npm install -g "@earendil-works/pi-coding-agent@${version}"
+    # Use npm with custom prefix (like OmniRoute/ModelRelay)
+    npm_prefix="${install_dir}/npm"
+    mkdir -p "${npm_prefix}/bin" "${npm_prefix}/lib/node_modules"
 
-    # Find where npm installed it
-    pi_binary=$(command -v pi)
+    # Set npm config to use our prefix (avoids writing to global node_modules)
+    npm install "@earendil-works/pi-coding-agent@${version}" \
+        --prefix "${npm_prefix}" \
+        --no-audit \
+        --no-fund \
+        --loglevel error \
+        --no-save || {
+        # Fallback: try with --global-style in the prefix dir
+        (cd "${npm_prefix}" && npm install "@earendil-works/pi-coding-agent@${version}" --no-audit --no-fund --loglevel error) || {
+            echo "ERROR: Pi-Agent npm install failed" >&2
+            return 1
+        }
+    }
+
+    # Find the pi binary (symlink in .bin directory)
+    pi_binary=$(find "${npm_prefix}" -name "pi" -path "*/node_modules/.bin/*" 2>/dev/null | head -1)
     if [ -z "${pi_binary}" ]; then
-        echo "Pi-Agent binary not found after npm install" >&2
+        pi_binary=$(find "${npm_prefix}" -name "pi" -path "*/bin/*" 2>/dev/null | head -1)
+    fi
+    if [ -z "${pi_binary}" ]; then
+        pi_binary=$(find "${npm_prefix}" -name "pi" 2>/dev/null | head -1)
+    fi
+
+    if [ -z "${pi_binary}" ]; then
+        echo "ERROR: Pi-Agent binary not found after npm install" >&2
         return 1
     fi
 
-    # Create symlink in our install_dir
-    mkdir -p "${install_dir}"
-    ln -sf "${pi_binary}" "${install_dir}/pi"
+    # Fix macOS quarantine on the bin directory
+    fix_macos_quarantine "${npm_prefix}/bin"
 
-    # Fix macOS quarantine
-    fix_macos_quarantine "${install_dir}/pi"
+    # Create wrapper script that sets up the right environment
+    cat > "${install_dir}/pi" << EOF
+#!/usr/bin/env sh
+export PATH="${npm_prefix}/bin:\${PATH}"
+export NODE_PATH="${npm_prefix}/lib/node_modules"
+exec "${pi_binary}" "\$@"
+EOF
+    make_executable "${install_dir}/pi"
 
-    echo "Pi-Agent ${version} installed (npm) and linked to ${install_dir}/pi"
+    # Verify the binary works
+    if "${install_dir}/pi" --version >/dev/null 2>&1; then
+        echo "Pi-Agent ${version} installed (npm) and linked to ${install_dir}/pi"
+    else
+        echo "WARNING: Pi-Agent installed but binary verification failed" >&2
+    fi
 }
 
 # Install pi-failover extension
@@ -35,7 +67,7 @@ install_pi_failover_ext() {
     install_dir=$1
 
     echo "Installing pi-failover extension..."
-    
+
     # Use pi to install the extension
     if "${install_dir}/pi" extensions install pi-failover 2>/dev/null; then
         echo "pi-failover extension installed"

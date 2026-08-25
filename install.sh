@@ -68,6 +68,7 @@ log_dry() { echo "${YELLOW}[DRY-RUN]${NC} $*"; }
 # Source lib functions (relative to script location)
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# Detect platform FIRST (needs detect.sh)
 # If running from a checked-out repo, use repo's lib; otherwise from install location
 if [ -d "${SCRIPT_DIR}/lib" ]; then
     LIB_DIR="${SCRIPT_DIR}/lib"
@@ -77,20 +78,6 @@ fi
 
 # shellcheck disable=SC1091
 . "${LIB_DIR}/detect.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/download.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/node.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/uv.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/pi.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/hermes.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/npm_packages.sh"
-# shellcheck disable=SC1091
-. "${LIB_DIR}/mnemon.sh"
 
 # Detect platform
 if ! detect_platform; then
@@ -165,17 +152,31 @@ mkdir -p "${MINIONS_HOME}/bin"
 mkdir -p "${MINIONS_HOME}/workspace"
 mkdir -p "${MINIONS_HOME}/var/cache"
 
-# Copy config templates if running from a repo checkout
+# Copy config templates if running from a repo checkout (always, even in dry-run for sourcing)
 if [ -d "${SCRIPT_DIR}/etc" ]; then
     log_info "Copying config templates..."
-    if [ "${DRY_RUN}" -eq 0 ]; then
-        cp -n "${SCRIPT_DIR}"/etc/*.env "${SCRIPT_DIR}"/etc/*.toml "${MINIONS_HOME}/etc/" 2>/dev/null || true
-        cp -n "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
-        cp -n "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
-        cp -n "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
-        cp -n "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
-    fi
+    cp -n "${SCRIPT_DIR}"/etc/*.env "${SCRIPT_DIR}"/etc/*.toml "${MINIONS_HOME}/etc/" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
+
+# NOW source remaining lib functions (from installed location)
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/download.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/node.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/uv.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/pi.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/hermes.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/npm_packages.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/mnemon.sh"
 
 # Step 2: Source versions
 if [ -f "${MINIONS_HOME}/etc/versions.env" ]; then
@@ -189,7 +190,7 @@ ensure_node "22.22.2"
 ensure_uv
 
 # Step 4: Install components
-log_info "Installing Pi-Agent (standalone binary)..."
+log_info "Installing Pi-Agent..."
 ensure_pi
 
 log_info "Installing OmniRoute..."
