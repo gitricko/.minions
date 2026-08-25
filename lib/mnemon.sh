@@ -29,8 +29,17 @@ install_mnemon() {
         fi
     fi
 
-    echo "WARNING: Mnemon not installed (no cargo available)" >&2
-    return 1
+    echo "WARNING: Mnemon not installed (no cargo available), continuing without Mnemon binary" >&2
+    # Create a stub that warns when called
+    mkdir -p "${install_dir}"
+    cat > "${install_dir}/mnemon" << 'EOF'
+#!/usr/bin/env sh
+echo "WARNING: Mnemon not installed. Install via: cargo install mnemon" >&2
+exit 1
+EOF
+    chmod +x "${install_dir}/mnemon"
+    fix_macos_quarantine "${install_dir}/mnemon"
+    return 0  # Non-fatal
 }
 
 # Ensure Mnemon is available
@@ -83,8 +92,13 @@ setup_mnemon_all() {
 
     # Ensure mnemon is available
     if ! command -v mnemon >/dev/null 2>&1; then
-        echo "Mnemon not in PATH, skipping setup" >&2
-        return 0
+        # Check if we have a stub
+        if [ -x "${minions_home}/bin/mnemon" ]; then
+            echo "Using Mnemon stub (not fully installed)"
+        else
+            echo "Mnemon not in PATH, skipping setup" >&2
+            return 0
+        fi
     fi
 
     # Setup for Pi
