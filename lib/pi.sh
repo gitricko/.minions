@@ -27,31 +27,23 @@ install_pi() {
         }
     }
 
-    # Find the pi binary (symlink in .bin directory)
-    pi_binary=$(find "${npm_prefix}" -name "pi" -path "*/node_modules/.bin/*" 2>/dev/null | head -1)
-    if [ -z "${pi_binary}" ]; then
-        pi_binary=$(find "${npm_prefix}" -name "pi" -path "*/bin/*" 2>/dev/null | head -1)
-    fi
-    if [ -z "${pi_binary}" ]; then
-        pi_binary=$(find "${npm_prefix}" -name "pi" 2>/dev/null | head -1)
-    fi
+    # Find the pi binary in the package
+        pi_binary="${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+        if [ ! -f "${pi_binary}" ]; then
+            echo "ERROR: Pi-Agent binary not found at ${pi_binary}" >&2
+            return 1
+        fi
 
-    if [ -z "${pi_binary}" ]; then
-        echo "ERROR: Pi-Agent binary not found after npm install" >&2
-        return 1
-    fi
+        # Fix macOS quarantine
+        fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
-    # Fix macOS quarantine on the bin directory
-    fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
-
-    # Create wrapper script that calls the binary from node_modules/.bin
-    cat > "${install_dir}/pi" << EOF
-#!/usr/bin/env sh
-export PATH="${npm_prefix}/lib/node_modules/.bin:\${PATH}"
-export NODE_PATH="${npm_prefix}/lib/node_modules"
-exec "${pi_binary}" "\$@"
-EOF
-    make_executable "${install_dir}/pi"
+        # Create wrapper script (use printf to avoid heredoc issues)
+        printf '#!/usr/bin/env sh\n%s\n%s\n%s\n' \
+            "export PATH=\"${npm_prefix}/lib/node_modules/.bin:\${PATH}\"" \
+            "export NODE_PATH=\"${npm_prefix}/lib/node_modules\"" \
+            "exec \"${pi_binary}\" \"\$@\"" \
+            > "${install_dir}/pi"
+        make_executable "${install_dir}/pi"
 
     # Verify the binary works
     if "${install_dir}/pi" --version >/dev/null 2>&1; then

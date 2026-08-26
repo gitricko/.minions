@@ -2,12 +2,13 @@
 # lib/npm_packages.sh - npm package installation (OmniRoute, ModelRelay)
 
 # Install npm package globally into our vendored location
-# Usage: install_npm_package <package_name> <version> <install_dir> <bin_name>
+# Usage: install_npm_package <package_name> <version> <install_dir> <bin_name> [bin_path_in_package]
 install_npm_package() {
     package=$1
     version=$2
     install_dir=$3
     bin_name=$4
+    bin_path_in_package=${5:-"bin/${bin_name}"}
 
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/node.sh"
@@ -26,15 +27,15 @@ install_npm_package() {
         --no-save \
         --legacy-peer-deps
 
-    # Fix macOS quarantine on the bin directory
+    # Fix macOS quarantine
     fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
-    # Create wrapper script that calls the binary from node_modules/.bin
+    # Create wrapper that calls the actual binary in the package
     cat > "${install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
 export PATH="${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
-exec "${npm_prefix}/lib/node_modules/.bin/${bin_name}" "\$@"
+exec "${npm_prefix}/lib/node_modules/${package}/${bin_path_in_package}" "\$@"
 EOF
     make_executable "${install_dir}/${bin_name}"
 
@@ -57,7 +58,7 @@ ensure_omniroute() {
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/versions.env"
     mkdir -p "${MINIONS_HOME}/lib/omniroute"
-    install_npm_package "omniroute" "${OMNIROUTE_VERSION}" "${MINIONS_HOME}/lib/omniroute" "omniroute"
+    install_npm_package "omniroute" "${OMNIROUTE_VERSION}" "${MINIONS_HOME}/lib/omniroute" "omniroute" "bin/omniroute.mjs"
 
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/omniroute/omniroute" "${MINIONS_HOME}/bin/omniroute"
@@ -74,7 +75,7 @@ ensure_modelrelay() {
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/versions.env"
     mkdir -p "${MINIONS_HOME}/lib/modelrelay"
-    install_npm_package "modelrelay" "${MODELRELAY_VERSION}" "${MINIONS_HOME}/lib/modelrelay" "modelrelay"
+    install_npm_package "modelrelay" "${MODELRELAY_VERSION}" "${MINIONS_HOME}/lib/modelrelay" "modelrelay" "bin/modelrelay.js"
 
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/modelrelay/modelrelay" "${MINIONS_HOME}/bin/modelrelay"
