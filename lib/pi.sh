@@ -116,13 +116,14 @@ install_pi_failover_ext() {
 }
 
 # Setup Mnemon Pi plugin
-# Usage: setup_mnemon_pi
+# Usage: setup_mnemon_pi <minions_home>
 setup_mnemon_pi() {
+    minions_home=$1
     echo "Setting up Mnemon Pi plugin..."
 
     # Use local mnemon if available, otherwise fall back to system
-    if [ -x "${MINIONS_HOME}/bin/mnemon" ]; then
-        MNEMON_BIN="${MINIONS_HOME}/bin/mnemon"
+    if [ -x "${minions_home}/bin/mnemon" ]; then
+        MNEMON_BIN="${minions_home}/bin/mnemon"
     elif command -v mnemon >/dev/null 2>&1; then
         MNEMON_BIN="mnemon"
     else
@@ -188,6 +189,6 @@ ensure_pi() {
 
     # Run config steps
     install_pi_failover_ext "${MINIONS_HOME}/lib/pi"
-    setup_mnemon_pi
+    setup_mnemon_pi "${MINIONS_HOME}"
     create_pi_symlinks "${MINIONS_HOME}"
 }
