@@ -120,14 +120,18 @@ install_pi_failover_ext() {
 setup_mnemon_pi() {
     echo "Setting up Mnemon Pi plugin..."
 
-    # Check if mnemon is available
-    if ! command -v mnemon >/dev/null 2>&1; then
+    # Use local mnemon if available, otherwise fall back to system
+    if [ -x "${MINIONS_HOME}/bin/mnemon" ]; then
+        MNEMON_BIN="${MINIONS_HOME}/bin/mnemon"
+    elif command -v mnemon >/dev/null 2>&1; then
+        MNEMON_BIN="mnemon"
+    else
         echo "Mnemon not found, skipping Pi plugin setup" >&2
         return 0
     fi
 
     # Run mnemon setup for pi target
-    if mnemon setup --target pi --global --yes 2>/dev/null; then
+    if "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null; then
         echo "Mnemon Pi plugin setup complete"
     else
         echo "WARNING: Mnemon Pi plugin setup failed" >&2

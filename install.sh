@@ -190,6 +190,11 @@ ensure_node "22.22.2"
 ensure_uv
 
 # Step 4: Install components
+# Install Mnemon FIRST so it's available for Pi/Hermes plugin setup
+log_info "Setting up Mnemon (memory layer)..."
+ensure_mnemon "${MINIONS_HOME}"
+setup_mnemon_all "${MINIONS_HOME}"
+
 log_info "Installing Pi-Agent..."
 ensure_pi
 
@@ -203,11 +208,6 @@ if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes (opt-in)..."
     ensure_hermes
 fi
-
-# Step 4.5: Setup Mnemon (seed import for hermes/pi)
-log_info "Setting up Mnemon (memory layer)..."
-ensure_mnemon "${MINIONS_HOME}"
-setup_mnemon_all "${MINIONS_HOME}"
 
 # Step 5: Set up PATH snippet
 # shellcheck disable=SC2016
