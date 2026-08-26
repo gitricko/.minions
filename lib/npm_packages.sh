@@ -30,12 +30,31 @@ install_npm_package() {
     # Fix macOS quarantine
     fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
-    # Create wrapper that calls the actual binary in the package
+    # Find the actual binary path (npm 9+ hoists to prefix root)
+    actual_binary=""
+    for candidate in \
+        "${npm_prefix}/${bin_path_in_package}" \
+        "${npm_prefix}/node_modules/${package}/${bin_path_in_package}" \
+        "${npm_prefix}/lib/node_modules/${package}/${bin_path_in_package}"; do
+        if [ -f "${candidate}" ]; then
+            actual_binary="${candidate}"
+            break
+        fi
+    done
+
+    if [ -z "${actual_binary}" ]; then
+        echo "ERROR: Could not find binary at ${bin_path_in_package} for ${package}" >&2
+        return 1
+    fi
+
+    echo "Found ${package} binary at: ${actual_binary}"
+
+    # Create wrapper that calls the actual binary
     cat > "${install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
 export PATH="${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
-exec "${npm_prefix}/lib/node_modules/${package}/${bin_path_in_package}" "\$@"
+exec "${actual_binary}" "\$@"
 EOF
     make_executable "${install_dir}/${bin_name}"
 
