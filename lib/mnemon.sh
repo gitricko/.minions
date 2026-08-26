@@ -21,11 +21,11 @@ install_mnemon() {
     platform=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
     case "${arch}" in
-        x86_64) arch="x86_64" ;;
+        x86_64) arch="amd64" ;;
         aarch64|arm64) arch="aarch64" ;;
     esac
 
-    mnemon_version="v0.2.5"
+    mnemon_version="0.2.5"
 
     # Try latest release download
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
@@ -38,12 +38,12 @@ install_mnemon() {
     fi
 
     # Fallback: try specific version from releases
-    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/${mnemon_version}/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
+    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/v${mnemon_version}/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
         chmod +x "${install_dir}/mnemon"
         fix_macos_quarantine "${install_dir}/mnemon"
-        echo "Mnemon installed via prebuilt binary (${mnemon_version})"
+        echo "Mnemon installed via prebuilt binary (v${mnemon_version})"
         return 0
     fi
 
