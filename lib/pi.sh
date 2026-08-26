@@ -92,11 +92,11 @@ install_pi() {
             > "${install_dir}/pi"
         make_executable "${install_dir}/pi"
 
-    # Verify the binary works
-    if "${install_dir}/pi" --version >/dev/null 2>&1; then
+    # Verify the binary works (bounded timeout)
+    if timeout 30 "${install_dir}/pi" --version >/dev/null 2>&1; then
         echo "Pi-Agent ${version} installed (npm) and linked to ${install_dir}/pi"
     else
-        echo "WARNING: Pi-Agent installed but binary verification failed" >&2
+        echo "WARNING: Pi-Agent installed but binary verification (--version) failed or timed out" >&2
     fi
 }
 
