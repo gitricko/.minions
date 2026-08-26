@@ -10,16 +10,19 @@ install_npm_package() {
     bin_name=$4
     bin_path_in_package=${5:-"bin/${bin_name}"}
 
+    # Use system npm for installation (avoids prefix resolution issues with vendored node)
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/node.sh"
     ensure_node_v22
 
     # Use npm with custom prefix (NO -g flag - causes EACCES in newer npm)
+    # Use command -v npm to get system npm, not vendored node's npm
+    system_npm=$(command -v npm 2>/dev/null || echo "npm")
     npm_prefix="${install_dir}/npm"
     mkdir -p "${npm_prefix}/lib/node_modules"
 
     echo "Installing ${pkg_name}@${pkg_version}..."
-    npm install "${pkg_name}@${pkg_version}" \
+    "${system_npm}" install "${pkg_name}@${pkg_version}" \
         --prefix "${npm_prefix}" \
         --no-audit \
         --no-fund \
