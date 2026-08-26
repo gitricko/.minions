@@ -29,11 +29,14 @@ install_pi() {
 
     # Find the pi binary in the package (try multiple locations)
         pi_binary=""
+        # First check if package is hoisted to root of prefix (npm 9+ behavior)
         for candidate in \
-            "${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" \
-            "${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/bun/cli.js" \
-            "${npm_prefix}/lib/node_modules/pi-coding-agent/dist/cli.js" \
-            "${npm_prefix}/lib/node_modules/pi-coding-agent/dist/bun/cli.js"; do
+            "${npm_prefix}/dist/cli.js" \
+            "${npm_prefix}/dist/bun/cli.js" \
+            "${npm_prefix}/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" \
+            "${npm_prefix}/node_modules/@earendil-works/pi-coding-agent/dist/bun/cli.js" \
+            "${npm_prefix}/node_modules/pi-coding-agent/dist/cli.js" \
+            "${npm_prefix}/node_modules/pi-coding-agent/dist/bun/cli.js"; do
             if [ -f "${candidate}" ]; then
                 pi_binary="${candidate}"
                 break
@@ -45,7 +48,7 @@ install_pi() {
             echo "DEBUG: Using npm ls to find pi-coding-agent..." >&2
             cd "${npm_prefix}" && npm ls @earendil-works/pi-coding-agent --prefix "${npm_prefix}" 2>&1 | head -20 >&2
         
-            # Also try finding via npm list
+            # Also try finding via npm list --json
             pi_binary=$(cd "${npm_prefix}" && npm ls @earendil-works/pi-coding-agent --prefix "${npm_prefix}" --json 2>/dev/null | \
                 grep -o '"path":"[^"]*"' | head -1 | sed 's/"path":"//;s/"//' 2>/dev/null)
             if [ -n "${pi_binary}" ] && [ -f "${pi_binary}/dist/cli.js" ]; then
@@ -57,20 +60,22 @@ install_pi() {
             # Fallback: search for any cli.js
             echo "DEBUG: Searching for pi binary..." >&2
             echo "DEBUG: npm_prefix = ${npm_prefix}" >&2
+            echo "DEBUG: prefix root contents:" >&2
+            ls -la "${npm_prefix}/" 2>/dev/null >&2 || echo "DEBUG: prefix root not found" >&2
             echo "DEBUG: node_modules contents:" >&2
-            ls -la "${npm_prefix}/lib/node_modules/" 2>/dev/null >&2 || echo "DEBUG: node_modules not found" >&2
+            ls -la "${npm_prefix}/node_modules/" 2>/dev/null >&2 || echo "DEBUG: node_modules not found" >&2
             echo "DEBUG: @earendil-works contents:" >&2
-            ls -la "${npm_prefix}/lib/node_modules/@earendil-works/" 2>/dev/null >&2 || echo "DEBUG: @earendil-works not found" >&2
+            ls -la "${npm_prefix}/node_modules/@earendil-works/" 2>/dev/null >&2 || echo "DEBUG: @earendil-works not found" >&2
             echo "DEBUG: Full find for cli.js:" >&2
-            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -30 >&2
+            find "${npm_prefix}" -name "cli.js" 2>/dev/null | head -30 >&2
             echo "DEBUG: Full find for pi-coding-agent:" >&2
-            find "${npm_prefix}/lib/node_modules" -name "pi-coding-agent" -type d 2>/dev/null | head -20 >&2
-            pi_binary=$(find "${npm_prefix}/lib/node_modules" -name "cli.js" -path "*/pi-coding-agent/*" 2>/dev/null | head -1)
+            find "${npm_prefix}" -name "pi-coding-agent" -type d 2>/dev/null | head -20 >&2
+            pi_binary=$(find "${npm_prefix}" -name "cli.js" -path "*/pi-coding-agent/*" 2>/dev/null | head -1)
         fi
 
         if [ -z "${pi_binary}" ] || [ ! -f "${pi_binary}" ]; then
-            echo "ERROR: Pi-Agent binary not found in ${npm_prefix}/lib/node_modules" >&2
-            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -20 >&2
+            echo "ERROR: Pi-Agent binary not found in ${npm_prefix}" >&2
+            find "${npm_prefix}" -name "cli.js" 2>/dev/null | head -20 >&2
             return 1
         fi
 
