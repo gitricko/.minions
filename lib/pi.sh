@@ -42,6 +42,8 @@ install_pi() {
 
         if [ -z "${pi_binary}" ]; then
             # Fallback: search for any cli.js
+            echo "DEBUG: Searching for pi binary..." >&2
+            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -20 >&2
             pi_binary=$(find "${npm_prefix}/lib/node_modules" -name "cli.js" -path "*/pi-coding-agent/*" 2>/dev/null | head -1)
         fi
 
