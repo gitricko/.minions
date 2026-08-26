@@ -70,3 +70,12 @@ ensure_node() {
     # Prepend vendored node to PATH
     export PATH="${MINIONS_HOME}/lib/node/bin:${PATH}"
 }
+
+# Ensure Node.js 22.22.2 is available (vendored) for OmniRoute/ModelRelay/Pi
+# These packages have compatibility issues with Node 24+
+# Usage: ensure_node_v22
+ensure_node_v22() {
+    echo "Ensuring Node.js ${NODE_VERSION} (vendored) for npm packages..."
+    install_vendored_node "${NODE_VERSION}" "${MINIONS_HOME}/lib/node"
+    export PATH="${MINIONS_HOME}/lib/node/bin:${PATH}"
+}

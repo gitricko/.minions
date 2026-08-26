@@ -4,22 +4,22 @@
 # Install npm package globally into our vendored location
 # Usage: install_npm_package <package_name> <version> <install_dir> <bin_name> [bin_path_in_package]
 install_npm_package() {
-    package=$1
-    version=$2
+    pkg_name=$1
+    pkg_version=$2
     install_dir=$3
     bin_name=$4
     bin_path_in_package=${5:-"bin/${bin_name}"}
 
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/node.sh"
-    ensure_node "22.22.2"
+    ensure_node_v22
 
     # Use npm with custom prefix (NO -g flag - causes EACCES in newer npm)
     npm_prefix="${install_dir}/npm"
     mkdir -p "${npm_prefix}/lib/node_modules"
 
-    echo "Installing ${package}@${version}..."
-    npm install "${package}@${version}" \
+    echo "Installing ${pkg_name}@${pkg_version}..."
+    npm install "${pkg_name}@${pkg_version}" \
         --prefix "${npm_prefix}" \
         --no-audit \
         --no-fund \
@@ -34,8 +34,8 @@ install_npm_package() {
     actual_binary=""
     for candidate in \
         "${npm_prefix}/${bin_path_in_package}" \
-        "${npm_prefix}/node_modules/${package}/${bin_path_in_package}" \
-        "${npm_prefix}/lib/node_modules/${package}/${bin_path_in_package}"; do
+        "${npm_prefix}/node_modules/${pkg_name}/${bin_path_in_package}" \
+        "${npm_prefix}/lib/node_modules/${pkg_name}/${bin_path_in_package}"; do
         if [ -f "${candidate}" ]; then
             actual_binary="${candidate}"
             break
@@ -43,16 +43,16 @@ install_npm_package() {
     done
 
     if [ -z "${actual_binary}" ]; then
-        echo "ERROR: Could not find binary at ${bin_path_in_package} for ${package}" >&2
+        echo "ERROR: Could not find binary at ${bin_path_in_package} for ${pkg_name}" >&2
         return 1
     fi
 
-    echo "Found ${package} binary at: ${actual_binary}"
+    echo "Found ${pkg_name} binary at: ${actual_binary}"
 
-    # Create wrapper that calls the actual binary
+    # Create wrapper that calls the actual binary with vendored Node
     cat > "${install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
-export PATH="${npm_prefix}/lib/node_modules/.bin:\${PATH}"
+export PATH="${MINIONS_HOME}/lib/node/bin:${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
 exec "${actual_binary}" "\$@"
 EOF
@@ -60,9 +60,9 @@ EOF
 
     # Verify the binary works (bounded timeout — some bins hang on --version)
     if timeout 30 "${install_dir}/${bin_name}" --version >/dev/null 2>&1; then
-        echo "${package}@${version} installed and verified at ${install_dir}"
+        echo "${pkg_name}@${pkg_version} installed and verified at ${install_dir}"
     else
-        echo "WARNING: ${package} installed but binary verification (--version) failed or timed out" >&2
+        echo "WARNING: ${pkg_name} installed but binary verification (--version) failed or timed out" >&2
     fi
 }
 
