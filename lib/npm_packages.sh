@@ -58,11 +58,11 @@ exec "${actual_binary}" "\$@"
 EOF
     make_executable "${install_dir}/${bin_name}"
 
-    # Verify the binary works
-    if "${install_dir}/${bin_name}" --version >/dev/null 2>&1; then
+    # Verify the binary works (bounded timeout — some bins hang on --version)
+    if timeout 30 "${install_dir}/${bin_name}" --version >/dev/null 2>&1; then
         echo "${package}@${version} installed and verified at ${install_dir}"
     else
-        echo "WARNING: ${package} installed but binary verification failed" >&2
+        echo "WARNING: ${package} installed but binary verification (--version) failed or timed out" >&2
     fi
 }
 

@@ -28,7 +28,7 @@ install_hermes() {
     mkdir -p "${HERMES_HOME_OVERRIDE}"
 
     # The installer uses bash-specific syntax; run with bash not sh
-    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" || {
+    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" --skip-setup || {
         echo "ERROR: Hermes install script failed" >&2
         rm -f "${tmp_script}"
         return 1
@@ -58,11 +58,11 @@ EOF
     # Fix macOS quarantine
     fix_macos_quarantine "${install_dir}"
 
-    # Verify the binary works
-    if "${install_dir}/hermes" --version >/dev/null 2>&1; then
+    # Verify the binary works (bounded timeout)
+    if timeout 30 "${install_dir}/hermes" --version >/dev/null 2>&1; then
         echo "Hermes ${version} installed and verified at ${install_dir}"
     else
-        echo "WARNING: Hermes installed but binary verification failed" >&2
+        echo "WARNING: Hermes installed but binary verification (--version) failed or timed out" >&2
     fi
 
     # Preconfigure Hermes (if requested)
