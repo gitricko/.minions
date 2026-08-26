@@ -48,7 +48,10 @@ install_pi() {
             ls -la "${npm_prefix}/lib/node_modules/" 2>/dev/null >&2 || echo "DEBUG: node_modules not found" >&2
             echo "DEBUG: @earendil-works contents:" >&2
             ls -la "${npm_prefix}/lib/node_modules/@earendil-works/" 2>/dev/null >&2 || echo "DEBUG: @earendil-works not found" >&2
-            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -20 >&2
+            echo "DEBUG: Full find for cli.js:" >&2
+            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -30 >&2
+            echo "DEBUG: Full find for pi-coding-agent:" >&2
+            find "${npm_prefix}/lib/node_modules" -name "pi-coding-agent" -type d 2>/dev/null | head -20 >&2
             pi_binary=$(find "${npm_prefix}/lib/node_modules" -name "cli.js" -path "*/pi-coding-agent/*" 2>/dev/null | head -1)
         fi
 
