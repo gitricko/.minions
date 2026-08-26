@@ -111,22 +111,21 @@ setup_mnemon_all() {
 
     echo "Setting up Mnemon for all targets..."
 
-    # Ensure mnemon is available
-    if ! command -v mnemon >/dev/null 2>&1; then
-        # Check if we have a stub
-        if [ -x "${minions_home}/bin/mnemon" ]; then
-            echo "Using Mnemon stub (not fully installed)"
-        else
-            echo "Mnemon not in PATH, skipping setup" >&2
-            return 0
-        fi
+    # Use local mnemon if available, otherwise fall back to system
+    if [ -x "${minions_home}/bin/mnemon" ]; then
+        MNEMON_BIN="${minions_home}/bin/mnemon"
+    elif command -v mnemon >/dev/null 2>&1; then
+        MNEMON_BIN="mnemon"
+    else
+        echo "Mnemon not available, skipping setup" >&2
+        return 0
     fi
 
     # Setup for Pi
-    mnemon setup --target pi --global --yes 2>/dev/null || echo "WARNING: Mnemon Pi setup failed" >&2
+    "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null || echo "WARNING: Mnemon Pi setup failed" >&2
 
     # Setup for Hermes
-    mnemon setup --target hermes --global --yes 2>/dev/null || echo "WARNING: Mnemon Hermes setup failed" >&2
+    "${MNEMON_BIN}" setup --target hermes --global --yes 2>/dev/null || echo "WARNING: Mnemon Hermes setup failed" >&2
 
     # Import seeds if they exist
     for target in pi hermes; do
