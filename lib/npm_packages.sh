@@ -15,7 +15,7 @@ install_npm_package() {
 
     # Use npm with custom prefix (NO -g flag - causes EACCES in newer npm)
     npm_prefix="${install_dir}/npm"
-    mkdir -p "${npm_prefix}/bin" "${npm_prefix}/lib/node_modules"
+    mkdir -p "${npm_prefix}/lib/node_modules"
 
     echo "Installing ${package}@${version}..."
     npm install "${package}@${version}" \
@@ -27,14 +27,14 @@ install_npm_package() {
         --legacy-peer-deps
 
     # Fix macOS quarantine on the bin directory
-    fix_macos_quarantine "${npm_prefix}/bin"
+    fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
-    # Create wrapper script that sets up the right environment
+    # Create wrapper script that calls the binary from node_modules/.bin
     cat > "${install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
-export PATH="${npm_prefix}/bin:\${PATH}"
+export PATH="${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
-exec "\${npm_prefix}/bin/${bin_name}" "\$@"
+exec "${npm_prefix}/lib/node_modules/.bin/${bin_name}" "\$@"
 EOF
     make_executable "${install_dir}/${bin_name}"
 
