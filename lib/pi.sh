@@ -27,12 +27,31 @@ install_pi() {
         }
     }
 
-    # Find the pi binary in the package
-        pi_binary="${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
-        if [ ! -f "${pi_binary}" ]; then
-            echo "ERROR: Pi-Agent binary not found at ${pi_binary}" >&2
+    # Find the pi binary in the package (try multiple locations)
+        pi_binary=""
+        for candidate in \
+            "${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" \
+            "${npm_prefix}/lib/node_modules/@earendil-works/pi-coding-agent/dist/bun/cli.js" \
+            "${npm_prefix}/lib/node_modules/pi-coding-agent/dist/cli.js" \
+            "${npm_prefix}/lib/node_modules/pi-coding-agent/dist/bun/cli.js"; do
+            if [ -f "${candidate}" ]; then
+                pi_binary="${candidate}"
+                break
+            fi
+        done
+
+        if [ -z "${pi_binary}" ]; then
+            # Fallback: search for any cli.js
+            pi_binary=$(find "${npm_prefix}/lib/node_modules" -name "cli.js" -path "*/pi-coding-agent/*" 2>/dev/null | head -1)
+        fi
+
+        if [ -z "${pi_binary}" ] || [ ! -f "${pi_binary}" ]; then
+            echo "ERROR: Pi-Agent binary not found in ${npm_prefix}/lib/node_modules" >&2
+            find "${npm_prefix}/lib/node_modules" -name "cli.js" 2>/dev/null | head -20 >&2
             return 1
         fi
+
+        echo "Found Pi-Agent binary at: ${pi_binary}"
 
         # Fix macOS quarantine
         fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
