@@ -41,6 +41,19 @@ install_pi() {
         done
 
         if [ -z "${pi_binary}" ]; then
+            # Fallback: use npm ls to find the package location
+            echo "DEBUG: Using npm ls to find pi-coding-agent..." >&2
+            cd "${npm_prefix}" && npm ls @earendil-works/pi-coding-agent --prefix "${npm_prefix}" 2>&1 | head -20 >&2
+        
+            # Also try finding via npm list
+            pi_binary=$(cd "${npm_prefix}" && npm ls @earendil-works/pi-coding-agent --prefix "${npm_prefix}" --json 2>/dev/null | \
+                grep -o '"path":"[^"]*"' | head -1 | sed 's/"path":"//;s/"//' 2>/dev/null)
+            if [ -n "${pi_binary}" ] && [ -f "${pi_binary}/dist/cli.js" ]; then
+                pi_binary="${pi_binary}/dist/cli.js"
+            fi
+        fi
+
+        if [ -z "${pi_binary}" ]; then
             # Fallback: search for any cli.js
             echo "DEBUG: Searching for pi binary..." >&2
             echo "DEBUG: npm_prefix = ${npm_prefix}" >&2
