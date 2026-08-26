@@ -143,15 +143,19 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         fi
     done
 
-    # Mnemon is optional (needs cargo) - check but don't fail
+    # Mnemon is REQUIRED - fail if not installed
     if [ -x "${REAL_HOME}/bin/mnemon" ]; then
         if timeout 10s "${REAL_HOME}/bin/mnemon" --version >/dev/null 2>&1; then
             log_info "mnemon installed and --version works"
         else
-            log_warn "mnemon installed but --version failed (may be stub without cargo)"
+            log_error "mnemon installed but --version failed"
+            rm -rf "${REAL_HOME}"
+            exit 1
         fi
     else
-        log_warn "mnemon not installed (no cargo available in CI)"
+        log_error "mnemon not found in ${REAL_HOME}/bin - Mnemon is REQUIRED"
+        rm -rf "${REAL_HOME}"
+        exit 1
     fi
 
     # Verify Pi config symlinks
