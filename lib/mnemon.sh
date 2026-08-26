@@ -17,7 +17,24 @@ install_mnemon() {
     fi
 
     echo "Installing Mnemon..."
-    # Try to install via cargo (from source) or download binary
+    # Try to download prebuilt binary first (faster than cargo)
+    platform=$(uname -s | tr '[:upper:]' '[:lower:]')
+    arch=$(uname -m)
+    case "${arch}" in
+        x86_64) arch="x86_64" ;;
+        aarch64|arm64) arch="aarch64" ;;
+    esac
+
+    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon-${platform}-${arch}.tar.gz"
+    echo "Attempting to download Mnemon from ${mnemon_url}..."
+    if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
+        chmod +x "${install_dir}/mnemon"
+        fix_macos_quarantine "${install_dir}/mnemon"
+        echo "Mnemon installed via prebuilt binary"
+        return 0
+    fi
+
+    # Fallback to cargo if available
     if command -v cargo >/dev/null 2>&1; then
         cargo install mnemon --root "${install_dir}/mnemon-cargo" 2>/dev/null || true
         if [ -x "${install_dir}/mnemon-cargo/bin/mnemon" ]; then
@@ -29,7 +46,7 @@ install_mnemon() {
         fi
     fi
 
-    echo "WARNING: Mnemon not installed (no cargo available), continuing without Mnemon binary" >&2
+    echo "WARNING: Mnemon not installed (no prebuilt binary or cargo available), continuing without Mnemon binary" >&2
     # Create a stub that warns when called
     mkdir -p "${install_dir}"
     cat > "${install_dir}/mnemon" << 'EOF'

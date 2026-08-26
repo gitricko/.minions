@@ -143,6 +143,17 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         fi
     done
 
+    # Mnemon is optional (needs cargo) - check but don't fail
+    if [ -x "${REAL_HOME}/bin/mnemon" ]; then
+        if timeout 10s "${REAL_HOME}/bin/mnemon" --version >/dev/null 2>&1; then
+            log_info "mnemon installed and --version works"
+        else
+            log_warn "mnemon installed but --version failed (may be stub without cargo)"
+        fi
+    else
+        log_warn "mnemon not installed (no cargo available in CI)"
+    fi
+
     # Verify Pi config symlinks
     for cfg in pi.toml models.json settings.json; do
         if [ -L "${HOME}/.pi/${cfg}" ]; then
