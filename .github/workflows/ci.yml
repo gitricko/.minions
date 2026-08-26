@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (Linux)
@@ -57,4 +65,4 @@ jobs:
           CI_REAL_INSTALL: 1
         run: |
           set -e
-          bash tests/test_install.sh
+          bash install.sh

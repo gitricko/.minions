@@ -28,7 +28,7 @@ install_hermes() {
     mkdir -p "${HERMES_HOME_OVERRIDE}"
 
     # The installer uses bash-specific syntax; run with bash not sh
-    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" || {
+    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" --skip-setup || {
         echo "ERROR: Hermes install script failed" >&2
         rm -f "${tmp_script}"
         return 1
