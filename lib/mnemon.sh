@@ -26,7 +26,7 @@ install_mnemon() {
     esac
 
     # Try latest release download
-    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon-${platform}-${arch}.tar.gz"
+    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
         chmod +x "${install_dir}/mnemon"
@@ -37,7 +37,7 @@ install_mnemon() {
 
     # Fallback: try specific version from releases
     mnemon_version="v0.2.5"
-    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/${mnemon_version}/mnemon-${platform}-${arch}.tar.gz"
+    mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/${mnemon_version}/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
         chmod +x "${install_dir}/mnemon"
