@@ -29,7 +29,7 @@ jobs:
           node-version: '22.22.2'
 
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck netcat-openbsd
 
       - name: Run install tests
         run: |
@@ -41,6 +41,38 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
+      - name: Run real boot test
+        env:
+          CI_REAL_INSTALL: 1
+        run: |
+          set -e
+          echo "=== Running real boot test ==="
+          # First run real install
+          bash tests/test_install.sh
+          # Get the install dir (test_install.sh creates a temp dir and cleans it up)
+          # We need to re-run install to have the binaries available
+          REAL_HOME=$(mktemp -d)
+          export MINIONS_HOME="${REAL_HOME}"
+          export PATH="${REAL_HOME}/bin:${PATH}"
+          # Install fresh for boot test
+          bash install.sh --minions-home "${REAL_HOME}"
+          # Start boot.sh in background
+          timeout 60s bash boot.sh &
+          BOOT_PID=$!
+          sleep 10
+          # Check if services are running
+          for port in 20128 7352; do
+            if nc -z 127.0.0.1 $port; then
+              echo "Service on port $port is up"
+            else
+              echo "Service on port $port failed to start"
+              kill $BOOT_PID 2>/dev/null || true
+              exit 1
+            fi
+          done
+          # Clean up
+          kill $BOOT_PID 2>/dev/null || true
+          echo "Real boot test passed"
   real-install:
     name: Real Install (Linux)
     runs-on: ubuntu-latest
@@ -64,7 +96,7 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck netcat-openbsd
 
       - name: Run real install test
         env:
