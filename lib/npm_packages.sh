@@ -6,19 +6,27 @@
 install_npm_package() {
     pkg_name=$1
     pkg_version=$2
-    install_dir=$3
+    pkg_install_dir=$3
     bin_name=$4
     bin_path_in_package=${5:-"bin/${bin_name}"}
 
-    # Use system npm for installation (avoids prefix resolution issues with vendored node)
+    # Capture system npm FULL PATH BEFORE ensure_node_v22 prepends vendored node to PATH
+    # Use absolute path to avoid any PATH resolution issues
+    if [ -x "/home/codespace/nvm/current/bin/npm" ]; then
+        system_npm="/home/codespace/nvm/current/bin/npm"
+    elif [ -x "/usr/bin/npm" ]; then
+        system_npm="/usr/bin/npm"
+    else
+        system_npm="npm"
+    fi
+
+    # Use vendored node for runtime
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/node.sh"
     ensure_node_v22
 
     # Use npm with custom prefix (NO -g flag - causes EACCES in newer npm)
-    # Use command -v npm to get system npm, not vendored node's npm
-    system_npm=$(command -v npm 2>/dev/null || echo "npm")
-    npm_prefix="${install_dir}/npm"
+    npm_prefix="${pkg_install_dir}/npm"
     mkdir -p "${npm_prefix}/lib/node_modules"
 
     echo "Installing ${pkg_name}@${pkg_version}..."
@@ -53,17 +61,48 @@ install_npm_package() {
     echo "Found ${pkg_name} binary at: ${actual_binary}"
 
     # Create wrapper that calls the actual binary with vendored Node
-    cat > "${install_dir}/${bin_name}" << EOF
+    # Special case: omniroute CLI entry has a top-level-await bug (SyntaxError
+    # on Node 22/24); bypass it and run the Next.js standalone server directly.
+    # server.js reads PORT/HOSTNAME env vars, so translate --host/--port args.
+    if [ "${pkg_name}" = "omniroute" ]; then
+        cat > "${pkg_install_dir}/${bin_name}" << EOF
+#!/usr/bin/env sh
+export PATH="${MINIONS_HOME}/lib/node/bin:${npm_prefix}/lib/node_modules/.bin:\${PATH}"
+export NODE_PATH="${npm_prefix}/lib/node_modules"
+# Translate --host/--port CLI args into PORT/HOSTNAME env vars for server.js
+host=""
+port=""
+for arg in "\$@"; do
+    case "\$arg" in
+        --version|-V) echo "${pkg_version}"; exit 0 ;;
+    esac
+done
+while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+        --host) host="\$2"; shift 2 ;;
+        --host=*) host="\${1#*=}"; shift ;;
+        --port) port="\$2"; shift 2 ;;
+        --port=*) port="\${1#*=}"; shift ;;
+        *) shift ;;
+    esac
+done
+[ -n "\$host" ] && export HOSTNAME="\$host"
+[ -n "\$port" ] && export PORT="\$port"
+exec "${MINIONS_HOME}/lib/node/bin/node" "${npm_prefix}/node_modules/omniroute/dist/server.js"
+EOF
+    else
+        cat > "${pkg_install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
 export PATH="${MINIONS_HOME}/lib/node/bin:${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
 exec "${actual_binary}" "\$@"
 EOF
-    make_executable "${install_dir}/${bin_name}"
+    fi
+    make_executable "${pkg_install_dir}/${bin_name}"
 
     # Verify the binary works (bounded timeout — some bins hang on --version)
-    if timeout 30 "${install_dir}/${bin_name}" --version >/dev/null 2>&1; then
-        echo "${pkg_name}@${pkg_version} installed and verified at ${install_dir}"
+    if timeout 30 "${pkg_install_dir}/${bin_name}" --version >/dev/null 2>&1; then
+        echo "${pkg_name}@${pkg_version} installed and verified at ${pkg_install_dir}"
     else
         echo "WARNING: ${pkg_name} installed but binary verification (--version) failed or timed out" >&2
     fi
