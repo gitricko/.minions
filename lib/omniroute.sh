@@ -40,16 +40,5 @@ omniroute_preconfigure() {
             }' >/dev/null || true
     fi
 
-    echo "OmniRoute preconfig: enabling MCP..."
-    curl -s -X PATCH "${base_url}/api/settings" \
-        -H "Content-Type: application/json" \
-        -d '{"mcpEnabled": true}' >/dev/null || true
-
-    echo "OmniRoute preconfig: registering with Hermes..."
-    # Only if Hermes is installed
-    if command -v hermes >/dev/null 2>&1; then
-        hermes mcp add omniroute --command omniroute --args --mcp 2>/dev/null || true
-    fi
-
     echo "OmniRoute preconfig complete"
 }

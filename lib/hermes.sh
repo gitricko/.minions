@@ -72,7 +72,7 @@ EOF
 }
 
 # Preconfigure Hermes after install
-# Sets up: auto-fastest model combo, MCP, omniroute login off, gateway/dashboard
+# Sets up: auto-fastest model combo, omniroute login off (no MCP integration)
 hermes_preconfigure() {
     echo "Preconfiguring Hermes..."
 
@@ -82,14 +82,8 @@ hermes_preconfigure() {
     # Set auto-fastest model combo (uses OmniRoute by default)
     hermes config set model.provider auto-fastest 2>/dev/null || true
 
-    # Enable MCP
-    hermes config set mcp.enabled true 2>/dev/null || true
-
     # Disable OmniRoute login requirement (mirrors start-hermes.sh)
     hermes config set omniroute.login_required false 2>/dev/null || true
-
-    # Register OmniRoute as MCP server
-    hermes mcp add omniroute --command omniroute --args --mcp 2>/dev/null || true
 
     echo "Hermes preconfig complete"
 }
