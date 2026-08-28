@@ -104,17 +104,31 @@ is_service_running() {
 
 # Wait for a port to become available
 # Usage: wait_for_port <host> <port> <timeout_seconds> <service_name>
+# No hard dependency on nc: prefer nc if present, else fall back to a
+# Bash /dev/tcp probe (nc is NOT installed by default on many distros).
 wait_for_port() {
     host=$1
     port=$2
     timeout=$3
     name=$4
 
+    # Pick a port-checker once: nc if available, else bash /dev/tcp.
+    # The bash /dev/tcp probe works even when this script runs under dash,
+    # because we invoke bash explicitly via `bash -c`.
+    if command -v nc >/dev/null 2>&1; then
+        port_check() { nc -z "$1" "$2" 2>/dev/null; }
+    elif command -v bash >/dev/null 2>&1; then
+        port_check() { bash -c "exec 3<>/dev/tcp/$1/$2" 2>/dev/null; }
+    else
+        echo "WARNING: neither nc nor bash available to probe ${name} port" >&2
+        port_check() { return 1; }
+    fi
+
     echo "Waiting for ${name} on ${host}:${port}..."
     start_time=$(date +%s)
 
     while [ $(($(date +%s) - start_time)) -lt "${timeout}" ]; do
-        if nc -z "${host}" "${port}" 2>/dev/null; then
+        if port_check "${host}" "${port}"; then
             echo "${name} is up on ${host}:${port}"
             return 0
         fi
