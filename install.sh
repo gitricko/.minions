@@ -186,8 +186,12 @@ fi
 
 # Step 3: Install prerequisites
 log_info "Installing prerequisites..."
-ensure_node "22.22.2"
 ensure_uv
+
+# Install vendored Node.js 22.22.2 for npm packages (OmniRoute, ModelRelay, Pi)
+# These packages have compatibility issues with Node 24+
+log_info "Installing vendored Node.js ${NODE_VERSION} for npm packages..."
+ensure_node_v22
 
 # Step 4: Install components
 # Install Mnemon FIRST so it's available for Pi/Hermes plugin setup

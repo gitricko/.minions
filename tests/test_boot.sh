@@ -96,13 +96,10 @@ exit 0
 EOF
 chmod +x "${TEST_HOME}/bin/sqlite3"
 
-# Mock hermes for mcp add
+# Mock hermes (CLI stub; MCP add removed from preconfig per captain)
 cat > "${TEST_HOME}/bin/hermes" << 'EOF'
 #!/usr/bin/env sh
-if echo "$*" | grep -q "mcp add"; then
-    exit 0
-fi
-exit 1
+exit 0
 EOF
 chmod +x "${TEST_HOME}/bin/hermes"
 
