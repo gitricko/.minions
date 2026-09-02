@@ -65,6 +65,16 @@ EOF
         echo "WARNING: Hermes installed but binary verification (--version) failed or timed out" >&2
     fi
 
+    # Install python-dotenv in Hermes managed venv (required for hermes_cli)
+    # The managed uv is at ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent/venv/bin/uv
+    # INSTALL_DIR = ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent
+    install_dir_guess="${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent"
+    if [ -x "${install_dir_guess}/venv/bin/uv" ]; then
+        "${install_dir_guess}/venv/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
+    elif [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
+        "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
+    fi
+
     # Preconfigure Hermes (if requested)
     if [ "${MINIONS_HERMES_PRECONFIG:-0}" -eq 1 ]; then
         hermes_preconfigure
@@ -86,6 +96,72 @@ hermes_preconfigure() {
     hermes config set omniroute.login_required false 2>/dev/null || true
 
     echo "Hermes preconfig complete"
+}
+
+# Update Hermes config.yaml with current ports
+# Usage: hermes_update_config [omniroute_port] [modelrelay_port]
+# If ports not provided, reads from OMNIROUTE_PORT/MODELRELAY_PORT env vars
+hermes_update_config() {
+    omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
+    modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
+    omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
+    modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
+
+    # Determine Hermes config file path
+    config_file=""
+    if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
+        config_file="${HERMES_CONFIG_FILE}"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
+        config_file="${HERMES_HOME}/config.yaml"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
+        config_file="${HERMES_HOME}/.hermes/config.yaml"
+    elif [ -f "${HOME}/.hermes/config.yaml" ]; then
+        config_file="${HOME}/.hermes/config.yaml"
+    else
+        # Config doesn't exist yet; nothing to update
+        return 0
+    fi
+
+    # Use Python for reliable YAML manipulation
+    python3 -c "
+import yaml
+import sys
+
+config_file = '${config_file}'
+omniroute_url = '${omniroute_url}'
+modelrelay_url = '${modelrelay_url}'
+
+with open(config_file, 'r') as f:
+    config = yaml.safe_load(f) or {}
+
+if 'custom_providers' not in config:
+    config['custom_providers'] = {}
+
+config['custom_providers']['omniroute'] = {'base_url': omniroute_url}
+config['custom_providers']['modelrelay'] = {'base_url': modelrelay_url}
+
+with open(config_file, 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+print('Hermes config updated: omniroute -> {} , modelrelay -> {}'.format(omniroute_url, modelrelay_url))
+" 2>/dev/null || {
+        echo "WARNING: Python YAML update failed, trying sed fallback..." >&2
+        # Fallback sed approach (original logic)
+        if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
+            sed -i "/^[^#]/i\\\ncustom_providers:\\\n  omniroute:\\\n    base_url: ${omniroute_url}\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}\\\n" "${config_file}" 2>/dev/null || true
+        else
+            sed -i \
+                -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
+                -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
+                "${config_file}" 2>/dev/null || true
+            if ! grep -q "omniroute:" "${config_file}" 2>/dev/null; then
+                sed -i "/^custom_providers:/a\\\n  omniroute:\\\n    base_url: ${omniroute_url}" "${config_file}" 2>/dev/null || true
+            fi
+            if ! grep -q "modelrelay:" "${config_file}" 2>/dev/null; then
+                sed -i "/^custom_providers:/a\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}" "${config_file}" 2>/dev/null || true
+            fi
+        fi
+    }
 }
 
 # Ensure Hermes is available

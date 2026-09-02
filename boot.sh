@@ -162,6 +162,15 @@ fi
 # Step 5: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"
 
+# Step 5b: Update Hermes config with actual ports
+if [ "${DRY_RUN}" -eq 0 ] && [ "${INSTALL_HERMES:-1}" -eq 1 ]; then
+    # Set HERMES_HOME so hermes_update_config finds the right config
+    export HERMES_HOME="${MINIONS_HOME}/lib/hermes/home"
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/lib/hermes.sh"
+    hermes_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
+fi
+
 # Step 6: Print READY message
 echo ""
 echo "=============================================="
