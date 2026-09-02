@@ -116,7 +116,9 @@ if [ -f "${HERMES_CONFIG}" ]; then
         log_info "Hermes config has correct omniroute base_url"
     else
         log_error "Hermes config missing omniroute base_url (expected 20128)"
-        grep -A5 "custom_providers:" "${HERMES_CONFIG}" | head -10
+        echo "=== DEBUG: Full config file ==="
+        cat "${HERMES_CONFIG}"
+        echo "=== END DEBUG ==="
         exit 1
     fi
     
@@ -125,7 +127,9 @@ if [ -f "${HERMES_CONFIG}" ]; then
         log_info "Hermes config has correct modelrelay base_url"
     else
         log_error "Hermes config missing modelrelay base_url (expected 7352)"
-        grep -A5 "custom_providers:" "${HERMES_CONFIG}" | head -10
+        echo "=== DEBUG: Full config file ==="
+        cat "${HERMES_CONFIG}"
+        echo "=== END DEBUG ==="
         exit 1
     fi
 else
