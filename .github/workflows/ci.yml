@@ -104,17 +104,38 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Run real install test
+      - name: Run real install test + CLI integration test
         env:
           CI_REAL_INSTALL: 1
         run: |
           set -e
-          bash tests/test_install.sh
+          # First run the real install test (but don't cleanup)
+          REAL_HOME=$(mktemp -d)
+          export MINIONS_HOME="${REAL_HOME}"
+          echo "Running real install..."
+          bash install.sh --minions-home "${REAL_HOME}"
+          echo "Install complete"
 
-      - name: Run CLI integration test
-        if: runner.os == 'Linux'
-        env:
-          CI_REAL_INSTALL: 1
-        run: |
-          set -e
+          # Verify binaries
+          for bin in omniroute modelrelay pi hermes; do
+              if [ -x "${REAL_HOME}/bin/${bin}" ]; then
+                  if timeout 10s "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
+                      echo "✓ ${bin} installed and --version works"
+                  else
+                      echo "WARN: ${bin} installed but --version failed"
+                  fi
+              else
+                  echo "FAIL: ${bin} not found"
+                  exit 1
+              fi
+          done
+          if [ -x "${REAL_HOME}/bin/mnemon" ]; then
+              echo "✓ mnemon installed"
+          else
+              echo "FAIL: mnemon not found"
+              exit 1
+          fi
+
+          # Now run CLI integration test using the same MINIONS_HOME
+          export PATH="${REAL_HOME}/bin:${PATH}"
           bash tests/test_cli_integration.sh
