@@ -145,6 +145,24 @@ else
     log_warn "hermes config get model.provider didn't return expected value"
 fi
 
+# Test OmniRoute /v1/models endpoint responds (proves connectivity through proxy)
+echo "Testing OmniRoute /v1/models endpoint..."
+if curl -s -f "http://127.0.0.1:20128/v1/models" >/dev/null 2>&1; then
+    log_info "OmniRoute /v1/models endpoint responds"
+else
+    log_error "OmniRoute /v1/models endpoint failed"
+    exit 1
+fi
+
+# Test ModelRelay /v1/models endpoint responds
+echo "Testing ModelRelay /v1/models endpoint..."
+if curl -s -f "http://127.0.0.1:7352/v1/models" >/dev/null 2>&1; then
+    log_info "ModelRelay /v1/models endpoint responds"
+else
+    log_error "ModelRelay /v1/models endpoint failed"
+    exit 1
+fi
+
 # Step 4: Test Pi-Agent CLI
 echo ""
 echo "[4/5] Testing Pi-Agent CLI..."
