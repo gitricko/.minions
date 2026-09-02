@@ -65,6 +65,12 @@ EOF
         echo "WARNING: Hermes installed but binary verification (--version) failed or timed out" >&2
     fi
 
+    # Install python-dotenv in Hermes managed venv (required for hermes_cli)
+    # The managed uv is at ${HERMES_HOME_OVERRIDE}/.hermes/bin/uv
+    if [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
+        "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
+    fi
+
     # Preconfigure Hermes (if requested)
     if [ "${MINIONS_HERMES_PRECONFIG:-0}" -eq 1 ]; then
         hermes_preconfigure
