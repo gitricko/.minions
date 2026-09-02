@@ -110,39 +110,46 @@ hermes_update_config() {
         return 0
     fi
 
-    # Hermes uses custom_providers.omniroute.base_url and custom_providers.modelrelay.base_url
-    # Use sed to update or add these entries
-    # First, ensure custom_providers section exists
-    if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
-        # Add custom_providers section before the first non-comment section
-        sed -i "/^[^#]/i\\
-custom_providers:\\
-  omniroute:\\
-    base_url: ${omniroute_url}\\
-  modelrelay:\\
-    base_url: ${modelrelay_url}\\
-" "${config_file}" 2>/dev/null || true
-    else
-        # Update existing custom_providers entries
-        sed -i \
-            -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
-            -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
-            "${config_file}" 2>/dev/null || true
-        
-        # If omniroute or modelrelay don't exist under custom_providers, add them
-        if ! grep -q "omniroute:" "${config_file}" 2>/dev/null; then
-            sed -i "/^custom_providers:/a\\
-  omniroute:\\
-    base_url: ${omniroute_url}" "${config_file}" 2>/dev/null || true
-        fi
-        if ! grep -q "modelrelay:" "${config_file}" 2>/dev/null; then
-            sed -i "/^custom_providers:/a\\
-  modelrelay:\\
-    base_url: ${modelrelay_url}" "${config_file}" 2>/dev/null || true
-        fi
-    fi
+    # Use Python for reliable YAML manipulation
+    python3 -c "
+import yaml
+import sys
 
-    echo "Hermes config updated: omniroute -> ${omniroute_url}, modelrelay -> ${modelrelay_url}"
+config_file = '${config_file}'
+omniroute_url = '${omniroute_url}'
+modelrelay_url = '${modelrelay_url}'
+
+with open(config_file, 'r') as f:
+    config = yaml.safe_load(f) or {}
+
+if 'custom_providers' not in config:
+    config['custom_providers'] = {}
+
+config['custom_providers']['omniroute'] = {'base_url': omniroute_url}
+config['custom_providers']['modelrelay'] = {'base_url': modelrelay_url}
+
+with open(config_file, 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+print('Hermes config updated: omniroute -> {} , modelrelay -> {}'.format(omniroute_url, modelrelay_url))
+" 2>/dev/null || {
+        echo "WARNING: Python YAML update failed, trying sed fallback..." >&2
+        # Fallback sed approach (original logic)
+        if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
+            sed -i "/^[^#]/i\\\ncustom_providers:\\\n  omniroute:\\\n    base_url: ${omniroute_url}\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}\\\n" "${config_file}" 2>/dev/null || true
+        else
+            sed -i \
+                -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
+                -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
+                "${config_file}" 2>/dev/null || true
+            if ! grep -q "omniroute:" "${config_file}" 2>/dev/null; then
+                sed -i "/^custom_providers:/a\\\n  omniroute:\\\n    base_url: ${omniroute_url}" "${config_file}" 2>/dev/null || true
+            fi
+            if ! grep -q "modelrelay:" "${config_file}" 2>/dev/null; then
+                sed -i "/^custom_providers:/a\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}" "${config_file}" 2>/dev/null || true
+            fi
+        fi
+    }
 }
 
 # Ensure Hermes is available
