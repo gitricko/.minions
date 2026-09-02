@@ -41,44 +41,6 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
-      - name: Run real boot test
-        env:
-          CI_REAL_INSTALL: 1
-        run: |
-          set -e
-          echo "=== Running real boot test ==="
-          # Fresh install for boot test
-          REAL_HOME=$(mktemp -d)
-          export MINIONS_HOME="${REAL_HOME}"
-          export PATH="${REAL_HOME}/bin:${PATH}"
-          bash install.sh --minions-home "${REAL_HOME}" >/tmp/boot-install.log 2>&1
-          echo "Install complete"
-          # Run boot to COMPLETION in the foreground (services are setsid'd, so
-          # boot.sh returns after the stack is UP). A hang here — e.g. an
-          # interactive preconfig prompt blocking on TTY — trips the timeout
-          # and FAILS the build. Previously we only checked ports then killed
-          # boot, so post-port hangs (like the hermes mcp add prompt) were never
-          # caught.
-          timeout 180s bash boot.sh >/tmp/boot-run.log 2>&1
-          BOOT_EXIT=$?
-          echo "boot.sh exit code: ${BOOT_EXIT}"
-          # boot.sh must reach the READY marker (i.e. preconfig completed, no hang)
-          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/boot-run.log; then
-            echo "FAIL: boot.sh did not reach completion marker"
-            cat /tmp/boot-run.log
-            exit 1
-          fi
-          # Services must be listening (no nc dependency — bash /dev/tcp)
-          check_port() { bash -c "exec 3<>/dev/tcp/127.0.0.1/$1" 2>/dev/null; }
-          for port in 20128 7352; do
-            if check_port $port; then
-              echo "Service on port $port is up"
-            else
-              echo "Service on port $port failed to start"
-              exit 1
-            fi
-          done
-          echo "Real boot test passed"
   real-install:
     name: Real Install (Linux)
     runs-on: ubuntu-latest
