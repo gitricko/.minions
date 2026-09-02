@@ -102,12 +102,12 @@ else
 fi
 
 # Test hermes config shows correct base_urls
-# Hermes config is at HERMES_HOME/config.yaml (not .hermes/config.yaml)
+# Hermes config is at HERMES_HOME/.hermes/config.yaml (not HERMES_HOME/config.yaml)
 # HERMES_HOME is set in the hermes wrapper script to ${MINIONS_HOME}/lib/hermes/home
-HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
+HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
 if [ ! -f "${HERMES_CONFIG}" ]; then
     # Fallback to .hermes/config.yaml
-    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
+    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
 fi
 
 if [ -f "${HERMES_CONFIG}" ]; then

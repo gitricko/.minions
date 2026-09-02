@@ -103,6 +103,8 @@ hermes_update_config() {
         config_file="${HERMES_CONFIG_FILE}"
     elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
         config_file="${HERMES_HOME}/config.yaml"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
+        config_file="${HERMES_HOME}/.hermes/config.yaml"
     elif [ -f "${HOME}/.hermes/config.yaml" ]; then
         config_file="${HOME}/.hermes/config.yaml"
     else
