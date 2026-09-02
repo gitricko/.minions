@@ -211,6 +211,15 @@ ensure_modelrelay
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes (opt-in)..."
     ensure_hermes
+    
+    # Update Hermes config with current ports
+    if [ "${DRY_RUN}" -eq 0 ]; then
+        # Set HERMES_HOME so hermes_update_config finds the right config
+        export HERMES_HOME="${MINIONS_HOME}/lib/hermes/home"
+        # shellcheck disable=SC1091
+        . "${MINIONS_HOME}/etc/minions.env"
+        hermes_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
+    fi
 fi
 
 # Step 5: Set up PATH snippet

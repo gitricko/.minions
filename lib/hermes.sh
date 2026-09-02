@@ -88,6 +88,50 @@ hermes_preconfigure() {
     echo "Hermes preconfig complete"
 }
 
+# Update Hermes config.yaml with current ports
+# Usage: hermes_update_config [omniroute_port] [modelrelay_port]
+# If ports not provided, reads from OMNIROUTE_PORT/MODELRELAY_PORT env vars
+hermes_update_config() {
+    omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
+    modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
+    omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
+    modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
+
+    # Determine Hermes config file path
+    config_file=""
+    if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
+        config_file="${HERMES_CONFIG_FILE}"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
+        config_file="${HERMES_HOME}/.hermes/config.yaml"
+    elif [ -f "${HOME}/.hermes/config.yaml" ]; then
+        config_file="${HOME}/.hermes/config.yaml"
+    else
+        # Config doesn't exist yet; nothing to update
+        return 0
+    fi
+
+    # Use sed to update the base_url values
+    # Match "base_url:" under "omniroute:" and "modelrelay:" sections
+    # Use | as delimiter to avoid conflicts with / in URLs
+    sed -i \
+        -e "/^  providers:/,/^  [a-z]/ s|base_url: http://[^|]*|base_url: ${omniroute_url}|" \
+        -e "/^  providers:/,/^  [a-z]/ s|base_url: http://[^|]*|base_url: ${modelrelay_url}|" \
+        "${config_file}" 2>/dev/null || true
+
+    # More precise approach: find the specific sections
+    # First fix omniroute base_url
+    sed -i \
+        -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
+        "${config_file}" 2>/dev/null || true
+
+    # Then fix modelrelay base_url
+    sed -i \
+        -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
+        "${config_file}" 2>/dev/null || true
+
+    echo "Hermes config updated: omniroute -> ${omniroute_url}, modelrelay -> ${modelrelay_url}"
+}
+
 # Ensure Hermes is available
 ensure_hermes() {
     if [ -x "${MINIONS_HOME}/lib/hermes/hermes" ]; then
