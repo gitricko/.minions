@@ -200,18 +200,18 @@ MNEMON_BIN="${REAL_HOME}/bin/mnemon"
 if [ -x "${MNEMON_BIN}" ]; then
     TEST_KEY="ci-test-$(date +%s)"
     
-    # Test mnemon remember
-    if echo "test content" | "${MNEMON_BIN}" remember --text "${TEST_KEY}" 2>/dev/null; then
+    # Test mnemon remember - content is first arg, no --text flag
+    if "${MNEMON_BIN}" remember "test content for ${TEST_KEY}" --tags "${TEST_KEY}" --cat fact 2>/dev/null; then
         log_info "mnemon remember works"
     else
         log_warn "mnemon remember failed (may need different args)"
     fi
     
-    # Test mnemon recall
-    if "${MNEMON_BIN}" recall "${TEST_KEY}" --limit 5 2>/dev/null | grep -q "${TEST_KEY}"; then
+    # Test mnemon recall - searches by keyword (semantic), not exact key match
+    if "${MNEMON_BIN}" recall "${TEST_KEY}" --limit 5 2>/dev/null | grep -q "test content"; then
         log_info "mnemon recall works"
     else
-        log_warn "mnemon recall didn't find test key"
+        log_warn "mnemon recall didn't find test content (semantic search may not match exact)"
     fi
 else
     log_warn "mnemon binary not found at ${MNEMON_BIN} (may use system mnemon)"
