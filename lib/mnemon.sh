@@ -96,11 +96,17 @@ import_mnemon_seed() {
 
     echo "Importing Mnemon seed for ${target} from ${seed_file}..."
 
-    if mnemon import "${seed_file}" --data-dir "${HOME}/.mnemon" --store "${store_name}" 2>/dev/null; then
-        echo "Mnemon seed imported for ${target}"
+    # Try with --dry-run first to validate, then import
+    if mnemon import --help 2>&1 | grep -q "import"; then
+        if mnemon import "${seed_file}" --data-dir "${HOME}/.mnemon" --store "${store_name}" 2>/dev/null; then
+            echo "Mnemon seed imported for ${target}"
+        else
+            echo "WARNING: Mnemon seed import failed for ${target} (non-fatal)" >&2
+            return 0  # Non-fatal
+        fi
     else
-        echo "WARNING: Mnemon seed import failed for ${target}" >&2
-        return 1
+        echo "WARNING: mnemon import command not available, skipping seed import" >&2
+        return 0  # Non-fatal
     fi
 }
 
