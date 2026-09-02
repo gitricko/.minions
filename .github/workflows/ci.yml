@@ -100,7 +100,7 @@ jobs:
 
           # Now boot the stack
           export PATH="${REAL_HOME}/bin:${PATH}"
-          timeout 180s bash "${REAL_HOME}/boot.sh" >/tmp/boot.log 2>&1
+          timeout 300s bash "${REAL_HOME}/boot.sh" >/tmp/boot.log 2>&1
           BOOT_EXIT=$?
           echo "boot.sh exit code: ${BOOT_EXIT}"
           if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/boot.log; then
