@@ -136,6 +136,18 @@ jobs:
               exit 1
           fi
 
+          # Now boot the stack
+          export PATH="${REAL_HOME}/bin:${PATH}"
+          timeout 180s bash "${REAL_HOME}/boot.sh" >/tmp/boot.log 2>&1
+          BOOT_EXIT=$?
+          echo "boot.sh exit code: ${BOOT_EXIT}"
+          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/boot.log; then
+              echo "FAIL: boot.sh did not reach completion marker"
+              cat /tmp/boot.log
+              exit 1
+          fi
+          echo "Stack booted successfully"
+
           # Now run CLI integration test using the same MINIONS_HOME
           export PATH="${REAL_HOME}/bin:${PATH}"
           bash tests/test_cli_integration.sh
