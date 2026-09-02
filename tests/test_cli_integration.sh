@@ -163,6 +163,16 @@ else
     exit 1
 fi
 
+# Test Hermes chat through OmniRoute (real end-to-end query with free models)
+# The auto-fastest combo is preconfigured with free models (no API keys needed)
+echo "Testing Hermes chat via OmniRoute (auto-fastest with free models)..."
+HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
+if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then
+    log_info "Hermes chat via OmniRoute works (got expected response)"
+else
+    log_warn "Hermes chat via OmniRoute returned unexpected: ${HERMES_TEST_RESP}"
+fi
+
 # Step 4: Test Pi-Agent CLI
 echo ""
 echo "[4/5] Testing Pi-Agent CLI..."

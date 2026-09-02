@@ -24,19 +24,30 @@ omniroute_preconfigure() {
         grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//; s/"//') || true
 
     if [ -n "${combo_id}" ]; then
-        echo "OmniRoute preconfig: updating combo with models..."
-        # Update combo with model config
+        echo "OmniRoute preconfig: updating combo with FREE models (no API keys needed)..."
+        # Update combo with free models that work without API keys
+        # Model format: { "provider": "<provider>", "model": "<model>" }
         curl -s -X PUT "${base_url}/api/combos/${combo_id}" \
             -H "Content-Type: application/json" \
             -d '{
                 "name": "auto-fastest",
                 "strategy": "auto",
                 "models": [
-                    {"provider": "anthropic", "model": "claude-3-5-sonnet-20241022"},
-                    {"provider": "openai", "model": "gpt-4o"},
-                    {"provider": "google", "model": "gemini-1.5-pro"}
+                    {"provider": "opencode", "model": "deepseek-v4-flash-free"},
+                    {"provider": "opencode", "model": "big-pickle"},
+                    {"provider": "opencode-zen", "model": "deepseek-v4-flash-free"},
+                    {"provider": "opencode-zen", "model": "hy3-free"},
+                    {"provider": "opencode-zen", "model": "mimo-v2.5-free"},
+                    {"provider": "opencode-zen", "model": "north-mini-code-free"},
+                    {"provider": "opencode-zen", "model": "nemotron-3-ultra-free"},
+                    {"provider": "opencode-zen", "model": "big-pickle"}
                 ],
-                "retry": {"maxAttempts": 3, "backoffMs": 1000}
+                "config": {
+                    "maxRetries": 2,
+                    "retryDelayMs": 1000,
+                    "timeoutMs": 120000,
+                    "healthCheckEnabled": true
+                }
             }' >/dev/null || true
     fi
 
