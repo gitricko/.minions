@@ -192,3 +192,42 @@ ensure_pi() {
     setup_mnemon_pi "${MINIONS_HOME}"
     create_pi_symlinks "${MINIONS_HOME}"
 }
+
+# Update Pi config with actual proxy ports
+# Usage: pi_update_config <omniroute_port> <modelrelay_port>
+# Updates both pi.toml and models.json in ~/.pi/ with actual running ports
+pi_update_config() {
+    omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
+    modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
+    omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
+    modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
+
+    echo "Updating Pi config with ports: omniroute=${omniroute_port}, modelrelay=${modelrelay_port}"
+
+    # Update pi.toml
+    if [ -f "${HOME}/.pi/pi.toml" ]; then
+        sed -i "s|base_url = \".*\"|base_url = \"${omniroute_url}\"|" "${HOME}/.pi/pi.toml"
+        echo "Updated pi.toml base_url to ${omniroute_url}"
+    fi
+
+    # Update models.json (using Python for reliable JSON manipulation)
+    if [ -f "${HOME}/.pi/models.json" ]; then
+        python3 -c "
+import json
+with open('${HOME}/.pi/models.json', 'r') as f:
+    cfg = json.load(f)
+cfg['providers']['omniroute']['baseUrl'] = '${omniroute_url}'
+cfg['providers']['modelrelay']['baseUrl'] = '${modelrelay_url}'
+# Also update model-level baseUrl for both providers
+if 'models' in cfg['providers']['omniroute']:
+    for model in cfg['providers']['omniroute']['models']:
+        model['baseUrl'] = '${omniroute_url}'
+if 'models' in cfg['providers']['modelrelay']:
+    for model in cfg['providers']['modelrelay']['models']:
+        model['baseUrl'] = '${modelrelay_url}'
+with open('${HOME}/.pi/models.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+        echo "Updated models.json baseUrl to omniroute=${omniroute_url}, modelrelay=${modelrelay_url}"
+    fi
+}

@@ -222,6 +222,14 @@ if [ "${INSTALL_HERMES}" -eq 1 ]; then
     fi
 fi
 
+# Update Pi config with current ports
+if [ "${DRY_RUN}" -eq 0 ]; then
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/etc/minions.env"
+    . "${MINIONS_HOME}/lib/pi.sh"
+    pi_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
+fi
+
 # Step 5: Set up PATH snippet
 # shellcheck disable=SC2016
 PATH_SNIPPET='
