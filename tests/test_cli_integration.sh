@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # tests/test_cli_integration.sh - Integration test for Hermes/Pi/Mnemon CLI
 # Runs against a REAL installed .minions stack (not mocks)
+#
+# Usage:
+#   CI_REAL_INSTALL=1 bash tests/test_cli_integration.sh  # in CI, uses existing MINIONS_HOME
+#   bash tests/test_cli_integration.sh                    # local, does fresh install
 
 set -e
 set -u
@@ -25,34 +29,54 @@ log_info() { echo "${GREEN}[PASS]${NC} $*"; }
 log_error() { echo "${RED}[FAIL]${NC} $*"; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
-# Fresh install directory
-REAL_HOME=$(mktemp -d)
-export MINIONS_HOME="${REAL_HOME}"
+# In CI, MINIONS_HOME is already set from the real install step
+# Locally, create a fresh install
+if [ -n "${MINIONS_HOME:-}" ] && [ -d "${MINIONS_HOME}" ]; then
+    REAL_HOME="${MINIONS_HOME}"
+    echo "=== CLI Integration Test (using existing MINIONS_HOME) ==="
+    echo "MINIONS_HOME=${MINIONS_HOME}"
+else
+    REAL_HOME=$(mktemp -d)
+    export MINIONS_HOME="${REAL_HOME}"
+    export PATH="${REAL_HOME}/bin:${PATH}"
+    echo "=== CLI Integration Test (fresh install) ==="
+    echo "MINIONS_HOME=${MINIONS_HOME}"
+fi
+
+# Step 1: Install (only if fresh)
+if [ -z "${CI_REAL_INSTALL:-}" ]; then
+    echo ""
+    echo "[1/5] Installing .minions stack..."
+    bash "${PROJECT_ROOT}/install.sh" --minions-home "${REAL_HOME}" >/tmp/cli-install.log 2>&1
+    log_info "Install complete"
+else
+    echo ""
+    echo "[1/5] Using existing installation from Real Install step"
+    log_info "Using existing MINIONS_HOME"
+fi
+
 export PATH="${REAL_HOME}/bin:${PATH}"
 
-echo "=== CLI Integration Test ==="
-echo "MINIONS_HOME=${MINIONS_HOME}"
+# Step 2: Boot stack (only if not already running)
+if [ -z "${CI_REAL_INSTALL:-}" ]; then
+    echo ""
+    echo "[2/5] Starting stack with boot.sh..."
+    timeout 180s bash "${REAL_HOME}/boot.sh" >/tmp/cli-boot.log 2>&1
+    BOOT_EXIT=$?
+    echo "boot.sh exit code: ${BOOT_EXIT}"
 
-# Step 1: Install
-echo ""
-echo "[1/5] Installing .minions stack..."
-bash "${PROJECT_ROOT}/install.sh" --minions-home "${REAL_HOME}" >/tmp/cli-install.log 2>&1
-log_info "Install complete"
-
-# Step 2: Boot stack
-echo ""
-echo "[2/5] Starting stack with boot.sh..."
-timeout 180s bash "${REAL_HOME}/boot.sh" >/tmp/cli-boot.log 2>&1
-BOOT_EXIT=$?
-echo "boot.sh exit code: ${BOOT_EXIT}"
-
-# Verify READY marker
-if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/cli-boot.log; then
-    log_error "boot.sh did not reach completion marker"
-    cat /tmp/cli-boot.log
-    exit 1
+    # Verify READY marker
+    if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/cli-boot.log; then
+        log_error "boot.sh did not reach completion marker"
+        cat /tmp/cli-boot.log
+        exit 1
+    fi
+    log_info "Stack started successfully"
+else
+    echo ""
+    echo "[2/5] Stack already running from Real Install step"
+    log_info "Stack is already up"
 fi
-log_info "Stack started successfully"
 
 # Verify services are up
 check_port() { bash -c "exec 3<>/dev/tcp/127.0.0.1/$1" 2>/dev/null; }
@@ -78,11 +102,14 @@ else
 fi
 
 # Test hermes config shows correct base_urls
-# Note: Hermes config may be in ${MINIONS_HOME}/lib/hermes/home/.hermes/config.yaml
-HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
+# Hermes config is at HERMES_HOME/config.yaml (not .hermes/config.yaml)
+# HERMES_HOME is set in the hermes wrapper script to ${MINIONS_HOME}/lib/hermes/home
+HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
 if [ ! -f "${HERMES_CONFIG}" ]; then
-    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
+    # Fallback to .hermes/config.yaml
+    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
 fi
+
 if [ -f "${HERMES_CONFIG}" ]; then
     # Check omniroute base_url is set to localhost:20128 (under custom_providers)
     if grep -A2 "omniroute:" "${HERMES_CONFIG}" | grep -q "base_url: http://127.0.0.1:20128/v1"; then
@@ -102,7 +129,9 @@ if [ -f "${HERMES_CONFIG}" ]; then
         exit 1
     fi
 else
-    log_warn "Hermes config not found at ${HERMES_CONFIG} (may use default ~/.hermes)"
+    log_error "Hermes config not found at ${HERMES_CONFIG}"
+    find "${REAL_HOME}/lib/hermes" -name "config.yaml" 2>/dev/null | head -5
+    exit 1
 fi
 
 # Test hermes config get commands
@@ -155,13 +184,18 @@ else
     log_warn "mnemon binary not found at ${MNEMON_BIN} (may use system mnemon)"
 fi
 
-# Step 6: Stop stack
-echo ""
-echo "[6/6] Stopping stack..."
-"${REAL_HOME}/stop.sh" 2>&1 | grep -q "All services stopped" && log_info "stop.sh runs successfully" || log_error "stop.sh failed"
+# Step 6: Stop stack (only if we started it)
+if [ -z "${CI_REAL_INSTALL:-}" ]; then
+    echo ""
+    echo "[6/6] Stopping stack..."
+    "${REAL_HOME}/stop.sh" 2>&1 | grep -q "All services stopped" && log_info "stop.sh runs successfully" || log_error "stop.sh failed"
 
-# Cleanup
-rm -rf "${REAL_HOME}"
+    # Cleanup
+    rm -rf "${REAL_HOME}"
+else
+    echo ""
+    echo "[6/6] Not stopping stack (managed by CI)"
+fi
 
 echo ""
 echo "=== ALL CLI INTEGRATION TESTS PASSED ==="
