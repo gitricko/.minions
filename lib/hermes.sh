@@ -66,8 +66,12 @@ EOF
     fi
 
     # Install python-dotenv in Hermes managed venv (required for hermes_cli)
-    # The managed uv is at ${HERMES_HOME_OVERRIDE}/.hermes/bin/uv
-    if [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
+    # The managed uv is at ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent/venv/bin/uv
+    # INSTALL_DIR = ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent
+    install_dir_guess="${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent"
+    if [ -x "${install_dir_guess}/venv/bin/uv" ]; then
+        "${install_dir_guess}/venv/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
+    elif [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
         "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
     fi
 
