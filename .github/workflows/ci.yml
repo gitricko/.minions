@@ -110,3 +110,11 @@ jobs:
         run: |
           set -e
           bash tests/test_install.sh
+
+      - name: Run CLI integration test
+        if: runner.os == 'Linux'
+        env:
+          CI_REAL_INSTALL: 1
+        run: |
+          set -e
+          bash tests/test_cli_integration.sh

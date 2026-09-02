@@ -101,8 +101,8 @@ hermes_update_config() {
     config_file=""
     if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
         config_file="${HERMES_CONFIG_FILE}"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
-        config_file="${HERMES_HOME}/.hermes/config.yaml"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
+        config_file="${HERMES_HOME}/config.yaml"
     elif [ -f "${HOME}/.hermes/config.yaml" ]; then
         config_file="${HOME}/.hermes/config.yaml"
     else
@@ -110,24 +110,37 @@ hermes_update_config() {
         return 0
     fi
 
-    # Use sed to update the base_url values
-    # Match "base_url:" under "omniroute:" and "modelrelay:" sections
-    # Use | as delimiter to avoid conflicts with / in URLs
-    sed -i \
-        -e "/^  providers:/,/^  [a-z]/ s|base_url: http://[^|]*|base_url: ${omniroute_url}|" \
-        -e "/^  providers:/,/^  [a-z]/ s|base_url: http://[^|]*|base_url: ${modelrelay_url}|" \
-        "${config_file}" 2>/dev/null || true
-
-    # More precise approach: find the specific sections
-    # First fix omniroute base_url
-    sed -i \
-        -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
-        "${config_file}" 2>/dev/null || true
-
-    # Then fix modelrelay base_url
-    sed -i \
-        -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
-        "${config_file}" 2>/dev/null || true
+    # Hermes uses custom_providers.omniroute.base_url and custom_providers.modelrelay.base_url
+    # Use sed to update or add these entries
+    # First, ensure custom_providers section exists
+    if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
+        # Add custom_providers section before the first non-comment section
+        sed -i "/^[^#]/i\\
+custom_providers:\\
+  omniroute:\\
+    base_url: ${omniroute_url}\\
+  modelrelay:\\
+    base_url: ${modelrelay_url}\\
+" "${config_file}" 2>/dev/null || true
+    else
+        # Update existing custom_providers entries
+        sed -i \
+            -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
+            -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
+            "${config_file}" 2>/dev/null || true
+        
+        # If omniroute or modelrelay don't exist under custom_providers, add them
+        if ! grep -q "omniroute:" "${config_file}" 2>/dev/null; then
+            sed -i "/^custom_providers:/a\\
+  omniroute:\\
+    base_url: ${omniroute_url}" "${config_file}" 2>/dev/null || true
+        fi
+        if ! grep -q "modelrelay:" "${config_file}" 2>/dev/null; then
+            sed -i "/^custom_providers:/a\\
+  modelrelay:\\
+    base_url: ${modelrelay_url}" "${config_file}" 2>/dev/null || true
+        fi
+    fi
 
     echo "Hermes config updated: omniroute -> ${omniroute_url}, modelrelay -> ${modelrelay_url}"
 }
