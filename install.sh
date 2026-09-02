@@ -226,6 +226,7 @@ fi
 if [ "${DRY_RUN}" -eq 0 ]; then
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/minions.env"
+    # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/pi.sh"
     pi_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
 fi
