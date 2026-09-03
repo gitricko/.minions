@@ -178,11 +178,12 @@ if [ "${DRY_RUN}" -eq 0 ]; then
     pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
     
     # Install pi-failover extension (needs config in place and proxies running)
-    log_info "Installing pi-failover extension..."
-    if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl >> "${boot_log}" 2>&1; then
-        log_info "pi-failover extension installed"
+    # Do this synchronously with output visible
+    echo "[INFO] Installing pi-failover extension..."
+    if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>&1; then
+        echo "[INFO] pi-failover extension installed"
     else
-        log_warn "pi-failover extension install failed (non-fatal)"
+        echo "[WARN] pi-failover extension install failed (non-fatal)"
     fi
 fi
 
