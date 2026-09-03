@@ -189,7 +189,19 @@ ensure_pi() {
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/pi/pi" "${MINIONS_HOME}/bin/pi"
 
-    # Run config steps (pi-failover now installed at boot time after proxies running)
+    # Install pi-failover extension (needs proxies running, but we'll try during install too)
+    # This will fail if proxies aren't running, but that's okay - we'll retry at boot
+    if [ "${OMNIROUTE_PORT:-20128}" ] && [ "${MODELRELAY_PORT:-7352}" ]; then
+        # Proxies might not be running yet during install, but let's try
+        echo "Installing pi-failover extension..."
+        if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>/dev/null; then
+            echo "pi-failover extension installed"
+        else
+            echo "pi-failover extension install will retry at boot (proxies not running yet)"
+        fi
+    fi
+
+    # Run config steps
     setup_mnemon_pi "${MINIONS_HOME}"
     create_pi_symlinks "${MINIONS_HOME}"
 }
