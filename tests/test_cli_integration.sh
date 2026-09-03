@@ -191,10 +191,19 @@ PI_TOML="${HOME}/.pi/pi.toml"
 PI_MODELS="${HOME}/.pi/models.json"
 
 if [ -f "${PI_TOML}" ]; then
+    echo "[DEBUG] Contents of ${PI_TOML}:" >&2
+    cat "${PI_TOML}" >&2
     if grep -q "base_url = \"http://127.0.0.1:20128/v1\"" "${PI_TOML}"; then
         log_info "Pi config (pi.toml) has correct omniroute base_url (20128)"
     else
         log_error "Pi config (pi.toml) missing correct omniroute base_url"
+        cat "${PI_TOML}"
+        exit 1
+    fi
+    if grep -q 'provider = "omniroute"' "${PI_TOML}"; then
+        log_info "Pi config (pi.toml) has provider = omniroute"
+    else
+        log_error "Pi config (pi.toml) missing provider = omniroute"
         cat "${PI_TOML}"
         exit 1
     fi
