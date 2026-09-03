@@ -229,6 +229,15 @@ else
     log_warn "pi extensions list doesn't show pi-failover (may need --all or different flag)"
 fi
 
+# Test Pi-Agent end-to-end query (with provider to disambiguate auto-fastest)
+echo "Testing Pi-Agent chat via omniroute..."
+PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute 2>&1 || true)
+if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
+    log_info "Pi-Agent chat via omniroute works (got expected response)"
+else
+    log_warn "Pi-Agent chat via omniroute returned unexpected: ${PI_TEST_RESP}"
+fi
+
 # Step 5: Test Mnemon (if available)
 echo ""
 echo "[5/5] Testing Mnemon..."
