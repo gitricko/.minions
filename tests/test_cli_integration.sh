@@ -211,7 +211,7 @@ if [ -f "${PI_MODELS}" ]; then
         exit 1
     fi
     
-    if grep -Fq "\"baseUrl\": \"${EXPECTED_MODELRELAY_URL}\"" "${PI_MODELS}"; then
+    if grep -q '"baseUrl": "http://127.0.0.1:7352/v1"' "${PI_MODELS}"; then
         log_info "Pi config (models.json) has correct modelrelay baseUrl (7352)"
     else
         log_error "Pi config (models.json) missing correct modelrelay baseUrl"
