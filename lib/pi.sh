@@ -189,8 +189,7 @@ ensure_pi() {
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/pi/pi" "${MINIONS_HOME}/bin/pi"
 
-    # Run config steps
-    install_pi_failover_ext "${MINIONS_HOME}/lib/pi"
+    # Run config steps (pi-failover now installed at boot time after proxies running)
     setup_mnemon_pi "${MINIONS_HOME}"
     create_pi_symlinks "${MINIONS_HOME}"
 }
