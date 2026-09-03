@@ -85,12 +85,14 @@ install_pi() {
         fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
         # Create wrapper script (use printf to avoid heredoc issues)
-        printf '#!/usr/bin/env sh\n%s\n%s\n%s\n' \
-            "export PATH=\"${npm_prefix}/lib/node_modules/.bin:\${PATH}\"" \
-            "export NODE_PATH=\"${npm_prefix}/lib/node_modules\"" \
-            "exec \"${pi_binary}\" \"\$@\"" \
-            > "${install_dir}/pi"
-        make_executable "${install_dir}/pi"
+                # Use MINIONS_HOME-based paths so wrapper works regardless of install location
+                printf '#!/usr/bin/env sh\n%s\n%s\n%s\n%s\n' \
+                    "export PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules/.bin:\${PATH}\"" \
+                    "export NODE_PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules\"" \
+                    "cd \"\${MINIONS_HOME}/lib/pi/npm\"" \
+                    "exec \"\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi\" \"\$@\"" \
+                    > "${install_dir}/pi"
+                make_executable "${install_dir}/pi"
 
     # Verify the binary works (bounded timeout)
     if timeout 30 "${install_dir}/pi" --version >/dev/null 2>&1; then
@@ -191,4 +193,49 @@ ensure_pi() {
     install_pi_failover_ext "${MINIONS_HOME}/lib/pi"
     setup_mnemon_pi "${MINIONS_HOME}"
     create_pi_symlinks "${MINIONS_HOME}"
+}
+
+# Update Pi config with actual proxy ports
+# Usage: pi_update_config <omniroute_port> <modelrelay_port>
+# Updates both pi.toml and models.json in ~/.pi/ with actual running ports
+pi_update_config() {
+    omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
+    modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
+    omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
+    modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
+
+    echo "Updating Pi config with ports: omniroute=${omniroute_port}, modelrelay=${modelrelay_port}"
+
+    # Update pi.toml
+    if [ -f "${HOME}/.pi/pi.toml" ]; then
+        sed -i "s|base_url = \".*\"|base_url = \"${omniroute_url}\"|" "${HOME}/.pi/pi.toml"
+        # Add provider if not present
+        if ! grep -q '^provider =' "${HOME}/.pi/pi.toml"; then
+            sed -i '/^model = "auto"/a # Default provider to use (both omniroute and modelrelay have auto-fastest)\nprovider = "omniroute"' "${HOME}/.pi/pi.toml"
+        else
+            sed -i "s|provider = \".*\"|provider = \"omniroute\"|" "${HOME}/.pi/pi.toml"
+        fi
+        echo "Updated pi.toml base_url to ${omniroute_url}"
+    fi
+
+    # Update models.json (using Python for reliable JSON manipulation)
+    if [ -f "${HOME}/.pi/models.json" ]; then
+        python3 -c "
+import json
+with open('${HOME}/.pi/models.json', 'r') as f:
+    cfg = json.load(f)
+cfg['providers']['omniroute']['baseUrl'] = '${omniroute_url}'
+cfg['providers']['modelrelay']['baseUrl'] = '${modelrelay_url}'
+# Also update model-level baseUrl for both providers
+if 'models' in cfg['providers']['omniroute']:
+    for model in cfg['providers']['omniroute']['models']:
+        model['baseUrl'] = '${omniroute_url}'
+if 'models' in cfg['providers']['modelrelay']:
+    for model in cfg['providers']['modelrelay']['models']:
+        model['baseUrl'] = '${modelrelay_url}'
+with open('${HOME}/.pi/models.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+        echo "Updated models.json baseUrl to omniroute=${omniroute_url}, modelrelay=${modelrelay_url}"
+    fi
 }

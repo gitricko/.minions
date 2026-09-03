@@ -185,11 +185,73 @@ else
     exit 1
 fi
 
+# Test pi config auto-detection: pi.toml and models.json have actual ports
+echo "Testing Pi config auto-detection..."
+PI_TOML="${HOME}/.pi/pi.toml"
+PI_MODELS="${HOME}/.pi/models.json"
+
+if [ -f "${PI_TOML}" ]; then
+    echo "[DEBUG] Contents of ${PI_TOML}:" >&2
+    cat "${PI_TOML}" >&2
+    if grep -q "base_url = \"http://127.0.0.1:20128/v1\"" "${PI_TOML}"; then
+        log_info "Pi config (pi.toml) has correct omniroute base_url (20128)"
+    else
+        log_error "Pi config (pi.toml) missing correct omniroute base_url"
+        cat "${PI_TOML}"
+        exit 1
+    fi
+    if grep -q 'provider = "omniroute"' "${PI_TOML}"; then
+        log_info "Pi config (pi.toml) has provider = omniroute"
+    else
+        log_error "Pi config (pi.toml) missing provider = omniroute"
+        cat "${PI_TOML}"
+        exit 1
+    fi
+else
+    log_warn "Pi config pi.toml not found at ${PI_TOML}"
+fi
+
+if [ -f "${PI_MODELS}" ]; then
+    if grep -q '"baseUrl": "http://127.0.0.1:20128/v1"' "${PI_MODELS}"; then
+        log_info "Pi config (models.json) has correct omniroute baseUrl (20128)"
+    else
+        log_error "Pi config (models.json) missing correct omniroute baseUrl"
+        cat "${PI_MODELS}"
+        exit 1
+    fi
+    
+    if grep -q '"baseUrl": "http://127.0.0.1:7352/v1"' "${PI_MODELS}"; then
+        log_info "Pi config (models.json) has correct modelrelay baseUrl (7352)"
+    else
+        log_error "Pi config (models.json) missing correct modelrelay baseUrl"
+        cat "${PI_MODELS}"
+        exit 1
+    fi
+else
+    log_warn "Pi config models.json not found at ${PI_MODELS}"
+fi
+
 # Test pi extensions list shows pi-failover (may not be available in test env)
 if "${REAL_HOME}/bin/pi" extensions list 2>/dev/null | grep -q "pi-failover"; then
     log_info "pi extensions list shows pi-failover"
 else
     log_warn "pi extensions list doesn't show pi-failover (may need --all or different flag)"
+fi
+
+# Test Pi-Agent end-to-end query (with provider to disambiguate auto-fastest)
+echo "Testing Pi-Agent chat via omniroute..."
+# First check what models are available
+echo "[DEBUG] Available models:" >&2
+"${REAL_HOME}/bin/pi" --list-models 2>&1 | head -20 >&2
+# Also check the models.json content
+echo "[DEBUG] models.json content:" >&2
+cat "${HOME}/.pi/models.json" >&2
+# Try with explicit provider/model
+PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
+if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
+    log_info "Pi-Agent chat via omniroute works (got expected response)"
+else
+    log_warn "Pi-Agent chat via omniroute returned unexpected: ${PI_TEST_RESP}"
 fi
 
 # Step 5: Test Mnemon (if available)

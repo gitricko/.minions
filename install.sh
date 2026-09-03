@@ -155,7 +155,7 @@ mkdir -p "${MINIONS_HOME}/var/cache"
 # Copy config templates if running from a repo checkout (always, even in dry-run for sourcing)
 if [ -d "${SCRIPT_DIR}/etc" ]; then
     log_info "Copying config templates..."
-    cp -n "${SCRIPT_DIR}"/etc/*.env "${SCRIPT_DIR}"/etc/*.toml "${MINIONS_HOME}/etc/" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/etc/*.env "${SCRIPT_DIR}"/etc/*.toml "${SCRIPT_DIR}"/etc/*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
     cp -n "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
     cp -n "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
     cp -n "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
@@ -220,6 +220,15 @@ if [ "${INSTALL_HERMES}" -eq 1 ]; then
         . "${MINIONS_HOME}/etc/minions.env"
         hermes_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
     fi
+fi
+
+# Update Pi config with current ports
+if [ "${DRY_RUN}" -eq 0 ]; then
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/etc/minions.env"
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/lib/pi.sh"
+    pi_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
 fi
 
 # Step 5: Set up PATH snippet

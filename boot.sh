@@ -171,6 +171,13 @@ if [ "${DRY_RUN}" -eq 0 ] && [ "${INSTALL_HERMES:-1}" -eq 1 ]; then
     hermes_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
 fi
 
+# Step 5c: Update Pi config with actual ports
+if [ "${DRY_RUN}" -eq 0 ]; then
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/lib/pi.sh"
+    pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
+fi
+
 # Step 6: Print READY message
 echo ""
 echo "=============================================="
