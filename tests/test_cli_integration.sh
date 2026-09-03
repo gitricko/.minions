@@ -240,6 +240,9 @@ fi
 
 # Test Pi-Agent end-to-end query (with provider to disambiguate auto-fastest)
 echo "Testing Pi-Agent chat via omniroute..."
+# First check what models are available
+echo "[DEBUG] Available models:" >&2
+"${REAL_HOME}/bin/pi" --list-models 2>&1 | head -20 >&2
 # Try with explicit provider/model
 PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
 if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
