@@ -251,7 +251,8 @@ PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omni
 if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
     log_info "Pi-Agent chat via omniroute works (got expected response)"
 else
-    log_warn "Pi-Agent chat via omniroute returned unexpected: ${PI_TEST_RESP}"
+    log_error "Pi-Agent chat via omniroute failed: ${PI_TEST_RESP}"
+    exit 1
 fi
 
 # Step 5: Test Mnemon (if available)
