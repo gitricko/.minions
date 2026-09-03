@@ -207,6 +207,12 @@ pi_update_config() {
     # Update pi.toml
     if [ -f "${HOME}/.pi/pi.toml" ]; then
         sed -i "s|base_url = \".*\"|base_url = \"${omniroute_url}\"|" "${HOME}/.pi/pi.toml"
+        # Add provider if not present
+        if ! grep -q '^provider =' "${HOME}/.pi/pi.toml"; then
+            sed -i '/^model = "auto"/a # Default provider to use (both omniroute and modelrelay have auto-fastest)\nprovider = "omniroute"' "${HOME}/.pi/pi.toml"
+        else
+            sed -i "s|provider = \".*\"|provider = \"omniroute\"|" "${HOME}/.pi/pi.toml"
+        fi
         echo "Updated pi.toml base_url to ${omniroute_url}"
     fi
 
