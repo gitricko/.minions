@@ -56,6 +56,7 @@ else
 fi
 
 export PATH="${REAL_HOME}/bin:${PATH}"
+export MINIONS_HOME="${REAL_HOME}"
 
 # Step 2: Boot stack (only if not already running)
 if [ -z "${CI_REAL_INSTALL:-}" ]; then
