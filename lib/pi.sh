@@ -85,12 +85,14 @@ install_pi() {
         fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
         # Create wrapper script (use printf to avoid heredoc issues)
-        printf '#!/usr/bin/env sh\n%s\n%s\n%s\n' \
-            "export PATH=\"${npm_prefix}/lib/node_modules/.bin:\${PATH}\"" \
-            "export NODE_PATH=\"${npm_prefix}/lib/node_modules\"" \
-            "exec \"${pi_binary}\" \"\$@\"" \
-            > "${install_dir}/pi"
-        make_executable "${install_dir}/pi"
+                # Use MINIONS_HOME-based paths so wrapper works regardless of install location
+                printf '#!/usr/bin/env sh\n%s\n%s\n%s\n%s\n' \
+                    "export PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules/.bin:\${PATH}\"" \
+                    "export NODE_PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules\"" \
+                    "cd \"\${MINIONS_HOME}/lib/pi/npm\"" \
+                    "exec \"\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi\" \"\$@\"" \
+                    > "${install_dir}/pi"
+                make_executable "${install_dir}/pi"
 
     # Verify the binary works (bounded timeout)
     if timeout 30 "${install_dir}/pi" --version >/dev/null 2>&1; then
