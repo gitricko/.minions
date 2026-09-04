@@ -112,8 +112,8 @@ if [ ! -f "${HERMES_CONFIG}" ]; then
 fi
 
 if [ -f "${HERMES_CONFIG}" ]; then
-    # Check omniroute base_url is set to localhost:20128 (under custom_providers)
-    if grep -A2 "omniroute:" "${HERMES_CONFIG}" | grep -q "base_url: http://127.0.0.1:20128/v1"; then
+    # Check omniroute base_url is set to localhost:20128 (under custom_providers list)
+    if grep -A3 "custom_providers:" "${HERMES_CONFIG}" | grep -q "name: omniroute" && grep -A5 "custom_providers:" "${HERMES_CONFIG}" | grep -q "base_url: http://127.0.0.1:20128/v1"; then
         log_info "Hermes config has correct omniroute base_url"
     else
         log_error "Hermes config missing omniroute base_url (expected 20128)"
@@ -124,7 +124,7 @@ if [ -f "${HERMES_CONFIG}" ]; then
     fi
     
     # Check modelrelay base_url is set to localhost:7352
-    if grep -A2 "modelrelay:" "${HERMES_CONFIG}" | grep -q "base_url: http://127.0.0.1:7352/v1"; then
+    if grep -A3 "custom_providers:" "${HERMES_CONFIG}" | grep -q "name: modelrelay" && grep -A5 "custom_providers:" "${HERMES_CONFIG}" | grep -q "base_url: http://127.0.0.1:7352/v1"; then
         log_info "Hermes config has correct modelrelay base_url"
     else
         log_error "Hermes config missing modelrelay base_url (expected 7352)"
