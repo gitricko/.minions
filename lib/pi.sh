@@ -148,12 +148,12 @@ create_pi_symlinks() {
 
     echo "Creating Pi config symlinks..."
 
-    # Ensure ~/.pi directory exists
-    mkdir -p "${HOME}/.pi"
+    # Ensure ~/.pi/agent directory exists (Pi reads config from ~/.pi/agent/)
+    mkdir -p "${HOME}/.pi/agent"
 
     # Symlink pi.toml
     if [ -f "${minions_home}/etc/pi.toml" ]; then
-        ln -sf "${minions_home}/etc/pi.toml" "${HOME}/.pi/pi.toml"
+        ln -sf "${minions_home}/etc/pi.toml" "${HOME}/.pi/agent/pi.toml"
         echo "Symlinked pi.toml"
     else
         echo "WARNING: ${minions_home}/etc/pi.toml not found" >&2
@@ -161,13 +161,13 @@ create_pi_symlinks() {
 
     # Symlink models.json if it exists
     if [ -f "${minions_home}/etc/models.json" ]; then
-        ln -sf "${minions_home}/etc/models.json" "${HOME}/.pi/models.json"
+        ln -sf "${minions_home}/etc/models.json" "${HOME}/.pi/agent/models.json"
         echo "Symlinked models.json"
     fi
 
     # Symlink settings.json if it exists
     if [ -f "${minions_home}/etc/settings.json" ]; then
-        ln -sf "${minions_home}/etc/settings.json" "${HOME}/.pi/settings.json"
+        ln -sf "${minions_home}/etc/settings.json" "${HOME}/.pi/agent/settings.json"
         echo "Symlinked settings.json"
     fi
 }
@@ -210,32 +210,38 @@ ensure_pi() {
 
 # Update Pi config with actual proxy ports
 # Usage: pi_update_config <omniroute_port> <modelrelay_port>
-# Updates both pi.toml and models.json in ~/.pi/ with actual running ports
+# Updates pi.toml and models.json in ~/.pi/agent/ (Pi reads config from agent dir)
 pi_update_config() {
     omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
     modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
     omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
     modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
+    pi_agent_dir="${HOME}/.pi/agent"
 
     echo "Updating Pi config with ports: omniroute=${omniroute_port}, modelrelay=${modelrelay_port}"
 
+    # Ensure agent dir exists (files may not be symlinked yet)
+    mkdir -p "${pi_agent_dir}"
+
     # Update pi.toml
-    if [ -f "${HOME}/.pi/pi.toml" ]; then
-        sed -i "s|base_url = \".*\"|base_url = \"${omniroute_url}\"|" "${HOME}/.pi/pi.toml"
+    if [ -f "${pi_agent_dir}/pi.toml" ]; then
+        sed -i "s|base_url = \".*\"|base_url = \"${omniroute_url}\"|" "${pi_agent_dir}/pi.toml"
         # Add provider if not present
-        if ! grep -q '^provider =' "${HOME}/.pi/pi.toml"; then
-            sed -i '/^model = "auto"/a # Default provider to use (both omniroute and modelrelay have auto-fastest)\nprovider = "omniroute"' "${HOME}/.pi/pi.toml"
+        if ! grep -q '^provider =' "${pi_agent_dir}/pi.toml"; then
+            sed -i '/^model = "auto"/a # Default provider to use (both omniroute and modelrelay have auto-fastest)\nprovider = "omniroute"' "${pi_agent_dir}/pi.toml"
         else
-            sed -i "s|provider = \".*\"|provider = \"omniroute\"|" "${HOME}/.pi/pi.toml"
+            sed -i "s|provider = \".*\"|provider = \"omniroute\"|" "${pi_agent_dir}/pi.toml"
         fi
         echo "Updated pi.toml base_url to ${omniroute_url}"
+    else
+        echo "WARNING: ${pi_agent_dir}/pi.toml not found" >&2
     fi
 
     # Update models.json (using Python for reliable JSON manipulation)
-    if [ -f "${HOME}/.pi/models.json" ]; then
+    if [ -f "${pi_agent_dir}/models.json" ]; then
         python3 -c "
 import json
-with open('${HOME}/.pi/models.json', 'r') as f:
+with open('${pi_agent_dir}/models.json', 'r') as f:
     cfg = json.load(f)
 cfg['providers']['omniroute']['baseUrl'] = '${omniroute_url}'
 cfg['providers']['modelrelay']['baseUrl'] = '${modelrelay_url}'
@@ -246,9 +252,11 @@ if 'models' in cfg['providers']['omniroute']:
 if 'models' in cfg['providers']['modelrelay']:
     for model in cfg['providers']['modelrelay']['models']:
         model['baseUrl'] = '${modelrelay_url}'
-with open('${HOME}/.pi/models.json', 'w') as f:
+with open('${pi_agent_dir}/models.json', 'w') as f:
     json.dump(cfg, f, indent=2)
 "
         echo "Updated models.json baseUrl to omniroute=${omniroute_url}, modelrelay=${modelrelay_url}"
+    else
+        echo "WARNING: ${pi_agent_dir}/models.json not found" >&2
     fi
 }

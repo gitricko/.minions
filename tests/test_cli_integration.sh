@@ -188,8 +188,8 @@ fi
 
 # Test pi config auto-detection: pi.toml and models.json have actual ports
 echo "Testing Pi config auto-detection..."
-PI_TOML="${HOME}/.pi/pi.toml"
-PI_MODELS="${HOME}/.pi/models.json"
+PI_TOML="${HOME}/.pi/agent/pi.toml"
+PI_MODELS="${HOME}/.pi/agent/models.json"
 
 if [ -f "${PI_TOML}" ]; then
     echo "[DEBUG] Contents of ${PI_TOML}:" >&2
@@ -246,7 +246,7 @@ echo "[DEBUG] Available models:" >&2
 "${REAL_HOME}/bin/pi" --list-models 2>&1 | head -20 >&2
 # Also check the models.json content
 echo "[DEBUG] models.json content:" >&2
-cat "${HOME}/.pi/models.json" >&2
+cat "${HOME}/.pi/agent/models.json" >&2
 # Try with explicit provider/model
 PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
 if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
