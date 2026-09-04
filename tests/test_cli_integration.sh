@@ -140,8 +140,8 @@ else
 fi
 
 # Test hermes config get commands
-if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "auto-fastest"; then
-    log_info "hermes config get model.provider returns auto-fastest"
+if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "custom:omniroute"; then
+    log_info "hermes config get model.provider returns custom:omniroute"
 else
     log_warn "hermes config get model.provider didn't return expected value"
 fi
@@ -165,7 +165,7 @@ else
 fi
 
 # Test Hermes chat through OmniRoute (real end-to-end query with free models)
-# The auto-fastest combo is preconfigured with free models (no API keys needed)
+# custom:omniroute provider + auto-fastest model (free models in OmniRoute)
 echo "Testing Hermes chat via OmniRoute (auto-fastest with free models)..."
 HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
 if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then

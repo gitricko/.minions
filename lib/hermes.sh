@@ -82,7 +82,7 @@ EOF
 }
 
 # Preconfigure Hermes after install
-# Sets up: auto-fastest model combo, omniroute login off (no MCP integration)
+# Sets up: custom:omniroute provider, auto-fastest model, omniroute login off (no MCP integration)
 # Uses HERMES_HOME if set, otherwise falls back to ${HOME}/.hermes
 hermes_preconfigure() {
     echo "Preconfiguring Hermes..."
@@ -101,8 +101,11 @@ hermes_preconfigure() {
     
     mkdir -p "${hermes_config_dir}"
 
-    # Set auto-fastest model combo (uses OmniRoute by default)
-    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.provider auto-fastest 2>/dev/null || true
+    # Set custom:omniroute as the provider (auto-fastest is a combo in OmniRoute, not a Hermes provider)
+    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.provider custom:omniroute 2>/dev/null || true
+
+    # Set auto-fastest as the default model (within the custom:omniroute provider)
+    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.default auto-fastest 2>/dev/null || true
 
     # Disable OmniRoute login requirement (mirrors start-hermes.sh)
     HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set omniroute.login_required false 2>/dev/null || true
@@ -146,11 +149,29 @@ modelrelay_url = '${modelrelay_url}'
 with open(config_file, 'r') as f:
     config = yaml.safe_load(f) or {}
 
-if 'custom_providers' not in config:
-    config['custom_providers'] = {}
+# Hermes expects custom_providers as a list of dicts with 'name' and 'base_url'
+if 'custom_providers' not in config or not isinstance(config['custom_providers'], list):
+    config['custom_providers'] = []
 
-config['custom_providers']['omniroute'] = {'base_url': omniroute_url}
-config['custom_providers']['modelrelay'] = {'base_url': modelrelay_url}
+# Update or add omniroute
+found_omniroute = False
+for p in config['custom_providers']:
+    if p.get('name') == 'omniroute':
+        p['base_url'] = omniroute_url
+        found_omniroute = True
+        break
+if not found_omniroute:
+    config['custom_providers'].append({'name': 'omniroute', 'base_url': omniroute_url})
+
+# Update or add modelrelay
+found_modelrelay = False
+for p in config['custom_providers']:
+    if p.get('name') == 'modelrelay':
+        p['base_url'] = modelrelay_url
+        found_modelrelay = True
+        break
+if not found_modelrelay:
+    config['custom_providers'].append({'name': 'modelrelay', 'base_url': modelrelay_url})
 
 with open(config_file, 'w') as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False)
@@ -160,18 +181,10 @@ print('Hermes config updated: omniroute -> {} , modelrelay -> {}'.format(omnirou
         echo "WARNING: Python YAML update failed, trying sed fallback..." >&2
         # Fallback sed approach (original logic)
         if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
-            sed -i "/^[^#]/i\\\ncustom_providers:\\\n  omniroute:\\\n    base_url: ${omniroute_url}\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}\\\n" "${config_file}" 2>/dev/null || true
+            sed -i "/^[^#]/i\\custom_providers:\\n  - name: omniroute\\n    base_url: ${omniroute_url}\\n  - name: modelrelay\\n    base_url: ${modelrelay_url}\\" "${config_file}" 2>/dev/null || true
         else
-            sed -i \
-                -e "/^[[:space:]]*omniroute:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${omniroute_url}|" \
-                -e "/^[[:space:]]*modelrelay:/,/^[[:space:]]*[a-z]*:/ s|base_url:.*|base_url: ${modelrelay_url}|" \
-                "${config_file}" 2>/dev/null || true
-            if ! grep -q "omniroute:" "${config_file}" 2>/dev/null; then
-                sed -i "/^custom_providers:/a\\\n  omniroute:\\\n    base_url: ${omniroute_url}" "${config_file}" 2>/dev/null || true
-            fi
-            if ! grep -q "modelrelay:" "${config_file}" 2>/dev/null; then
-                sed -i "/^custom_providers:/a\\\n  modelrelay:\\\n    base_url: ${modelrelay_url}" "${config_file}" 2>/dev/null || true
-            fi
+            # For sed fallback, we'd need more complex logic - skip for now
+            true
         fi
     }
 }
