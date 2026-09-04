@@ -184,9 +184,15 @@ if [ "${DRY_RUN}" -eq 0 ]; then
         echo "[INFO] pi-failover extension installed"
         # Reload extensions to register the provider
         "${MINIONS_HOME}/bin/pi" extensions reload 2>&1 || true
+        echo "[INFO] Extensions reloaded"
     else
         echo "[WARN] pi-failover extension install failed (non-fatal)"
     fi
+    
+    # Verify extension is loaded
+    echo "[INFO] Verifying pi-failover extension..."
+    "${MINIONS_HOME}/bin/pi" extensions list 2>&1 | grep -i failover || echo "[WARN] pi-failover not in extensions list yet"
+    "${MINIONS_HOME}/bin/pi" --list-models 2>&1 | grep -i omniroute || echo "[WARN] omniroute not in models list"
 fi
 
 # Step 6: Print READY message
