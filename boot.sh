@@ -176,6 +176,17 @@ if [ "${DRY_RUN}" -eq 0 ]; then
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/pi.sh"
     pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
+    
+    # Install pi-failover extension (needs config in place and proxies running)
+    # Do this synchronously with output visible
+    echo "[INFO] Installing pi-failover extension..."
+    if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>&1; then
+        echo "[INFO] pi-failover extension installed"
+        # Reload extensions to register the provider
+        "${MINIONS_HOME}/bin/pi" extensions reload 2>&1 || true
+    else
+        echo "[WARN] pi-failover extension install failed (non-fatal)"
+    fi
 fi
 
 # Step 6: Print READY message

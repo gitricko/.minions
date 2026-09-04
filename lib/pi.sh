@@ -196,6 +196,8 @@ ensure_pi() {
         echo "Installing pi-failover extension..."
         if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>/dev/null; then
             echo "pi-failover extension installed"
+            # Reload extensions to register the provider
+            "${MINIONS_HOME}/bin/pi" extensions reload 2>/dev/null || true
         else
             echo "pi-failover extension install will retry at boot (proxies not running yet)"
         fi
