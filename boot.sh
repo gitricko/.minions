@@ -176,20 +176,6 @@ if [ "${DRY_RUN}" -eq 0 ]; then
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/pi.sh"
     pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
-    
-    # Reload pi-failover extension (already installed during install.sh)
-    # Do this synchronously with output visible
-    echo "[INFO] Reloading pi-failover extension..."
-    if "${MINIONS_HOME}/bin/pi" extensions reload 2>&1; then
-        echo "[INFO] Extensions reloaded"
-    else
-        echo "[WARN] Extensions reload failed (non-fatal)"
-    fi
-    
-    # Verify extension is loaded
-    echo "[INFO] Verifying pi-failover extension..."
-    "${MINIONS_HOME}/bin/pi" extensions list 2>&1 | grep -i failover || echo "[WARN] pi-failover not in extensions list yet"
-    "${MINIONS_HOME}/bin/pi" --list-models 2>&1 | grep -i omniroute || echo "[WARN] omniroute not in models list"
 fi
 
 # Step 6: Print READY message
