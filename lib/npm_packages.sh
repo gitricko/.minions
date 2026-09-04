@@ -20,6 +20,11 @@ install_npm_package() {
         system_npm="npm"
     fi
 
+    # Suppress interactive prompts from postinstall scripts (playwright, etc.)
+    export CI=true
+    export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    export PUPPETEER_SKIP_DOWNLOAD=1
+
     # Use vendored node for runtime
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/node.sh"
