@@ -169,6 +169,8 @@ if [ "${DRY_RUN}" -eq 0 ] && [ "${INSTALL_HERMES:-1}" -eq 1 ]; then
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/lib/hermes.sh"
     hermes_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
+    # Preconfigure Hermes (auto-fastest model, login off)
+    hermes_preconfigure
 fi
 
 # Step 5c: Update Pi config with actual ports
