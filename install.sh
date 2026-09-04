@@ -211,7 +211,7 @@ ensure_modelrelay
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes (opt-in)..."
     # Preconfigure Hermes (set auto-fastest model, disable login)
-    MINIONS_HERMES_PRECONFIG=1
+    export MINIONS_HERMES_PRECONFIG=1
     ensure_hermes
     
     # Update Hermes config with current ports
