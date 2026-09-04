@@ -83,17 +83,29 @@ EOF
 
 # Preconfigure Hermes after install
 # Sets up: auto-fastest model combo, omniroute login off (no MCP integration)
+# Uses HERMES_HOME if set, otherwise falls back to ${HOME}/.hermes
 hermes_preconfigure() {
     echo "Preconfiguring Hermes..."
 
-    # Ensure HERMES config dir exists
-    mkdir -p "${HOME}/.hermes"
+    # Determine Hermes config directory (matches hermes_update_config logic)
+    hermes_config_dir=""
+    if [ -n "${HERMES_HOME:-}" ] && [ -d "${HERMES_HOME}/.hermes" ]; then
+        hermes_config_dir="${HERMES_HOME}/.hermes"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -d "${HERMES_HOME}" ]; then
+        hermes_config_dir="${HERMES_HOME}"
+    elif [ -d "${HOME}/.hermes" ]; then
+        hermes_config_dir="${HOME}/.hermes"
+    else
+        hermes_config_dir="${HOME}/.hermes"
+    fi
+    
+    mkdir -p "${hermes_config_dir}"
 
     # Set auto-fastest model combo (uses OmniRoute by default)
-    hermes config set model.provider auto-fastest 2>/dev/null || true
+    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.provider auto-fastest 2>/dev/null || true
 
     # Disable OmniRoute login requirement (mirrors start-hermes.sh)
-    hermes config set omniroute.login_required false 2>/dev/null || true
+    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set omniroute.login_required false 2>/dev/null || true
 
     echo "Hermes preconfig complete"
 }
