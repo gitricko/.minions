@@ -177,16 +177,13 @@ if [ "${DRY_RUN}" -eq 0 ]; then
     . "${MINIONS_HOME}/lib/pi.sh"
     pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
     
-    # Install pi-failover extension (needs config in place and proxies running)
+    # Reload pi-failover extension (already installed during install.sh)
     # Do this synchronously with output visible
-    echo "[INFO] Installing pi-failover extension..."
-    if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>&1; then
-        echo "[INFO] pi-failover extension installed"
-        # Reload extensions to register the provider
-        "${MINIONS_HOME}/bin/pi" extensions reload 2>&1 || true
+    echo "[INFO] Reloading pi-failover extension..."
+    if "${MINIONS_HOME}/bin/pi" extensions reload 2>&1; then
         echo "[INFO] Extensions reloaded"
     else
-        echo "[WARN] pi-failover extension install failed (non-fatal)"
+        echo "[WARN] Extensions reload failed (non-fatal)"
     fi
     
     # Verify extension is loaded
