@@ -117,29 +117,29 @@ install_pi_failover_ext() {
     fi
 }
 
-# Setup Mnemon Pi plugin
+# Setup Mnemon Pi plugin — DISABLED per user request
 # Usage: setup_mnemon_pi <minions_home>
-setup_mnemon_pi() {
-    minions_home=$1
-    echo "Setting up Mnemon Pi plugin..."
-
-    # Use local mnemon if available, otherwise fall back to system
-    if [ -x "${minions_home}/bin/mnemon" ]; then
-        MNEMON_BIN="${minions_home}/bin/mnemon"
-    elif command -v mnemon >/dev/null 2>&1; then
-        MNEMON_BIN="mnemon"
-    else
-        echo "Mnemon not found, skipping Pi plugin setup" >&2
-        return 0
-    fi
-
-    # Run mnemon setup for pi target
-    if "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null; then
-        echo "Mnemon Pi plugin setup complete"
-    else
-        echo "WARNING: Mnemon Pi plugin setup failed" >&2
-    fi
-}
+#setup_mnemon_pi() {
+#    minions_home=$1
+#    echo "Setting up Mnemon Pi plugin..."
+#
+#    # Use local mnemon if available, otherwise fall back to system
+#    if [ -x "${minions_home}/bin/mnemon" ]; then
+#        MNEMON_BIN="${minions_home}/bin/mnemon"
+#    elif command -v mnemon >/dev/null 2>&1; then
+#        MNEMON_BIN="mnemon"
+#    else
+#        echo "Mnemon not found, skipping Pi plugin setup" >&2
+#        return 0
+#    fi
+#
+#    # Run mnemon setup for pi target
+#    if "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null; then
+#        echo "Mnemon Pi plugin setup complete"
+#    else
+#        echo "WARNING: Mnemon Pi plugin setup failed" >&2
+#    fi
+#}
 
 # Create Pi config symlinks
 # Usage: create_pi_symlinks <minions_home>
@@ -204,7 +204,7 @@ ensure_pi() {
     fi
 
     # Run config steps
-    setup_mnemon_pi "${MINIONS_HOME}"
+    # setup_mnemon_pi "${MINIONS_HOME}"  # disabled per user request
     create_pi_symlinks "${MINIONS_HOME}"
 }
 

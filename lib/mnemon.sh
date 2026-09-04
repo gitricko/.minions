@@ -128,7 +128,7 @@ setup_mnemon_all() {
     fi
 
     # Setup for Pi
-    "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null || echo "WARNING: Mnemon Pi setup failed" >&2
+    # "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null || echo "WARNING: Mnemon Pi setup failed" >&2  # disabled per user request
 
     # Setup for Hermes
     "${MNEMON_BIN}" setup --target hermes --global --yes 2>/dev/null || echo "WARNING: Mnemon Hermes setup failed" >&2
