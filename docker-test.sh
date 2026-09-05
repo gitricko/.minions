@@ -200,7 +200,7 @@ setup_container() {
     # Install minimal dependencies (bash for Hermes install, util-linux for
     # setsid, python3 for hermes config YAML manipulation)
     log_step "Installing minimal dependencies (curl, git, ca-certificates, bash, util-linux, python3)"
-    docker_exec bash -c "apt-get update && apt-get install -y curl git ca-certificates bash util-linux python3"
+    docker_exec bash -c "apt-get update && apt-get install -y curl git ca-certificates bash util-linux python3 xz-utils"
 }
 
 # Run install.sh inside the container
