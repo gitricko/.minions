@@ -127,6 +127,7 @@ mode_test() {
     run_status || true
     verify_binaries
     verify_llm_call
+    verify_pi_call
 
     print_summary
 
@@ -277,6 +278,24 @@ verify_llm_call() {
         log_warn "LLM call test - failing output was:"
         printf '%s\n' "${llm_out}" | head -20
         record_fail "LLM call through OmniRoute failed"
+    fi
+}
+
+# Verify Pi-Agent call (requires provider config, expects failure without auth)
+verify_pi_call() {
+    log_step "Verifying Pi-Agent call (requires provider config)"
+
+    # Test Pi-Agent call - this requires provider setup, so we expect it to fail without auth
+    # but we verify the binary works and gives a meaningful error (not "command not found")
+    pi_out=$(docker_exec_user "pi -p 'Reply with exactly: OK'" 2>&1) || true
+    if printf '%s' "${pi_out}" | grep -qi "OK"; then
+        record_pass "Pi-Agent call works (provider configured)"
+    elif printf '%s' "${pi_out}" | grep -qi "API key\|login\|provider"; then
+        record_pass "Pi-Agent binary works (provider config needed - expected without auth)"
+    else
+        log_warn "Pi-Agent call test - output was:"
+        printf '%s\n' "${pi_out}" | head -20
+        record_fail "Pi-Agent call failed unexpectedly"
     fi
 }
 
