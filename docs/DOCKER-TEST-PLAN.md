@@ -106,18 +106,37 @@ docker rm -f minions-test
 | `pi --version` | Pi-Agent binary works and is on PATH |
 | `mnemon --version` | Mnemon binary works |
 | LLM call | OmniRoute answers keyless via free providers (model=auto) — `hermes chat -q "Reply with exactly: OK"` works without API keys |
+| Pi-Agent call | Pi-Agent binary executes (`pi -p ...`) — expects provider config error without auth (validates binary works, not full integration) |
 
 ### What does NOT get tested in Docker
 
 - Hermes gateway/dashboard (dropped from v1)
 - macOS-specific paths (Docker is Linux)
 - LLM inference performance under load
+- Pi-Agent full integration with OmniRoute (requires explicit provider config)
 
 ### Known limitations
 
 1. **Network:** Container needs internet for npm/git downloads. Works on local machine; may need proxy config behind corporate firewalls.
 2. **Root user:** Docker runs as root by default. Some tools behave differently as root vs regular user. Could add `--user` flag if this becomes an issue.
 3. **Ubuntu only:** Tests the Linux path. macOS/Windows are explicitly deferred from v1.
+
+### Lessons learned / Findings (for future captains/firstmates)
+
+| Issue | Root cause | Fix |
+|-------|------------|-----|
+| Node.js tarball extraction fails | `xz-utils` not installed in base Ubuntu | Added `xz-utils` to apt-get install |
+| Hermes install times out compiling node-pty | Missing C++ compiler (`g++`, `make`) | Added `g++ make` to apt-get install |
+| Pi-Agent wrapper fails with "can't cd to /lib/pi/npm" | `MINIONS_HOME` not exported in wrapper environment | Ensure wrapper sets `MINIONS_HOME` or document requirement |
+| Pi-Agent wrapper "node: No such file or directory" | Node binary not in PATH (only .bin folder was) | Added `${MINIONS_HOME}/lib/node/bin` to wrapper PATH |
+| Pi-Agent `pi -p` fails with "No API key" | Pi-Agent doesn't use OmniRoute keyless by default; needs explicit provider config | Document: `pi -p` requires provider setup; `hermes chat -q` works keyless via OmniRoute |
+
+### Key differences: Hermes vs Pi-Agent LLM calls
+
+| Command | Works keyless? | Uses |
+|---------|----------------|------|
+| `hermes chat -q "..."` | Yes | OmniRoute free providers (auto) |
+| `pi -p "..."` | No | Requires provider config (API key/OAuth) — separate from OmniRoute |
 
 ---
 
@@ -134,7 +153,29 @@ No Dockerfile. No docker-compose. Just one script.
 
 ## Next steps
 
-1. Write `docker-test.sh`
-2. Test it against current `main` (reproduce the Hermes failure on empty Codespace)
-3. Fix whatever breaks
-4. Commit to a branch, open PR
+1. Write `docker-test.sh` ✓
+2. Test it against current `main` (reproduce the Hermes failure on empty Codespace) ✓
+3. Fix whatever breaks ✓
+4. Commit to a branch, open PR ✓
+
+---
+
+## Handoff for next iteration
+
+**Current state:** PR #18 open with docker-test.sh and docs.
+
+**To complete full integration test:**
+1. Configure Pi-Agent to use OmniRoute (or add provider keys)
+2. Add `pi -p` success test when auth is available
+3. Consider adding `mnemon recall` test to verify memory layer
+
+**To run locally:**
+```bash
+cd .minions
+./docker-test.sh test   # full test (takes ~5-10 min first run, ~1-2 min cached)
+./docker-test.sh shell  # drop into container for debugging
+./docker-test.sh clean  # remove container
+```
+
+**Docker prerequisites (auto-installed):**
+- `curl git ca-certificates xz-utils g++ make`
