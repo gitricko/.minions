@@ -87,30 +87,44 @@ EOF
 hermes_preconfigure() {
     echo "Preconfiguring Hermes..."
 
-    # Determine Hermes config directory (matches hermes_update_config logic)
-    hermes_config_dir=""
-    if [ -n "${HERMES_HOME:-}" ] && [ -d "${HERMES_HOME}/.hermes" ]; then
-        hermes_config_dir="${HERMES_HOME}/.hermes"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -d "${HERMES_HOME}" ]; then
-        hermes_config_dir="${HERMES_HOME}"
-    elif [ -d "${HOME}/.hermes" ]; then
-        hermes_config_dir="${HOME}/.hermes"
+    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml (parent), NOT .hermes/config.yaml
+    # get_config_path() = get_hermes_home() / "config.yaml" — always the parent
+    config_file=""
+    if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
+        config_file="${HERMES_CONFIG_FILE}"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
+        config_file="${HERMES_HOME}/config.yaml"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
+        config_file="${HERMES_HOME}/.hermes/config.yaml"
+    elif [ -f "${HOME}/.hermes/config.yaml" ]; then
+        config_file="${HOME}/.hermes/config.yaml"
     else
-        hermes_config_dir="${HOME}/.hermes"
+        return 0
     fi
-    
-    mkdir -p "${hermes_config_dir}"
 
-    # Set custom:omniroute as the provider (auto-fastest is a combo in OmniRoute, not a Hermes provider)
-    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.provider custom:omniroute 2>/dev/null || true
+    # Use sed to modify the config file directly
+    # Provider must be 'omniroute' (not 'custom:omniroute') — hermes doesn't recognize the colon format
+    if grep -q "^  provider:" "${config_file}" 2>/dev/null; then
+        sed -i "s/^  provider:.*/  provider: omniroute/" "${config_file}"
+    elif grep -q "^model:" "${config_file}" 2>/dev/null; then
+        sed -i '/^model:/a\  provider: omniroute' "${config_file}"
+    else
+        echo -e "\nmodel:\n  provider: omniroute" >> "${config_file}"
+    fi
 
-    # Set auto-fastest as the default model (within the custom:omniroute provider)
-    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set model.default auto-fastest 2>/dev/null || true
+    if grep -q "^  default:" "${config_file}" 2>/dev/null; then
+        sed -i "s/^  default:.*/  default: auto-fastest/" "${config_file}"
+    elif grep -q "^model:" "${config_file}" 2>/dev/null; then
+        sed -i '/^model:/a\  default: auto-fastest' "${config_file}"
+    fi
 
-    # Disable OmniRoute login requirement (mirrors start-hermes.sh)
-    HERMES_CONFIG_DIR="${hermes_config_dir}" hermes config set omniroute.login_required false 2>/dev/null || true
+    if grep -q "login_required:" "${config_file}" 2>/dev/null; then
+        sed -i "s/login_required:.*/login_required: false/" "${config_file}"
+    else
+        echo -e "\nomniroute:\n  login_required: false" >> "${config_file}"
+    fi
 
-    echo "Hermes preconfig complete"
+    echo "Hermes preconfig complete (provider=omniroute, model=auto-fastest)"
 }
 
 # Update Hermes config.yaml with current ports
@@ -122,7 +136,8 @@ hermes_update_config() {
     omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
     modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
 
-    # Determine Hermes config file path
+    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml (parent), NOT .hermes/config.yaml
+    # get_config_path() = get_hermes_home() / "config.yaml" — always the parent
     config_file=""
     if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
         config_file="${HERMES_CONFIG_FILE}"
@@ -133,7 +148,6 @@ hermes_update_config() {
     elif [ -f "${HOME}/.hermes/config.yaml" ]; then
         config_file="${HOME}/.hermes/config.yaml"
     else
-        # Config doesn't exist yet; nothing to update
         return 0
     fi
 

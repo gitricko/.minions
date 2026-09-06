@@ -87,8 +87,8 @@ install_pi() {
         # Create wrapper script (use printf to avoid heredoc issues)
                 # Use MINIONS_HOME-based paths so wrapper works regardless of install location
                 printf '#!/usr/bin/env sh\n%s\n%s\n%s\n%s\n' \
-                    "export PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules/.bin:\${PATH}\"" \
-                    "export NODE_PATH=\"\${MINIONS_HOME}/lib/pi/npm/lib/node_modules\"" \
+                    "export PATH=\"\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin:\${MINIONS_HOME}/lib/node/bin:\${PATH}\"" \
+                    "export NODE_PATH=\"\${MINIONS_HOME}/lib/pi/npm/node_modules\"" \
                     "cd \"\${MINIONS_HOME}/lib/pi/npm\"" \
                     "exec \"\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi\" \"\$@\"" \
                     > "${install_dir}/pi"

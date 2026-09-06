@@ -166,12 +166,25 @@ fi
 
 # Test Hermes chat through OmniRoute (real end-to-end query with free models)
 # custom:omniroute provider + auto-fastest model (free models in OmniRoute)
+# Retry up to 3 times with 10s delay — free providers are transiently unavailable
 echo "Testing Hermes chat via OmniRoute (auto-fastest with free models)..."
-HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
-if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then
-    log_info "Hermes chat via OmniRoute works (got expected response)"
-else
-    log_warn "Hermes chat via OmniRoute returned unexpected: ${HERMES_TEST_RESP}"
+HERMES_MAX_RETRIES=3
+HERMES_RETRY_DELAY=10
+HERMES_PASSED=false
+for attempt in $(seq 1 $HERMES_MAX_RETRIES); do
+    HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
+    if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then
+        log_info "Hermes chat via OmniRoute works (got expected response on attempt ${attempt})"
+        HERMES_PASSED=true
+        break
+    fi
+    if [ "$attempt" -lt "$HERMES_MAX_RETRIES" ]; then
+        log_warn "Hermes chat attempt ${attempt}/${HERMES_MAX_RETRIES} failed, retrying in ${HERMES_RETRY_DELAY}s..."
+        sleep "$HERMES_RETRY_DELAY"
+    fi
+done
+if [ "$HERMES_PASSED" != "true" ]; then
+    log_warn "Hermes chat via OmniRoute returned unexpected after ${HERMES_MAX_RETRIES} attempts: ${HERMES_TEST_RESP}"
 fi
 
 # Step 4: Test Pi-Agent CLI
@@ -247,12 +260,24 @@ echo "[DEBUG] Available models:" >&2
 # Also check the models.json content
 echo "[DEBUG] models.json content:" >&2
 cat "${HOME}/.pi/agent/models.json" >&2
-# Try with explicit provider/model
-PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
-if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
-    log_info "Pi-Agent chat via omniroute works (got expected response)"
-else
-    log_error "Pi-Agent chat via omniroute failed: ${PI_TEST_RESP}"
+# Retry up to 3 times with 10s delay — free providers are transiently unavailable
+PI_MAX_RETRIES=3
+PI_RETRY_DELAY=10
+PI_PASSED=false
+for attempt in $(seq 1 $PI_MAX_RETRIES); do
+    PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
+    if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
+        log_info "Pi-Agent chat via omniroute works (got expected response on attempt ${attempt})"
+        PI_PASSED=true
+        break
+    fi
+    if [ "$attempt" -lt "$PI_MAX_RETRIES" ]; then
+        log_warn "Pi-Agent chat attempt ${attempt}/${PI_MAX_RETRIES} failed, retrying in ${PI_RETRY_DELAY}s..."
+        sleep "$PI_RETRY_DELAY"
+    fi
+done
+if [ "$PI_PASSED" != "true" ]; then
+    log_error "Pi-Agent chat via omniroute failed after ${PI_MAX_RETRIES} attempts: ${PI_TEST_RESP}"
     exit 1
 fi
 
