@@ -176,3 +176,15 @@ docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/
 # Test individual components
 docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/bin:/home/ubuntu/.minions/lib/node/bin:$PATH minions-test bash -l -c "hermes chat -q 'hello'"
 ```
+
+---
+
+## Issue 9: Transient upstream free provider unavailability (503)
+
+**Symptom:** `Pi-Agent chat via omniroute failed: 503: {"message":"No models currently available for this request."}`
+
+**Root cause:** Free tier upstream providers (used by OmniRoute/ModelRelay) are transiently unavailable. Both proxies return the same 503 — it's the same upstream being down. Pi-Agent's fallback chain only triggers on connection errors (timeout/refused), not HTTP 503 responses.
+
+**Fix:** Added retry logic (3 attempts, 10s delay) to both CI test (`test_cli_integration.sh`) and docker test (`docker-test.sh`). Retry masks transient upstream outages while still catching real configuration bugs.
+
+**Key insight:** This is an external dependency issue, not a code bug. The CI test correctly detects a real failure — the retry just gives the upstream time to recover.
