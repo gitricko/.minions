@@ -274,15 +274,23 @@ verify_llm_call() {
     # Wait a bit for OmniRoute to be fully ready
     sleep 5
 
-    # Test actual LLM call via OmniRoute (model=auto uses free providers, no API key needed)
-    llm_out=$(docker_exec_user "hermes chat -q 'Reply with exactly: OK'" 2>&1) || true
-    if printf '%s' "${llm_out}" | grep -qi "OK"; then
-        record_pass "LLM call through OmniRoute works (keyless)"
-    else
-        log_warn "LLM call test - failing output was:"
-        printf '%s\n' "${llm_out}" | head -20
-        record_fail "LLM call through OmniRoute failed"
-    fi
+    # Retry up to 3 times with 10s delay — free providers are transiently unavailable
+    local max_retries=3
+    local retry_delay=10
+    for attempt in $(seq 1 $max_retries); do
+        llm_out=$(docker_exec_user "hermes chat -q 'Reply with exactly: OK'" 2>&1) || true
+        if printf '%s' "${llm_out}" | grep -qi "OK"; then
+            record_pass "LLM call through OmniRoute works (keyless, attempt ${attempt})"
+            return
+        fi
+        if [ "$attempt" -lt "$max_retries" ]; then
+            log_warn "LLM call attempt ${attempt}/${max_retries} failed, retrying in ${retry_delay}s..."
+            sleep "$retry_delay"
+        fi
+    done
+    log_warn "LLM call test - failing output was:"
+    printf '%s\n' "${llm_out}" | head -20
+    record_fail "LLM call through OmniRoute failed after ${max_retries} attempts"
 }
 
 # Verify Pi-Agent call (requires provider config, expects failure without auth)
@@ -306,19 +314,30 @@ verify_pi_call() {
 # Verify Pi-Agent call with explicit provider (matches CI test_cli_integration.sh)
 verify_pi_integration() {
     log_step "Verifying Pi-Agent end-to-end with omniroute provider (CI parity)"
-    
+
     # Test Pi-Agent with explicit provider flags like CI does
     # --provider omniroute --model omniroute/auto-fastest
-    pi_out=$(docker_exec_user "pi -p 'Reply with exactly: OK' --provider omniroute --model omniroute/auto-fastest" 2>&1) || true
-    if printf '%s' "${pi_out}" | grep -qi "OK"; then
-        record_pass "Pi-Agent integration via omniroute works (keyless)"
-    elif printf '%s' "${pi_out}" | grep -qi "API key\|login\|provider\|auth"; then
-        record_pass "Pi-Agent integration reached provider (auth needed for model)"
-    else
-        log_warn "Pi-Agent integration test - output was:"
-        printf '%s\n' "${pi_out}" | head -20
-        record_fail "Pi-Agent integration failed unexpectedly"
-    fi
+    # Retry up to 3 times with 10s delay — free providers are transiently unavailable
+    local max_retries=3
+    local retry_delay=10
+    for attempt in $(seq 1 $max_retries); do
+        pi_out=$(docker_exec_user "pi -p 'Reply with exactly: OK' --provider omniroute --model omniroute/auto-fastest" 2>&1) || true
+        if printf '%s' "${pi_out}" | grep -qi "OK"; then
+            record_pass "Pi-Agent integration via omniroute works (keyless, attempt ${attempt})"
+            return
+        fi
+        if printf '%s' "${pi_out}" | grep -qi "API key\|login\|provider\|auth"; then
+            record_pass "Pi-Agent integration reached provider (auth needed for model)"
+            return
+        fi
+        if [ "$attempt" -lt "$max_retries" ]; then
+            log_warn "Pi-Agent integration attempt ${attempt}/${max_retries} failed, retrying in ${retry_delay}s..."
+            sleep "$retry_delay"
+        fi
+    done
+    log_warn "Pi-Agent integration test - output was:"
+    printf '%s\n' "${pi_out}" | head -20
+    record_fail "Pi-Agent integration failed after ${max_retries} attempts"
 }
 
 # Verify Hermes config has correct custom_providers (like CI test_cli_integration.sh)
