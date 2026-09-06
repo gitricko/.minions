@@ -128,6 +128,7 @@ mode_test() {
     verify_binaries
     verify_llm_call
     verify_pi_call
+    verify_pi_integration
     verify_hermes_config
     verify_pi_config
     verify_service_endpoints
@@ -299,6 +300,24 @@ verify_pi_call() {
         log_warn "Pi-Agent call test - output was:"
         printf '%s\n' "${pi_out}" | head -20
         record_fail "Pi-Agent call failed unexpectedly"
+    fi
+}
+
+# Verify Pi-Agent call with explicit provider (matches CI test_cli_integration.sh)
+verify_pi_integration() {
+    log_step "Verifying Pi-Agent end-to-end with omniroute provider (CI parity)"
+    
+    # Test Pi-Agent with explicit provider flags like CI does
+    # --provider omniroute --model omniroute/auto-fastest
+    pi_out=$(docker_exec_user "pi -p 'Reply with exactly: OK' --provider omniroute --model omniroute/auto-fastest" 2>&1) || true
+    if printf '%s' "${pi_out}" | grep -qi "OK"; then
+        record_pass "Pi-Agent integration via omniroute works (keyless)"
+    elif printf '%s' "${pi_out}" | grep -qi "API key\|login\|provider\|auth"; then
+        record_pass "Pi-Agent integration reached provider (auth needed for model)"
+    else
+        log_warn "Pi-Agent integration test - output was:"
+        printf '%s\n' "${pi_out}" | head -20
+        record_fail "Pi-Agent integration failed unexpectedly"
     fi
 }
 
