@@ -218,7 +218,7 @@ run_install() {
 # Run boot.sh inside the container
 run_boot() {
     log_step "Running boot.sh"
-    if docker_exec_user "bash ${SRC_MOUNT}/boot.sh"; then
+    if docker_exec_user "bash ${CONTAINER_HOME}/boot.sh"; then
         record_pass "boot.sh completed successfully"
     else
         record_fail "boot.sh failed"
@@ -229,7 +229,7 @@ run_boot() {
 # Run status.sh inside the container
 run_status() {
     log_step "Running status.sh"
-    if docker_exec_user "bash ${SRC_MOUNT}/status.sh"; then
+    if docker_exec_user "bash ${CONTAINER_HOME}/status.sh"; then
         record_pass "status.sh completed successfully"
     else
         record_fail "status.sh failed"
