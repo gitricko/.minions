@@ -187,4 +187,24 @@ docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/
 
 **Fix:** Added retry logic (3 attempts, 10s delay) to both CI test (`test_cli_integration.sh`) and docker test (`docker-test.sh`). Retry masks transient upstream outages while still catching real configuration bugs.
 
+---
+
+## Issue 10: hermes chat -q fails — three-part config resolution bug
+
+**Symptom:** `hermes chat -q "Reply with exactly: OK"` returns "Unknown provider 'custom:omniroute'" or "Unknown provider 'omniroute'" despite the config file having `custom_providers` with the omniroute entry.
+
+**Root cause (three layers):**
+
+1. **Wrong config file targeted.** `hermes_update_config` and `hermes_preconfigure` prioritized `${HERMES_HOME}/.hermes/config.yaml` (nested), but hermes reads from `${HERMES_HOME}/config.yaml` (parent). The function `get_config_path()` in `hermes_cli/config.py` returns `get_hermes_home() / "config.yaml"` — always the parent. The nested `.hermes/config.yaml` is a separate template that hermes never reads for config resolution.
+
+2. **Provider name format.** The provider must be `omniroute` (not `custom:omniroute`). Hermes resolves custom providers via `resolve_custom_provider()` which matches against `custom_provider_aliases()`. The aliases for a `custom_providers` entry with `name: omniroute` are `{'omniroute', 'custom:omniroute'}`. However, `hermes config set` was writing `custom:omniroute` as the provider name, and the built-in provider list doesn't include `omniroute` — so it falls through to `resolve_custom_provider()` which needs the `custom_providers` list in the SAME config file.
+
+3. **custom_providers missing from parent.** Since `hermes_update_config` wrote to the nested file, the parent config.yaml had `model.provider: omniroute` but NO `custom_providers` list. Hermes couldn't resolve the provider.
+
+**Fix:** Both `hermes_update_config` and `hermes_preconfigure` now prioritize `${HERMES_HOME}/config.yaml` (parent) — matching what `get_config_path()` actually returns. Provider name changed from `custom:omniroute` to `omniroute`.
+
+**Verification:** `hermes chat -q "Reply with exactly: OK"` returns "OK" in docker container.
+
+**Lesson:** Never assume which config file hermes reads — check `get_config_path()` in `hermes_cli/config.py`. The `.hermes/config.yaml` is a template; `${HERMES_HOME}/config.yaml` is the runtime config.
+
 **Key insight:** This is an external dependency issue, not a code bug. The CI test correctly detects a real failure — the retry just gives the upstream time to recover.
