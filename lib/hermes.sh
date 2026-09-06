@@ -123,18 +123,27 @@ hermes_update_config() {
     modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
 
     # Determine Hermes config file path
+    # Hermes reads from .hermes/config.yaml (nested), so prioritize that
     config_file=""
     if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
         config_file="${HERMES_CONFIG_FILE}"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
-        config_file="${HERMES_HOME}/config.yaml"
     elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
         config_file="${HERMES_HOME}/.hermes/config.yaml"
+    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
+        config_file="${HERMES_HOME}/config.yaml"
     elif [ -f "${HOME}/.hermes/config.yaml" ]; then
         config_file="${HOME}/.hermes/config.yaml"
     else
-        # Config doesn't exist yet; nothing to update
-        return 0
+        # Config doesn't exist yet; create the nested .hermes/config.yaml
+        if [ -n "${HERMES_HOME:-}" ]; then
+            mkdir -p "${HERMES_HOME}/.hermes"
+            config_file="${HERMES_HOME}/.hermes/config.yaml"
+        elif [ -n "${MINIONS_HOME:-}" ]; then
+            mkdir -p "${MINIONS_HOME}/lib/hermes/home/.hermes"
+            config_file="${MINIONS_HOME}/lib/hermes/home/.hermes/config.yaml"
+        else
+            return 0
+        fi
     fi
 
     # Use Python for reliable YAML manipulation
