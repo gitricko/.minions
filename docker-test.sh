@@ -128,6 +128,9 @@ mode_test() {
     verify_binaries
     verify_llm_call
     verify_pi_call
+    verify_hermes_config
+    verify_pi_config
+    verify_service_endpoints
 
     print_summary
 
@@ -296,6 +299,81 @@ verify_pi_call() {
         log_warn "Pi-Agent call test - output was:"
         printf '%s\n' "${pi_out}" | head -20
         record_fail "Pi-Agent call failed unexpectedly"
+    fi
+}
+
+# Verify Hermes config has correct custom_providers (like CI test_cli_integration.sh)
+verify_hermes_config() {
+    log_step "Verifying Hermes config has correct OmniRoute/ModelRelay config"
+    
+    # Find the actual Hermes config file (hermes reads from .hermes/config.yaml)
+    config_file=""
+    for candidate in \
+        "${CONTAINER_HOME}/.minions/lib/hermes/home/.hermes/config.yaml" \
+        "${CONTAINER_HOME}/.minions/lib/hermes/home/config.yaml"; do
+        if docker_exec bash -c "[ -f '${candidate}' ]"; then
+            config_file="${candidate}"
+            break
+        fi
+    done
+    
+    if [ -z "${config_file}" ]; then
+        record_fail "Hermes config file not found"
+        return
+    fi
+    
+    # Check custom_providers with omniroute and modelrelay
+    if docker_exec bash -c "grep -A3 'custom_providers:' '${config_file}' | grep -q 'name: omniroute'" && \
+       docker_exec bash -c "grep -A5 'custom_providers:' '${config_file}' | grep -q 'base_url: http://127.0.0.1:20128/v1'" && \
+       docker_exec bash -c "grep -A3 'custom_providers:' '${config_file}' | grep -q 'name: modelrelay'" && \
+       docker_exec bash -c "grep -A5 'custom_providers:' '${config_file}' | grep -q 'base_url: http://127.0.0.1:7352/v1'"; then
+        record_pass "Hermes config has correct OmniRoute/ModelRelay custom_providers"
+    else
+        log_warn "Hermes config missing correct custom_providers:"
+        docker_exec bash -c "cat '${config_file}'" | head -30
+        record_fail "Hermes config verification failed"
+    fi
+}
+
+# Verify Pi-Agent config files (pi.toml, models.json)
+verify_pi_config() {
+    log_step "Verifying Pi-Agent config files"
+    
+    # Check pi.toml
+    if docker_exec bash -c "grep -q 'base_url = \"http://127.0.0.1:20128/v1\"' '${CONTAINER_HOME}/.pi/agent/pi.toml' 2>/dev/null" && \
+       docker_exec bash -c "grep -q 'provider = \"omniroute\"' '${CONTAINER_HOME}/.pi/agent/pi.toml' 2>/dev/null"; then
+        record_pass "Pi-Agent pi.toml has correct omniroute config"
+    else
+        log_warn "Pi-Agent pi.toml missing correct config:"
+        docker_exec bash -c "cat '${CONTAINER_HOME}/.pi/agent/pi.toml' 2>/dev/null || echo 'pi.toml not found'"
+        record_fail "Pi-Agent pi.toml verification failed"
+    fi
+    
+    # Check models.json
+    if docker_exec bash -c "grep -q '\"baseUrl\": \"http://127.0.0.1:20128/v1\"' '${CONTAINER_HOME}/.pi/agent/models.json' 2>/dev/null" && \
+       docker_exec bash -c "grep -q '\"baseUrl\": \"http://127.0.0.1:7352/v1\"' '${CONTAINER_HOME}/.pi/agent/models.json' 2>/dev/null"; then
+        record_pass "Pi-Agent models.json has correct omniroute/modelrelay config"
+    else
+        log_warn "Pi-Agent models.json missing correct config:"
+        docker_exec bash -c "cat '${CONTAINER_HOME}/.pi/agent/models.json' 2>/dev/null || echo 'models.json not found'"
+        record_fail "Pi-Agent models.json verification failed"
+    fi
+}
+
+# Verify OmniRoute and ModelRelay service endpoints
+verify_service_endpoints() {
+    log_step "Verifying OmniRoute/ModelRelay /v1/models endpoints"
+    
+    if docker_exec bash -c "curl -s -f http://127.0.0.1:20128/v1/models >/dev/null 2>&1"; then
+        record_pass "OmniRoute /v1/models endpoint responds"
+    else
+        record_fail "OmniRoute /v1/models endpoint failed"
+    fi
+    
+    if docker_exec bash -c "curl -s -f http://127.0.0.1:7352/v1/models >/dev/null 2>&1"; then
+        record_pass "ModelRelay /v1/models endpoint responds"
+    else
+        record_fail "ModelRelay /v1/models endpoint failed"
     fi
 }
 
