@@ -242,7 +242,7 @@ export PATH="${MINIONS_HOME}/bin:${PATH}"
 '
 
 # Add to shell rc files (only if not already present)
-for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+for rc in "${HOME}/.bashrc" "${HOME}/.zshrc" "${HOME}/.profile"; do
     if [ -f "${rc}" ] && ! grep -q "MINIONS_HOME" "${rc}"; then
         log_info "Adding MINIONS_HOME to ${rc}"
         if [ "${DRY_RUN}" -eq 0 ]; then

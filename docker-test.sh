@@ -93,7 +93,7 @@ docker_exec() {
 docker_exec_user() {
     local env_flags
     env_flags=$(minions_env_flags "${CONTAINER_HOME}")
-    docker exec ${env_flags} "${CONTAINER_NAME}" env bash -c "$1"
+    docker exec ${env_flags} "${CONTAINER_NAME}" bash -l -c "$1"
 }
 
 # Remove the test container if it exists (idempotent)
