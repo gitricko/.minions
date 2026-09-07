@@ -145,11 +145,11 @@ start_service "modelrelay" \
     --port "${MODELRELAY_PORT}" \
     >> "${boot_log}" 2>&1 || log_error "Failed to start ModelRelay"
 
-wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
+wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 120 "modelrelay"
 
 # Step 3: Wait for OmniRoute health (needed for preconfig)
 log_info "Waiting for OmniRoute health..."
-wait_for_health "${OMNIROUTE_BASE_URL}/models" 30 "omniroute"
+wait_for_health "${OMNIROUTE_BASE_URL}/healthz" 120 "omniroute"
 
 # Step 4: OmniRoute preconfiguration
 if [ "${DRY_RUN}" -eq 0 ]; then
