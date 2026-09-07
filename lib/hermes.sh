@@ -87,19 +87,27 @@ EOF
 hermes_preconfigure() {
     echo "Preconfiguring Hermes..."
 
-    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml (parent), NOT .hermes/config.yaml
-    # get_config_path() = get_hermes_home() / "config.yaml" — always the parent
-    config_file=""
-    if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
-        config_file="${HERMES_CONFIG_FILE}"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
-        config_file="${HERMES_HOME}/config.yaml"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
-        config_file="${HERMES_HOME}/.hermes/config.yaml"
-    elif [ -f "${HOME}/.hermes/config.yaml" ]; then
-        config_file="${HOME}/.hermes/config.yaml"
-    else
+    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml — this is the ONLY config path
+    # get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
+    # .hermes/config.yaml is a template; hermes NEVER reads it for config resolution
+    if [ -z "${HERMES_HOME:-}" ]; then
+        echo "WARNING: HERMES_HOME not set, skipping hermes preconfigure" >&2
         return 0
+    fi
+
+    config_file="${HERMES_HOME}/config.yaml"
+
+    # Create the config file if it doesn't exist — hermes needs it at this exact path
+    if [ ! -f "${config_file}" ]; then
+        mkdir -p "${HERMES_HOME}"
+        cat > "${config_file}" << 'YAMLEOF'
+model:
+  provider: omniroute
+  default: auto-fastest
+omniroute:
+  login_required: false
+YAMLEOF
+        echo "Created ${config_file} with default settings"
     fi
 
     # Use sed to modify the config file directly
@@ -136,19 +144,21 @@ hermes_update_config() {
     omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
     modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
 
-    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml (parent), NOT .hermes/config.yaml
-    # get_config_path() = get_hermes_home() / "config.yaml" — always the parent
-    config_file=""
-    if [ -n "${HERMES_CONFIG_FILE:-}" ] && [ -f "${HERMES_CONFIG_FILE}" ]; then
-        config_file="${HERMES_CONFIG_FILE}"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/config.yaml" ]; then
-        config_file="${HERMES_HOME}/config.yaml"
-    elif [ -n "${HERMES_HOME:-}" ] && [ -f "${HERMES_HOME}/.hermes/config.yaml" ]; then
-        config_file="${HERMES_HOME}/.hermes/config.yaml"
-    elif [ -f "${HOME}/.hermes/config.yaml" ]; then
-        config_file="${HOME}/.hermes/config.yaml"
-    else
+    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml — this is the ONLY config path
+    # get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
+    # .hermes/config.yaml is a template; hermes NEVER reads it for config resolution
+    if [ -z "${HERMES_HOME:-}" ]; then
+        echo "WARNING: HERMES_HOME not set, skipping hermes config update" >&2
         return 0
+    fi
+
+    config_file="${HERMES_HOME}/config.yaml"
+
+    # Create the config file if it doesn't exist
+    if [ ! -f "${config_file}" ]; then
+        mkdir -p "${HERMES_HOME}"
+        echo -e "model:\n  provider: omniroute\n  default: auto-fastest" > "${config_file}"
+        echo "Created ${config_file}"
     fi
 
     # Use Python for reliable YAML manipulation
