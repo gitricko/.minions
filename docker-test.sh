@@ -344,11 +344,12 @@ verify_pi_integration() {
 verify_hermes_config() {
     log_step "Verifying Hermes config has correct OmniRoute/ModelRelay config"
     
-    # Find the actual Hermes config file (hermes reads from .hermes/config.yaml)
-    config_file=""
+    # Find the actual Hermes config file
+    # CRITICAL: hermes reads from config.yaml (parent), NOT .hermes/config.yaml
+    local config_file=""
     for candidate in \
-        "${CONTAINER_HOME}/.minions/lib/hermes/home/.hermes/config.yaml" \
-        "${CONTAINER_HOME}/.minions/lib/hermes/home/config.yaml"; do
+        "${CONTAINER_HOME}/.minions/lib/hermes/home/config.yaml" \
+        "${CONTAINER_HOME}/.minions/lib/hermes/home/.hermes/config.yaml"; do
         if docker_exec bash -c "[ -f '${candidate}' ]"; then
             config_file="${candidate}"
             break

@@ -103,12 +103,13 @@ else
 fi
 
 # Test hermes config shows correct base_urls
-# Hermes config is at HERMES_HOME/.hermes/config.yaml (not HERMES_HOME/config.yaml)
+# CRITICAL: hermes reads from HERMES_HOME/config.yaml (parent), NOT .hermes/config.yaml
+# get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
 # HERMES_HOME is set in the hermes wrapper script to ${MINIONS_HOME}/lib/hermes/home
-HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
+HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
 if [ ! -f "${HERMES_CONFIG}" ]; then
-    # Fallback to .hermes/config.yaml
-    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
+    # Fallback to .hermes/config.yaml (legacy — hermes doesn't read this for config)
+    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
 fi
 
 if [ -f "${HERMES_CONFIG}" ]; then
@@ -140,8 +141,9 @@ else
 fi
 
 # Test hermes config get commands
-if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "custom:omniroute"; then
-    log_info "hermes config get model.provider returns custom:omniroute"
+# Provider must be 'omniroute' (not 'custom:omniroute') — hermes doesn't recognize the colon format
+if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "omniroute"; then
+    log_info "hermes config get model.provider returns omniroute"
 else
     log_warn "hermes config get model.provider didn't return expected value"
 fi
