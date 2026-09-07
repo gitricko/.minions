@@ -65,44 +65,17 @@ install_npm_package() {
 
     echo "Found ${pkg_name} binary at: ${actual_binary}"
 
-    # Create wrapper that calls the actual binary with vendored Node
-    # Special case: omniroute CLI entry has a top-level-await bug (SyntaxError
-    # on Node 22/24); bypass it and run the Next.js standalone server directly.
-    # server.js reads PORT/HOSTNAME env vars, so translate --host/--port args.
-    if [ "${pkg_name}" = "omniroute" ]; then
-        cat > "${pkg_install_dir}/${bin_name}" << EOF
-#!/usr/bin/env sh
-export PATH="${MINIONS_HOME}/lib/node/bin:${npm_prefix}/lib/node_modules/.bin:\${PATH}"
-export NODE_PATH="${npm_prefix}/lib/node_modules"
-# Translate --host/--port CLI args into PORT/HOSTNAME env vars for server.js
-host=""
-port=""
-for arg in "\$@"; do
-    case "\$arg" in
-        --version|-V) echo "${pkg_version}"; exit 0 ;;
-    esac
-done
-while [ "\$#" -gt 0 ]; do
-    case "\$1" in
-        --host) host="\$2"; shift 2 ;;
-        --host=*) host="\${1#*=}"; shift ;;
-        --port) port="\$2"; shift 2 ;;
-        --port=*) port="\${1#*=}"; shift ;;
-        *) shift ;;
-    esac
-done
-[ -n "\$host" ] && export HOSTNAME="\$host"
-[ -n "\$port" ] && export PORT="\$port"
-exec "${MINIONS_HOME}/lib/node/bin/node" "${npm_prefix}/node_modules/omniroute/dist/server.js"
-EOF
-    else
-        cat > "${pkg_install_dir}/${bin_name}" << EOF
+    # Create wrapper that calls the actual binary with vendored Node.
+    # The old omniroute special case (bypassing the CLI to exec dist/server.js,
+    # translating --host/--port into HOSTNAME/PORT env) is DEAD since 3.8.x:
+    # dist/server.js no longer exists and the Commander-based CLI works on Node 22.
+    # Every package now uses the same generic "exec the real binary" wrapper.
+    cat > "${pkg_install_dir}/${bin_name}" << EOF
 #!/usr/bin/env sh
 export PATH="${MINIONS_HOME}/lib/node/bin:${npm_prefix}/lib/node_modules/.bin:\${PATH}"
 export NODE_PATH="${npm_prefix}/lib/node_modules"
 exec "${actual_binary}" "\$@"
 EOF
-    fi
     make_executable "${pkg_install_dir}/${bin_name}"
 
     # Verify the binary works (bounded timeout — some bins hang on --version)

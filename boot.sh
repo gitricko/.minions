@@ -103,7 +103,8 @@ if [ -f "${MINIONS_HOME}/etc/minions.env" ]; then
 fi
 
 # Re-derive composite URLs after sourcing config
-OMNIROUTE_BASE_URL="http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
+OMNIROUTE_ROOT_URL="http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}"
+OMNIROUTE_BASE_URL="${OMNIROUTE_ROOT_URL}/v1"
 MODELRELAY_BASE_URL="http://${MODELRELAY_HOST}:${MODELRELAY_PORT}/v1"
 
 # Ensure PATH includes our bins
@@ -129,10 +130,14 @@ echo ""
 
 # Step 1: OmniRoute
 log_info "Starting OmniRoute (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})..."
+# OmniRoute 3.8.x: `serve` is the Commander-based CLI. There is NO --host flag
+# (host is bound to 127.0.0.1 by default); old --host/--port invocation misparses.
+# --no-open suppresses the browser. NO --daemon: start_service backgrounds via
+# setsid and tracks the PID; --daemon would fork a detached child the pid files
+# can't track (verified working invocation is `nohup omniroute serve --no-open`).
 start_service "omniroute" \
     "${MINIONS_HOME}/bin/omniroute" \
-    --host "${OMNIROUTE_HOST}" \
-    --port "${OMNIROUTE_PORT}" \
+    serve --port "${OMNIROUTE_PORT}" --no-open \
     >> "${boot_log}" 2>&1 || log_error "Failed to start OmniRoute"
 
 wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 15 "omniroute"
@@ -149,7 +154,7 @@ wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
 
 # Step 3: Wait for OmniRoute health (needed for preconfig)
 log_info "Waiting for OmniRoute health..."
-wait_for_health "${OMNIROUTE_BASE_URL}/models" 30 "omniroute"
+wait_for_health "${OMNIROUTE_ROOT_URL}/healthz" 120 "omniroute"
 
 # Step 4: OmniRoute preconfiguration
 if [ "${DRY_RUN}" -eq 0 ]; then
