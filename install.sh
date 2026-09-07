@@ -155,11 +155,16 @@ mkdir -p "${MINIONS_HOME}/var/cache"
 # Copy config templates if running from a repo checkout (always, even in dry-run for sourcing)
 if [ -d "${SCRIPT_DIR}/etc" ]; then
     log_info "Copying config templates..."
-    cp -n "${SCRIPT_DIR}"/etc/*.env "${SCRIPT_DIR}"/etc/*.toml "${SCRIPT_DIR}"/etc/*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
-    cp -n "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
-    cp -n "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
-    cp -n "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
-    cp -n "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
+    # versions.env is a lockfile (component versions) — force-overwrite so upgrades
+    # propagate into existing installs. minions.env/pi.toml/models.json are user
+    # config — cp -n (no-clobber) respects local customization.
+    cp -f "${SCRIPT_DIR}"/etc/versions.env "${MINIONS_HOME}/etc/versions.env" 2>/dev/null || true
+    cp -n "${SCRIPT_DIR}"/etc/minions.env "${SCRIPT_DIR}"/etc/*.toml "${SCRIPT_DIR}"/etc/*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
+    # Scripts are code, not user config — force-overwrite so fixes propagate on re-install.
+    cp -f "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
 
 # NOW source remaining lib functions (from installed location)
