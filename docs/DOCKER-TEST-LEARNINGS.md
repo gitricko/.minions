@@ -189,22 +189,24 @@ docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/
 
 ---
 
-## Issue 10: hermes chat -q fails — three-part config resolution bug
+## Issue 10: hermes chat -q fails — config file path never created
 
-**Symptom:** `hermes chat -q "Reply with exactly: OK"` returns "Unknown provider 'custom:omniroute'" or "Unknown provider 'omniroute'" despite the config file having `custom_providers` with the omniroute entry.
+**Symptom:** `hermes chat -q "Reply with exactly: OK"` returns "No inference provider configured" despite the config having `custom_providers` and `provider: omniroute`.
 
 **Root cause (three layers):**
 
-1. **Wrong config file targeted.** `hermes_update_config` and `hermes_preconfigure` prioritized `${HERMES_HOME}/.hermes/config.yaml` (nested), but hermes reads from `${HERMES_HOME}/config.yaml` (parent). The function `get_config_path()` in `hermes_cli/config.py` returns `get_hermes_home() / "config.yaml"` — always the parent. The nested `.hermes/config.yaml` is a separate template that hermes never reads for config resolution.
+1. **Wrong config file targeted.** `get_config_path()` in `hermes_cli/config.py` returns `get_hermes_home() / "config.yaml"` — the parent path `${HERMES_HOME}/config.yaml`. The `.hermes/config.yaml` installed by hermes is a template that hermes NEVER reads for config resolution. `hermes_update_config` and `hermes_preconfigure` were writing to `.hermes/config.yaml` (nested), not the parent.
 
-2. **Provider name format.** The provider must be `omniroute` (not `custom:omniroute`). Hermes resolves custom providers via `resolve_custom_provider()` which matches against `custom_provider_aliases()`. The aliases for a `custom_providers` entry with `name: omniroute` are `{'omniroute', 'custom:omniroute'}`. However, `hermes config set` was writing `custom:omniroute` as the provider name, and the built-in provider list doesn't include `omniroute` — so it falls through to `resolve_custom_provider()` which needs the `custom_providers` list in the SAME config file.
+2. **Parent config.yaml never created.** `install.sh` never creates `${HERMES_HOME}/config.yaml`. The hermes installation creates `.hermes/config.yaml` as a template, but `get_config_path()` only looks at the parent. When the parent doesn't exist, hermes sees no config → "No inference provider configured."
 
-3. **custom_providers missing from parent.** Since `hermes_update_config` wrote to the nested file, the parent config.yaml had `model.provider: omniroute` but NO `custom_providers` list. Hermes couldn't resolve the provider.
+3. **cp -n prevented re-install.** `install.sh` used `cp -n` (no-clobber) for `lib/*.sh` files, so re-running install.sh in an existing container didn't update the broken `lib/hermes.sh`.
 
-**Fix:** Both `hermes_update_config` and `hermes_preconfigure` now prioritize `${HERMES_HOME}/config.yaml` (parent) — matching what `get_config_path()` actually returns. Provider name changed from `custom:omniroute` to `omniroute`.
+**Fix:**
+- `hermes_update_config` and `hermes_preconfigure` now ALWAYS target `${HERMES_HOME}/config.yaml`, creating it with defaults if it doesn't exist
+- `install.sh` changed `cp -n` to `cp` for scripts (lib/*.sh, boot.sh, stop.sh, status.sh) — these are code, not user config
 
-**Verification:** `hermes chat -q "Reply with exactly: OK"` returns "OK" in docker container.
+**Verification:** `hermes chat -q "Reply with exactly: OK"` connects to OmniRoute (transient 401s from free upstream providers are a separate issue).
 
-**Lesson:** Never assume which config file hermes reads — check `get_config_path()` in `hermes_cli/config.py`. The `.hermes/config.yaml` is a template; `${HERMES_HOME}/config.yaml` is the runtime config.
+**Lesson:** Never assume which config file hermes reads — check `get_config_path()` in `hermes_cli/config.py`. The `.hermes/config.yaml` is a template; `${HERMES_HOME}/config.yaml` is the runtime config. Always create the runtime config if it doesn't exist.
 
 **Key insight:** This is an external dependency issue, not a code bug. The CI test correctly detects a real failure — the retry just gives the upstream time to recover.
