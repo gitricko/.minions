@@ -270,6 +270,7 @@ MODELRELAY_PORT=7353 \
 | **Additional Pi extensions** | Beyond `pi-failover` | Low |
 | **Performance/optimization** | Faster boot, smaller footprint, parallel npm installs | Low |
 | **Documentation polish** | Usage examples, troubleshooting guide | Low |
+| **Docker-based local testing** | `docker-test.sh` for fast local iteration (30-60s vs 5-10 min CI) | ✅ Done (PR #18) |
 
 ---
 
@@ -298,6 +299,7 @@ MODELRELAY_PORT=7353 \
 | `lib/omniroute.sh` | OmniRoute preconfig (sqlite, combo, MCP) |
 | `lib/mnemon.sh` | Mnemon binary + seed import |
 | `lib/process.sh` | `start_service`, `stop_service`, `wait_for_port`, `wait_for_health` |
+| `docker-test.sh` | Local Docker test — fresh ubuntu:24.04 + install + boot + verify |
 | `tests/test_cli_integration.sh` | Real CLI end-to-end test (Hermes chat + Pi chat + config checks) |
 | `.github/workflows/ci.yml` | CI pipeline with path filtering |
 
