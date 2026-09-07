@@ -117,7 +117,7 @@ YAMLEOF
     elif grep -q "^model:" "${config_file}" 2>/dev/null; then
         sed -i '/^model:/a\  provider: omniroute' "${config_file}"
     else
-        echo -e "\nmodel:\n  provider: omniroute" >> "${config_file}"
+        printf '\nmodel:\n  provider: omniroute\n' >> "${config_file}"
     fi
 
     if grep -q "^  default:" "${config_file}" 2>/dev/null; then
@@ -129,7 +129,7 @@ YAMLEOF
     if grep -q "login_required:" "${config_file}" 2>/dev/null; then
         sed -i "s/login_required:.*/login_required: false/" "${config_file}"
     else
-        echo -e "\nomniroute:\n  login_required: false" >> "${config_file}"
+        printf '\nomniroute:\n  login_required: false\n' >> "${config_file}"
     fi
 
     echo "Hermes preconfig complete (provider=omniroute, model=auto-fastest)"
@@ -157,7 +157,7 @@ hermes_update_config() {
     # Create the config file if it doesn't exist
     if [ ! -f "${config_file}" ]; then
         mkdir -p "${HERMES_HOME}"
-        echo -e "model:\n  provider: omniroute\n  default: auto-fastest" > "${config_file}"
+        printf 'model:\n  provider: omniroute\n  default: auto-fastest\n' > "${config_file}"
         echo "Created ${config_file}"
     fi
 
