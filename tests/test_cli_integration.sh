@@ -103,12 +103,13 @@ else
 fi
 
 # Test hermes config shows correct base_urls
-# Hermes config is at HERMES_HOME/.hermes/config.yaml (not HERMES_HOME/config.yaml)
+# CRITICAL: hermes reads from HERMES_HOME/config.yaml (parent), NOT .hermes/config.yaml
+# get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
 # HERMES_HOME is set in the hermes wrapper script to ${MINIONS_HOME}/lib/hermes/home
-HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
+HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
 if [ ! -f "${HERMES_CONFIG}" ]; then
-    # Fallback to .hermes/config.yaml
-    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/config.yaml"
+    # Fallback to .hermes/config.yaml (legacy — hermes doesn't read this for config)
+    HERMES_CONFIG="${REAL_HOME}/lib/hermes/home/.hermes/config.yaml"
 fi
 
 if [ -f "${HERMES_CONFIG}" ]; then
@@ -140,8 +141,9 @@ else
 fi
 
 # Test hermes config get commands
-if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "custom:omniroute"; then
-    log_info "hermes config get model.provider returns custom:omniroute"
+# Provider must be 'omniroute' (not 'custom:omniroute') — hermes doesn't recognize the colon format
+if "${REAL_HOME}/bin/hermes" config get model.provider 2>/dev/null | grep -q "omniroute"; then
+    log_info "hermes config get model.provider returns omniroute"
 else
     log_warn "hermes config get model.provider didn't return expected value"
 fi
@@ -166,12 +168,25 @@ fi
 
 # Test Hermes chat through OmniRoute (real end-to-end query with free models)
 # custom:omniroute provider + auto-fastest model (free models in OmniRoute)
+# Retry up to 3 times with 10s delay — free providers are transiently unavailable
 echo "Testing Hermes chat via OmniRoute (auto-fastest with free models)..."
-HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
-if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then
-    log_info "Hermes chat via OmniRoute works (got expected response)"
-else
-    log_warn "Hermes chat via OmniRoute returned unexpected: ${HERMES_TEST_RESP}"
+HERMES_MAX_RETRIES=3
+HERMES_RETRY_DELAY=10
+HERMES_PASSED=false
+for attempt in $(seq 1 $HERMES_MAX_RETRIES); do
+    HERMES_TEST_RESP=$("${REAL_HOME}/bin/hermes" chat -q "Reply with exactly: OK" 2>&1 || true)
+    if echo "${HERMES_TEST_RESP}" | grep -qi "OK"; then
+        log_info "Hermes chat via OmniRoute works (got expected response on attempt ${attempt})"
+        HERMES_PASSED=true
+        break
+    fi
+    if [ "$attempt" -lt "$HERMES_MAX_RETRIES" ]; then
+        log_warn "Hermes chat attempt ${attempt}/${HERMES_MAX_RETRIES} failed, retrying in ${HERMES_RETRY_DELAY}s..."
+        sleep "$HERMES_RETRY_DELAY"
+    fi
+done
+if [ "$HERMES_PASSED" != "true" ]; then
+    log_warn "Hermes chat via OmniRoute returned unexpected after ${HERMES_MAX_RETRIES} attempts: ${HERMES_TEST_RESP}"
 fi
 
 # Step 4: Test Pi-Agent CLI
@@ -247,12 +262,24 @@ echo "[DEBUG] Available models:" >&2
 # Also check the models.json content
 echo "[DEBUG] models.json content:" >&2
 cat "${HOME}/.pi/agent/models.json" >&2
-# Try with explicit provider/model
-PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
-if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
-    log_info "Pi-Agent chat via omniroute works (got expected response)"
-else
-    log_error "Pi-Agent chat via omniroute failed: ${PI_TEST_RESP}"
+# Retry up to 3 times with 10s delay — free providers are transiently unavailable
+PI_MAX_RETRIES=3
+PI_RETRY_DELAY=10
+PI_PASSED=false
+for attempt in $(seq 1 $PI_MAX_RETRIES); do
+    PI_TEST_RESP=$("${REAL_HOME}/bin/pi" -p "Reply with exactly: OK" --provider omniroute --model omniroute/auto-fastest 2>&1 || true)
+    if echo "${PI_TEST_RESP}" | grep -qi "OK"; then
+        log_info "Pi-Agent chat via omniroute works (got expected response on attempt ${attempt})"
+        PI_PASSED=true
+        break
+    fi
+    if [ "$attempt" -lt "$PI_MAX_RETRIES" ]; then
+        log_warn "Pi-Agent chat attempt ${attempt}/${PI_MAX_RETRIES} failed, retrying in ${PI_RETRY_DELAY}s..."
+        sleep "$PI_RETRY_DELAY"
+    fi
+done
+if [ "$PI_PASSED" != "true" ]; then
+    log_error "Pi-Agent chat via omniroute failed after ${PI_MAX_RETRIES} attempts: ${PI_TEST_RESP}"
     exit 1
 fi
 

@@ -270,6 +270,7 @@ MODELRELAY_PORT=7353 \
 | **Additional Pi extensions** | Beyond `pi-failover` | Low |
 | **Performance/optimization** | Faster boot, smaller footprint, parallel npm installs | Low |
 | **Documentation polish** | Usage examples, troubleshooting guide | Low |
+| **Docker-based local testing** | `dts` (docker-test-shell skill) for fast local iteration (30-60s vs 5-10 min CI) | ✅ Done |
 
 ---
 

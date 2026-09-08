@@ -1,0 +1,212 @@
+# Docker Test Iteration: Learnings & Pitfalls
+
+**Date:** September 2026
+**Context:** First-time docker-based testing iteration for .minions (originally via `docker-test.sh`, now via the `dts` skill/primitive)
+
+---
+
+## Summary
+
+Tested .minions install/boot in a fresh Ubuntu container (via `dts`: `dts up` → `dts apt` → `dts exec install.sh` → `dts exec boot.sh`). Iterated through several issues during local testing. This document captures all root causes and fixes for future captains/firstmates.
+
+---
+
+## Issue 1: Node.js tarball extraction fails
+
+**Symptom:**
+```
+tar (child): xz: Cannot exec: No such file or directory
+tar (child): Error is not recoverable: exiting now
+```
+
+**Root cause:** Ubuntu 24.04 base image does not include `xz-utils`. The Node.js tarball is `.tar.xz` format.
+
+**Fix:** Add `xz-utils` to the apt install (e.g. `dts apt "curl git ca-certificates xz-utils g++ make sqlite3 python3 python3-yaml"`).
+
+**Lesson:** Bare Ubuntu containers need explicit `xz-utils` for tar.xz extraction.
+
+---
+
+## Issue 2: Hermes install times out compiling node-pty
+
+**Symptom:** Docker test hangs at hermes install, eventually times out at 7 min.
+
+**Root cause:** Hermes install compiles `node-pty` native module via `node-gyp`, which requires `g++` and `make`. Ubuntu 24.04 has `gcc-14-base` but not the full compiler toolchain.
+
+**Fix:** Add `g++ make` to the apt install (Hermes node-pty compilation).
+
+**Lesson:** Native Node module compilation (node-pty, better-sqlite3, etc.) needs build-essential. The Hermes install silently fails without it.
+
+---
+
+## Issue 3: Pi-Agent wrapper script wrong paths
+
+**Symptom:**
+```
+/home/ubuntu/.minions/bin/pi: 4: cd: can't cd to /lib/pi/npm
+/home/ubuntu/.minions/bin/pi: 5: exec: /lib/pi/npm/node_modules/.bin/pi: not found
+```
+
+**Root cause:** `lib/pi.sh` wrapper script used `lib/node_modules/` but actual npm structure is `node_modules/` (npm 9+ hoists to root). Also, Node binary wasn't in PATH (only `.bin` folder was).
+
+**Fix in lib/pi.sh:**
+- Changed `lib/node_modules` → `node_modules`
+- Added `${MINIONS_HOME}/lib/node/bin` to wrapper PATH
+
+**Lesson:** npm package structure varies by npm version. Always verify the actual installed paths with `ls -la` in the container.
+
+---
+
+## Issue 4: Docker exec doesn't source .bashrc
+
+**Symptom:**
+```
+bash: line 1: hermes: command not found
+```
+Even though `.bashrc` has the correct PATH.
+
+**Root cause:** `docker exec ... bash -c` runs non-interactive shell, which doesn't source `.bashrc`. `.profile` is only sourced by login shells.
+
+**Fix (in `dts`):**
+- `dts` uses `bash -l -c` (login shell) — done
+- `install.sh` writes the PATH snippet to `.profile` too (not just `.bashrc/.zshrc`)
+
+**Lesson:** For Docker dev-prod parity, always use `bash -l` (login shell) or write to `/etc/environment`. CI workflows use `export` in the step, which Docker doesn't have.
+
+---
+
+## Issue 5: boot.sh runs from wrong location
+
+**Symptom:** Boot failed silently (no clear error, just timeout).
+
+**Root cause:** The container ran `bash /src/boot.sh` but `install.sh` copies boot.sh to `${MINIONS_HOME}/boot.sh`. The `/src/boot.sh` is the source, not the installed copy. Using the installed copy ensures it runs with the correct environment.
+
+**Fix:** Changed `bash ${SRC_MOUNT}/boot.sh` → `bash ${CONTAINER_HOME}/boot.sh` (same for status.sh).
+
+**Lesson:** Only `install.sh` should run from `/src` (the volume mount). Everything else gets installed to `${MINIONS_HOME}` and should run from there.
+
+---
+
+## Issue 6: Hermes config.yaml malformed (literal \n)
+
+**Symptom:**
+```
+Failed to parse config.yaml: mapping values are not allowed in this context
+in config.yaml, line 1, column 53
+```
+
+**Root cause:** `hermes_update_config()` uses Python YAML dump which writes proper YAML, but the fallback sed approach (line 184) writes literal `\n` characters instead of actual newlines. If Python yaml import fails, sed produces broken YAML.
+
+**Status:** Pre-existing bug. Not a docker-test issue but surfaced during testing.
+
+**Lesson:** When testing install scripts in Docker, YAML config generation is a common failure point. Always validate the generated config with `cat` before the service tries to parse it.
+
+---
+
+## Issue 7: Pi-Agent -p requires provider auth
+
+**Symptom:**
+```
+No API key found for the selected model.
+```
+
+**Root cause:** Pi-Agent doesn't auto-use OmniRoute's keyless free providers. It needs explicit provider config (API key or OAuth). Hermes uses OmniRoute automatically; Pi-Agent does not.
+
+**Fix:** Docker test verifies binary works (gives meaningful "API key" error, not "command not found"). Full integration test requires provider config.
+
+**Lesson:** Hermes and Pi-Agent have different auth models. Don't assume pi -p will work keyless just because hermes chat -q does.
+
+---
+
+## Architecture: What Goes Where
+
+| What | Runs from | Why |
+|------|-----------|-----|
+| `install.sh` | `/src/install.sh` (volume mount) | Entry point, copies everything to MINIONS_HOME |
+| `boot.sh` | `${MINIONS_HOME}/boot.sh` | Installed copy, uses installed env |
+| `status.sh` | `${MINIONS_HOME}/status.sh` | Same as boot.sh |
+| `hermes chat` | `${MINIONS_HOME}/bin/hermes` | Wrapper sets HERMES_HOME |
+| `pi -p` | `${MINIONS_HOME}/bin/pi` | Wrapper sets PATH to node_modules/.bin |
+
+---
+
+## Docker Test Flow (Final)
+
+```
+1. docker run ubuntu:24.04 sleep infinity
+2. apt-get install: curl git ca-certificates xz-utils g++ make
+3. bash /src/install.sh
+   → Creates MINIONS_HOME, installs all components
+   → Writes PATH to ~/.profile, ~/.bashrc
+4. bash -l ${MINIONS_HOME}/boot.sh
+   → Starts OmniRoute + ModelRelay
+5. bash -l ${MINIONS_HOME}/status.sh
+   → Verifies all components healthy
+6. hermes --version / pi --version / mnemon --version
+7. hermes chat -q "Reply with exactly: OK" (keyless via OmniRoute)
+8. pi -p "Reply with exactly: OK" (expects provider error without auth)
+```
+
+---
+
+## Key Config Files
+
+| File | Purpose | Bug-prone? |
+|------|---------|------------|
+| `lib/pi.sh` wrapper | Sets PATH to pi node_modules | Yes — path structure varies by npm version |
+| `lib/hermes.sh` hermes_update_config | Writes custom_providers to config.yaml | Yes — Python yaml vs sed fallback can produce broken YAML |
+| `install.sh` PATH snippet | Writes MINIONS_HOME to shell rc files | Fixed — now writes to .profile too |
+| `dts` exec (uid 1000) | Runs commands as non-root user | Uses `bash -l` (login shell) — required |
+
+---
+
+## Commands for Debugging
+
+```bash
+# Drop into container with correct env
+docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/bin:/home/ubuntu/.minions/lib/node/bin:$PATH minions-test bash -l
+
+# Check what install produced
+docker exec minions-test bash -c "cat /home/ubuntu/.minions/lib/pi/pi"
+docker exec minions-test bash -c "cat /home/ubuntu/.minions/lib/hermes/home/config.yaml"
+
+# Verify hermes config
+docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/bin:/home/ubuntu/.minions/lib/node/bin:$PATH minions-test bash -l -c "hermes config get"
+
+# Test individual components
+docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/bin:/home/ubuntu/.minions/lib/node/bin:$PATH minions-test bash -l -c "hermes chat -q 'hello'"
+```
+
+---
+
+## Issue 9: Transient upstream free provider unavailability (503)
+
+**Symptom:** `Pi-Agent chat via omniroute failed: 503: {"message":"No models currently available for this request."}`
+
+**Root cause:** Free tier upstream providers (used by OmniRoute/ModelRelay) are transiently unavailable. Both proxies return the same 503 — it's the same upstream being down. Pi-Agent's fallback chain only triggers on connection errors (timeout/refused), not HTTP 503 responses.
+
+**Fix:** Added retry logic (3 attempts, 10s delay) to the CI test (`test_cli_integration.sh`). Retry masks transient upstream outages while still catching real configuration bugs.
+
+---
+
+## Issue 10: hermes chat -q fails — config file path never created
+
+**Symptom:** `hermes chat -q "Reply with exactly: OK"` returns "No inference provider configured" despite the config having `custom_providers` and `provider: omniroute`.
+
+**Root cause (three layers):**
+
+1. **Wrong config file targeted.** `get_config_path()` in `hermes_cli/config.py` returns `get_hermes_home() / "config.yaml"` — the parent path `${HERMES_HOME}/config.yaml`. The `.hermes/config.yaml` installed by hermes is a template that hermes NEVER reads for config resolution. `hermes_update_config` and `hermes_preconfigure` were writing to `.hermes/config.yaml` (nested), not the parent.
+
+2. **Parent config.yaml never created.** `install.sh` never creates `${HERMES_HOME}/config.yaml`. The hermes installation creates `.hermes/config.yaml` as a template, but `get_config_path()` only looks at the parent. When the parent doesn't exist, hermes sees no config → "No inference provider configured."
+
+3. **cp -n prevented re-install.** `install.sh` used `cp -n` (no-clobber) for `lib/*.sh` files, so re-running install.sh in an existing container didn't update the broken `lib/hermes.sh`.
+
+**Fix:**
+- `hermes_update_config` and `hermes_preconfigure` now ALWAYS target `${HERMES_HOME}/config.yaml`, creating it with defaults if it doesn't exist
+- `install.sh` changed `cp -n` to `cp` for scripts (lib/*.sh, boot.sh, stop.sh, status.sh) — these are code, not user config
+
+**Verification:** `hermes chat -q "Reply with exactly: OK"` connects to OmniRoute (transient 401s from free upstream providers are a separate issue).
+
+**Lesson:** Never assume which config file hermes reads — check `get_config_path()` in `hermes_cli/config.py`. The `.hermes/config.yaml` is a template; `${HERMES_HOME}/config.yaml` is the runtime config. Always create the runtime config if it doesn't exist.
+
+**Key insight:** This is an external dependency issue, not a code bug. The CI test correctly detects a real failure — the retry just gives the upstream time to recover.
