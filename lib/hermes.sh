@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # lib/hermes.sh - Hermes Agent installation
-
+#
 # Install Hermes using their official install script (git-based, mirrors hermes-codespace)
 # Usage: install_hermes <version> <install_dir>
 install_hermes() {
@@ -47,13 +47,8 @@ install_hermes() {
         return 1
     fi
 
-    # Create wrapper script in our install_dir
-    cat > "${install_dir}/hermes" << EOF
-#!/usr/bin/env sh
-export HERMES_HOME="${HERMES_HOME_OVERRIDE}"
-exec "${hermes_bin}" "\$@"
-EOF
-    make_executable "${install_dir}/hermes"
+    # Create direct symlink (no wrapper - config is at ~/.hermes/config.yaml)
+    ln -sf "${hermes_bin}" "${install_dir}/hermes"
 
     # Fix macOS quarantine
     fix_macos_quarantine "${install_dir}"
@@ -66,151 +61,12 @@ EOF
     fi
 
     # Install python-dotenv in Hermes managed venv (required for hermes_cli)
-    # The managed uv is at ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent/venv/bin/uv
-    # INSTALL_DIR = ${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent
     install_dir_guess="${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent"
     if [ -x "${install_dir_guess}/venv/bin/uv" ]; then
         "${install_dir_guess}/venv/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
     elif [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
         "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
     fi
-
-    # Preconfigure Hermes (if requested)
-    if [ "${MINIONS_HERMES_PRECONFIG:-0}" -eq 1 ]; then
-        hermes_preconfigure
-    fi
-}
-
-# Preconfigure Hermes after install
-# Sets up: custom:omniroute provider, auto-fastest model, omniroute login off (no MCP integration)
-# Uses HERMES_HOME if set, otherwise falls back to ${HOME}/.hermes
-hermes_preconfigure() {
-    echo "Preconfiguring Hermes..."
-
-    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml — this is the ONLY config path
-    # get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
-    # .hermes/config.yaml is a template; hermes NEVER reads it for config resolution
-    if [ -z "${HERMES_HOME:-}" ]; then
-        echo "WARNING: HERMES_HOME not set, skipping hermes preconfigure" >&2
-        return 0
-    fi
-
-    config_file="${HERMES_HOME}/config.yaml"
-
-    # Create the config file if it doesn't exist — hermes needs it at this exact path
-    if [ ! -f "${config_file}" ]; then
-        mkdir -p "${HERMES_HOME}"
-        cat > "${config_file}" << 'YAMLEOF'
-model:
-  provider: omniroute
-  default: auto-fastest
-omniroute:
-  login_required: false
-YAMLEOF
-        echo "Created ${config_file} with default settings"
-    fi
-
-    # Use sed to modify the config file directly
-    # Provider must be 'omniroute' (not 'custom:omniroute') — hermes doesn't recognize the colon format
-    if grep -q "^  provider:" "${config_file}" 2>/dev/null; then
-        sed -i "s/^  provider:.*/  provider: omniroute/" "${config_file}"
-    elif grep -q "^model:" "${config_file}" 2>/dev/null; then
-        sed -i '/^model:/a\  provider: omniroute' "${config_file}"
-    else
-        printf '\nmodel:\n  provider: omniroute\n' >> "${config_file}"
-    fi
-
-    if grep -q "^  default:" "${config_file}" 2>/dev/null; then
-        sed -i "s/^  default:.*/  default: auto-fastest/" "${config_file}"
-    elif grep -q "^model:" "${config_file}" 2>/dev/null; then
-        sed -i '/^model:/a\  default: auto-fastest' "${config_file}"
-    fi
-
-    if grep -q "login_required:" "${config_file}" 2>/dev/null; then
-        sed -i "s/login_required:.*/login_required: false/" "${config_file}"
-    else
-        printf '\nomniroute:\n  login_required: false\n' >> "${config_file}"
-    fi
-
-    echo "Hermes preconfig complete (provider=omniroute, model=auto-fastest)"
-}
-
-# Update Hermes config.yaml with current ports
-# Usage: hermes_update_config [omniroute_port] [modelrelay_port]
-# If ports not provided, reads from OMNIROUTE_PORT/MODELRELAY_PORT env vars
-hermes_update_config() {
-    omniroute_port="${1:-${OMNIROUTE_PORT:-20128}}"
-    modelrelay_port="${2:-${MODELRELAY_PORT:-7352}}"
-    omniroute_url="http://127.0.0.1:${omniroute_port}/v1"
-    modelrelay_url="http://127.0.0.1:${modelrelay_port}/v1"
-
-    # CRITICAL: hermes reads from ${HERMES_HOME}/config.yaml — this is the ONLY config path
-    # get_config_path() = get_hermes_home() / "config.yaml" in hermes_cli/config.py
-    # .hermes/config.yaml is a template; hermes NEVER reads it for config resolution
-    if [ -z "${HERMES_HOME:-}" ]; then
-        echo "WARNING: HERMES_HOME not set, skipping hermes config update" >&2
-        return 0
-    fi
-
-    config_file="${HERMES_HOME}/config.yaml"
-
-    # Create the config file if it doesn't exist
-    if [ ! -f "${config_file}" ]; then
-        mkdir -p "${HERMES_HOME}"
-        printf 'model:\n  provider: omniroute\n  default: auto-fastest\n' > "${config_file}"
-        echo "Created ${config_file}"
-    fi
-
-    # Use Python for reliable YAML manipulation
-    python3 -c "
-import yaml
-import sys
-
-config_file = '${config_file}'
-omniroute_url = '${omniroute_url}'
-modelrelay_url = '${modelrelay_url}'
-
-with open(config_file, 'r') as f:
-    config = yaml.safe_load(f) or {}
-
-# Hermes expects custom_providers as a list of dicts with 'name' and 'base_url'
-if 'custom_providers' not in config or not isinstance(config['custom_providers'], list):
-    config['custom_providers'] = []
-
-# Update or add omniroute
-found_omniroute = False
-for p in config['custom_providers']:
-    if p.get('name') == 'omniroute':
-        p['base_url'] = omniroute_url
-        found_omniroute = True
-        break
-if not found_omniroute:
-    config['custom_providers'].append({'name': 'omniroute', 'base_url': omniroute_url})
-
-# Update or add modelrelay
-found_modelrelay = False
-for p in config['custom_providers']:
-    if p.get('name') == 'modelrelay':
-        p['base_url'] = modelrelay_url
-        found_modelrelay = True
-        break
-if not found_modelrelay:
-    config['custom_providers'].append({'name': 'modelrelay', 'base_url': modelrelay_url})
-
-with open(config_file, 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-print('Hermes config updated: omniroute -> {} , modelrelay -> {}'.format(omniroute_url, modelrelay_url))
-" 2>/dev/null || {
-        echo "WARNING: Python YAML update failed, trying sed fallback..." >&2
-        # Fallback sed approach (original logic)
-        if ! grep -q "^custom_providers:" "${config_file}" 2>/dev/null; then
-            sed -i "/^[^#]/i\\custom_providers:\\n  - name: omniroute\\n    base_url: ${omniroute_url}\\n  - name: modelrelay\\n    base_url: ${modelrelay_url}\\" "${config_file}" 2>/dev/null || true
-        else
-            # For sed fallback, we'd need more complex logic - skip for now
-            true
-        fi
-    }
 }
 
 # Ensure Hermes is available

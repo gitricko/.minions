@@ -1,7 +1,7 @@
 {
   "providers": {
     "omniroute": {
-      "baseUrl": "{{OMNIROUTE_BASE_URL}}",
+      "baseUrl": "http://127.0.0.1:{{OMNIROUTE_PORT}}/v1",
       "api": "openai-completions",
       "apiKey": "no-key-needed",
       "models": [
@@ -10,7 +10,7 @@
           "name": "Auto Fastest",
           "api": "openai-completions",
           "provider": "omniroute",
-          "baseUrl": "{{OMNIROUTE_BASE_URL}}",
+          "baseUrl": "http://127.0.0.1:{{OMNIROUTE_PORT}}/v1",
           "reasoning": true,
           "input": ["text"],
           "cost": {
@@ -31,7 +31,7 @@
       }
     },
     "modelrelay": {
-      "baseUrl": "{{MODELRELAY_BASE_URL}}",
+      "baseUrl": "http://127.0.0.1:{{MODELRELAY_PORT}}/v1",
       "api": "openai-completions",
       "apiKey": "no-key-needed",
       "models": [
@@ -40,7 +40,7 @@
           "name": "Auto Fastest",
           "api": "openai-completions",
           "provider": "modelrelay",
-          "baseUrl": "{{MODELRELAY_BASE_URL}}",
+          "baseUrl": "http://127.0.0.1:{{MODELRELAY_PORT}}/v1",
           "reasoning": true,
           "input": ["text"],
           "cost": {

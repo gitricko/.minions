@@ -12,7 +12,7 @@ port = 8080
 [llm]
 # Base URL for OpenAI-compatible API (OmniRoute or ModelRelay)
 # Override via MINIONS_LLM_BASE_URL env var
-base_url = "http://localhost:20128/v1"
+base_url = "http://localhost:{{OMNIROUTE_PORT}}/v1"
 # Model selection: "auto" lets the proxy choose, or specify a model ID
 model = "auto"
 # Default provider to use (both omniroute and modelrelay have auto-fastest)
@@ -25,9 +25,9 @@ api_key = ""
 # Maximum conversation turns before summarization
 max_turns = 50
 # Working directory for agent operations
-workspace = "${MINIONS_HOME}/workspace"
+workspace = "${HOME}/.minions/workspace"
 
 # Logging
 [logging]
 level = "info"
-file = "${MINIONS_HOME}/var/log/pi-agent.log"
+file = "${HOME}/.minions/var/log/pi-agent.log"

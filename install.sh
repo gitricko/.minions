@@ -5,45 +5,47 @@
 # This script:
 #   1. Detects OS/arch
 #   2. Creates ~/.minions directory structure
-#   3. Checks/installs prerequisites (Node, uv, Bun-based Pi binary)
-#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, ModelRelay
-#   5. Writes config files (versions.env, minions.env, pi.toml)
-#   6. Fixes macOS quarantine where needed
+#   3. Checks/installs prerequisites (Node, uv)
+#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, ModelRelay, Mnemon
+#   4. Copies config templates to standard locations with port interpolation
+#   5. Fixes macOS quarantine where needed
 #
 # Usage:
-#   install.sh [--dry-run] [--no-hermes] [--minions-home PATH]
+#   install.sh [--no-hermes]
+#
+# Environment (set in ~/.bashrc BEFORE running):
+#   OMNIROUTE_PORT=20128   (default)
+#   MODELRELAY_PORT=7352   (default)
 
 set -e
 set -u
 
-# Defaults
-MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
-DRY_RUN=0
+# Defaults - no MINIONS_HOME override, fixed at ~/.minions
+MINIONS_HOME="${HOME}/.minions"
 INSTALL_HERMES=1
+
+# Port configuration (env-overridable with defaults)
+OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
+MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
-        --dry-run)
-            DRY_RUN=1
-            shift
-            ;;
         --no-hermes)
             INSTALL_HERMES=0
             shift
             ;;
-        --minions-home)
-            MINIONS_HOME="$2"
-            shift 2
-            ;;
         -h|--help)
-            echo "Usage: install.sh [--dry-run] [--no-hermes] [--minions-home PATH]"
+            echo "Usage: install.sh [--no-hermes]"
+            echo ""
+            echo "Environment variables (set before running):"
+            echo "  OMNIROUTE_PORT=20128  (default)"
+            echo "  MODELRELAY_PORT=7352  (default)"
             exit 0
             ;;
         *)
             echo "Unknown option: $1" >&2
             exit 1
-            ;;
     esac
 done
 
@@ -63,13 +65,11 @@ fi
 log_info() { echo "${GREEN}[INFO]${NC} $*"; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo "${RED}[ERROR]${NC} $*" >&2; }
-log_dry() { echo "${YELLOW}[DRY-RUN]${NC} $*"; }
 
 # Source lib functions (relative to script location)
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # Detect platform FIRST (needs detect.sh)
-# If running from a checked-out repo, use repo's lib; otherwise from install location
 if [ -d "${SCRIPT_DIR}/lib" ]; then
     LIB_DIR="${SCRIPT_DIR}/lib"
 else
@@ -86,61 +86,8 @@ if ! detect_platform; then
 fi
 
 log_info "Platform: ${PLATFORM}"
-
-# In dry-run mode, echo actions instead of executing them
-if [ "${DRY_RUN}" -eq 1 ]; then
-    log_dry "Running in dry-run mode - no actual changes will be made"
-    # Override install functions to be no-ops that print
-    download_file() {
-        log_dry "Would download: $1 -> $2"
-        # Create empty file so subsequent steps don't fail
-        mkdir -p "$(dirname "$2")"
-        touch "$2"
-    }
-    install_vendored_node() {
-        log_dry "Would install vendored Node $1 to $2"
-        mkdir -p "$2/bin"
-        touch "$2/bin/node"
-        chmod +x "$2/bin/node"
-    }
-    install_vendored_uv() {
-        log_dry "Would install vendored uv $1 to $2"
-        mkdir -p "$2"
-        touch "$2/uv"
-        chmod +x "$2/uv"
-    }
-    install_pi() {
-        log_dry "Would install Pi-Agent $1 to $2"
-        mkdir -p "$2"
-        touch "$2/pi"
-        chmod +x "$2/pi"
-    }
-    install_hermes() {
-        log_dry "Would install Hermes $1 to $2"
-        mkdir -p "$2"
-        touch "$2/hermes"
-        chmod +x "$2/hermes"
-    }
-    install_npm_package() {
-        log_dry "Would install npm package $1@$2 to $3 ($4)"
-        mkdir -p "$3"
-        touch "$3/$4"
-        chmod +x "$3/$4"
-    }
-    install_mnemon() {
-        log_dry "Would install Mnemon to $1"
-        mkdir -p "$1"
-        touch "$1/mnemon"
-        chmod +x "$1/mnemon"
-    }
-    ensure_mnemon() {
-        log_dry "Would ensure Mnemon"
-        install_mnemon "${MINIONS_HOME}/lib/mnemon"
-    }
-    setup_mnemon_all() {
-        log_dry "Would setup Mnemon for all targets in $1"
-    }
-fi
+log_info "Installing to: ${MINIONS_HOME}"
+log_info "Ports: omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
 
 # Step 1: Create directory structure
 log_info "Creating directory structure at ${MINIONS_HOME}"
@@ -152,22 +99,22 @@ mkdir -p "${MINIONS_HOME}/bin"
 mkdir -p "${MINIONS_HOME}/workspace"
 mkdir -p "${MINIONS_HOME}/var/cache"
 
-# Copy config templates if running from a repo checkout (always, even in dry-run for sourcing)
-if [ -d "${SCRIPT_DIR}/etc" ]; then
-    log_info "Copying config templates..."
-    # versions.env is a lockfile (component versions) — force-overwrite so upgrades
-    # propagate into existing installs. minions.env/pi.toml/models.json are user
-    # config — cp -n (no-clobber) respects local customization.
-    cp -f "${SCRIPT_DIR}"/etc/versions.env "${MINIONS_HOME}/etc/versions.env" 2>/dev/null || true
-    cp -n "${SCRIPT_DIR}"/etc/minions.env "${SCRIPT_DIR}"/etc/*.toml "${SCRIPT_DIR}"/etc/*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
-    # Scripts are code, not user config — force-overwrite so fixes propagate on re-install.
+# Copy lib scripts (code, not config - force overwrite so fixes propagate)
+if [ -d "${SCRIPT_DIR}/lib" ]; then
+    log_info "Copying lib scripts..."
     cp -f "${SCRIPT_DIR}"/lib/*.sh "${MINIONS_HOME}/lib/" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
 
-# NOW source remaining lib functions (from installed location)
+# Copy versions.env so lib scripts can source it from MINIONS_HOME
+if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
+    cp -f "${SCRIPT_DIR}/etc/versions.env" "${MINIONS_HOME}/etc/versions.env"
+    log_info "Copied versions.env to ${MINIONS_HOME}/etc/"
+fi
+
+# NOW source lib functions (from installed location)
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/download.sh"
 # shellcheck disable=SC1091
@@ -181,12 +128,14 @@ fi
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/npm_packages.sh"
 # shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/omniroute.sh"
+# shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/mnemon.sh"
 
 # Step 2: Source versions
-if [ -f "${MINIONS_HOME}/etc/versions.env" ]; then
+if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     # shellcheck disable=SC1090,SC1091
-    . "${MINIONS_HOME}/etc/versions.env"
+    . "${SCRIPT_DIR}/etc/versions.env"
 fi
 
 # Step 3: Install prerequisites
@@ -214,31 +163,82 @@ log_info "Installing ModelRelay..."
 ensure_modelrelay
 
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
-    log_info "Installing Hermes (opt-in)..."
-    # Preconfigure Hermes (set auto-fastest model, disable login)
-    export MINIONS_HERMES_PRECONFIG=1
+    log_info "Installing Hermes..."
     ensure_hermes
-    
-    # Update Hermes config with current ports
-    if [ "${DRY_RUN}" -eq 0 ]; then
-        # Set HERMES_HOME so hermes_update_config finds the right config
-        export HERMES_HOME="${MINIONS_HOME}/lib/hermes/home"
-        # shellcheck disable=SC1091
-        . "${MINIONS_HOME}/etc/minions.env"
-        hermes_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
-    fi
 fi
 
-# Update Pi config with current ports
-if [ "${DRY_RUN}" -eq 0 ]; then
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/etc/minions.env"
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/lib/pi.sh"
-    pi_update_config "${OMNIROUTE_PORT:-20128}" "${MODELRELAY_PORT:-7352}"
+# Step 5: Copy and interpolate config templates
+log_info "Copying and configuring templates..."
+
+# Create Pi agent config directory
+mkdir -p "${HOME}/.pi/agent"
+
+# Copy pi.toml with port interpolation
+if [ -f "${SCRIPT_DIR}/etc/pi.toml" ]; then
+    sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
+        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        "${SCRIPT_DIR}/etc/pi.toml" > "${HOME}/.pi/agent/pi.toml"
+    log_info "Created ~/.pi/agent/pi.toml"
 fi
 
-# Step 5: Set up PATH snippet
+# Copy models.json with port interpolation
+if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
+    sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
+        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        "${SCRIPT_DIR}/etc/models.json" > "${HOME}/.pi/agent/models.json"
+    log_info "Created ~/.pi/agent/models.json"
+fi
+
+# Copy settings.json if exists
+if [ -f "${SCRIPT_DIR}/etc/settings.json" ]; then
+    cp "${SCRIPT_DIR}/etc/settings.json" "${HOME}/.pi/agent/settings.json"
+    log_info "Created ~/.pi/agent/settings.json"
+fi
+
+# Create Hermes config.yaml
+log_info "Creating ~/.hermes/config.yaml..."
+mkdir -p "${HOME}/.hermes"
+cat > "${HOME}/.hermes/config.yaml" << YAMLEOF
+model:
+  provider: omniroute
+  default: auto-fastest
+omniroute:
+  login_required: false
+custom_providers:
+  - name: omniroute
+    base_url: http://127.0.0.1:${OMNIROUTE_PORT}/v1
+  - name: modelrelay
+    base_url: http://127.0.0.1:${MODELRELAY_PORT}/v1
+YAMLEOF
+log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
+
+# Mnemon seed import
+log_info "Importing Mnemon seeds..."
+if [ -f "${SCRIPT_DIR}/etc/mnemon-seed-hermes.json" ]; then
+    mnemon_import "${SCRIPT_DIR}/etc/mnemon-seed-hermes.json" || true
+fi
+if [ -f "${SCRIPT_DIR}/etc/mnemon-seed-pi.json" ]; then
+    mnemon_import "${SCRIPT_DIR}/etc/mnemon-seed-pi.json" || true
+fi
+
+# Step 6: Install pi-failover extension (CLI only, no proxy needed)
+log_info "Installing pi-failover extension..."
+if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>/dev/null; then
+    log_info "pi-failover extension installed"
+    "${MINIONS_HOME}/bin/pi" extensions reload 2>/dev/null || true
+else
+    log_warn "pi-failover extension install failed (may not exist yet or needs retry at boot)"
+fi
+
+# Step 7: Preconfigure OmniRoute default password and disable login (so boot is seamless)
+log_info "Preconfiguring OmniRoute defaults..."
+export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
+export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
+"${MINIONS_HOME}/bin/omniroute" setup --non-interactive --password 'minions123' >/dev/null 2>&1 || true
+"${MINIONS_HOME}/bin/omniroute" api system post-api-auth-login --body '{"password":"minions123"}' >/dev/null 2>&1 || true
+"${MINIONS_HOME}/bin/omniroute" api settings post-api-settings-require-login >/dev/null 2>&1 || true
+
+# Step 8: Set up PATH snippet
 # shellcheck disable=SC2016
 PATH_SNIPPET='
 # .minions - added by installer
@@ -250,24 +250,22 @@ export PATH="${MINIONS_HOME}/bin:${PATH}"
 for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
     if [ -f "${rc}" ] && ! grep -q "MINIONS_HOME" "${rc}"; then
         log_info "Adding MINIONS_HOME to ${rc}"
-        if [ "${DRY_RUN}" -eq 0 ]; then
-            printf '%s\n' "${PATH_SNIPPET}" >> "${rc}"
-        fi
+        printf '%s\n' "${PATH_SNIPPET}" >> "${rc}"
     fi
 done
 
-# Step 6: Print summary
+# Step 8: Print summary
 echo ""
 log_info "Installation complete!"
 echo ""
 echo "  Components installed to: ${MINIONS_HOME}"
-echo "    - Pi-Agent:    ${MINIONS_HOME}/lib/pi/pi (version ${PI_VERSION:-unknown})"
-echo "    - OmniRoute:   ${MINIONS_HOME}/lib/omniroute/omniroute (version ${OMNIROUTE_VERSION:-unknown})"
-echo "    - ModelRelay:  ${MINIONS_HOME}/lib/modelrelay/modelrelay (version ${MODELRELAY_VERSION:-unknown})"
+echo "    - Pi-Agent:    ${MINIONS_HOME}/bin/pi (version ${PI_VERSION:-unknown})"
+echo "    - OmniRoute:   ${MINIONS_HOME}/bin/omniroute (version ${OMNIROUTE_VERSION:-unknown})"
+echo "    - ModelRelay:  ${MINIONS_HOME}/bin/modelrelay (version ${MODELRELAY_VERSION:-unknown})"
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
-    echo "    - Hermes:      ${MINIONS_HOME}/lib/hermes/hermes (version ${HERMES_VERSION:-unknown})"
+    echo "    - Hermes:      ${MINIONS_HOME}/bin/hermes (version ${HERMES_VERSION:-unknown})"
 fi
-echo "    - Mnemon:      ${MINIONS_HOME}/lib/mnemon/mnemon (if available)"
+echo "    - Mnemon:      ${MINIONS_HOME}/bin/mnemon (if available)"
 echo ""
 echo "  Next step: run '${MINIONS_HOME}/boot.sh' to start the stack"
 if [ -t 1 ]; then
@@ -276,8 +274,7 @@ fi
 echo ""
 
 # Create a quick-start note
-if [ "${DRY_RUN}" -eq 0 ]; then
-    cat > "${MINIONS_HOME}/QUICKSTART.md" << 'EOF'
+cat > "${MINIONS_HOME}/QUICKSTART.md" << 'EOF'
 # .minions Quickstart
 
 Start the full stack:
@@ -289,10 +286,7 @@ Stop the stack:
 Check status:
     ~/.minions/status.sh
 
-Enable Hermes gateway:
-    export MINIONS_HERMES=on
-
-Point Pi-Agent at ModelRelay instead of OmniRoute:
+Switch LLM proxy to ModelRelay:
     export MINIONS_LLM_BASE_URL=http://localhost:7352/v1
+    ~/.minions/boot.sh
 EOF
-fi
