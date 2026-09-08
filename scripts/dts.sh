@@ -26,15 +26,6 @@ CONTAINER_UID="${CONTAINER_UID:-1000}"
 CONTAINER_GID="${CONTAINER_GID:-1000}"
 REPO_PATH="$(pwd)"
 MOUNT="/src"
-
-# Resolve the uid-1000 user's home (Ubuntu/Debian: ubuntu; fallback: /home/vscode)
-user_home() {
-    # Ask the container which user owns uid 1000; default to /home/ubuntu
-    docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" 2>/dev/null \
-        | tr -d '\n' || true
-    [ -n "${_HOME:-}" ] || echo /home/ubuntu
-}
-
 home="/home/ubuntu"
 
 color() { [ -t 1 ] && printf '\033[1;34m%s\033[0m\n' "$*" || echo "$*"; }

@@ -124,6 +124,9 @@ if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     log_info "Copied versions.env to ${MINIONS_HOME}/etc/"
 fi
 
+# Copy Mnemon seed templates so setup_mnemon_all can import them from MINIONS_HOME/etc
+cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
+
 # NOW source lib functions (from installed location)
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/download.sh"
@@ -167,10 +170,14 @@ log_info "Installing Pi-Agent..."
 ensure_pi
 
 log_info "Installing OmniRoute..."
-ensure_omniroute
+if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
+    ensure_omniroute
+fi
 
 log_info "Installing ModelRelay..."
-ensure_modelrelay
+if [ "${INSTALL_MODELRELAY}" -eq 1 ]; then
+    ensure_modelrelay
+fi
 
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes..."
@@ -199,11 +206,7 @@ if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
     log_info "Created ~/.pi/agent/models.json"
 fi
 
-# Copy settings.json if exists
-if [ -f "${SCRIPT_DIR}/etc/settings.json" ]; then
-    cp "${SCRIPT_DIR}/etc/settings.json" "${HOME}/.pi/agent/settings.json"
-    log_info "Created ~/.pi/agent/settings.json"
-fi
+# Copy settings.json is not used; Pi-Agent reads pi.toml + models.json.
 
 # Create Hermes config.yaml
 log_info "Creating ~/.hermes/config.yaml..."
@@ -222,14 +225,7 @@ custom_providers:
 YAMLEOF
 log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
 
-# Mnemon seed import
-log_info "Importing Mnemon seeds..."
-if [ -f "${SCRIPT_DIR}/etc/mnemon-seed-hermes.json" ]; then
-    mnemon_import "${SCRIPT_DIR}/etc/mnemon-seed-hermes.json" || true
-fi
-if [ -f "${SCRIPT_DIR}/etc/mnemon-seed-pi.json" ]; then
-    mnemon_import "${SCRIPT_DIR}/etc/mnemon-seed-pi.json" || true
-fi
+# (Mnemon seeds were already imported by setup_mnemon_all during install.)
 
 # Step 6: Install pi-failover extension (CLI only, no proxy needed)
 log_info "Installing pi-failover extension..."

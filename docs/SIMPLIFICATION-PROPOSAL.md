@@ -89,21 +89,20 @@ MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
 2. Source etc/versions.env for pinned versions
 3. Install vendored Node.js (if needed) + uv
 4. Install Mnemon binary + seed import
-5. Install Pi-Agent via npm → symlink ~/.minions/bin/pi → pi binary
-6. Install OmniRoute + ModelRelay via npm → symlinks in bin/
+5. Install Pi-Agent via npm → wrapper ~/.minions/bin/pi
+6. Install OmniRoute + ModelRelay via npm → wrappers in bin/
 7. Install Hermes via official script → symlink ~/.minions/bin/hermes → hermes binary
 8. Install pi-failover extension (pipelines CLI commands, no proxy needed)
 9. COPY + INTERPOLATE CONFIGS (using OMNIROUTE_PORT / MODELRELAY_PORT):
    - etc/pi.toml → ~/.pi/agent/pi.toml (sed ports)
    - etc/models.json → ~/.pi/agent/models.json (sed ports)
-   - etc/settings.json → ~/.pi/agent/settings.json
    - Create ~/.hermes/config.yaml with provider/ports
-   - omniroute_preconfigure() → ~/.config/omniroute/
+   - omniroute setup: set default password + disable requireLogin (writes sqlite, no server)
    - Mnemon seed import
-10. Add PATH snippet to ~/.profile (and .bashrc/.zshrc)
+10. Add PATH snippet to ~/.bashrc and ~/.zshrc
 ```
 
-### 4. Boot.sh Only Starts Services
+### 4. Boot.sh Only Starts Services (plus one OmniRoute combo)
 
 ```bash
 # Simplified boot.sh flow:
@@ -112,20 +111,31 @@ MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
 3. start_service omniroute → ~/.minions/bin/omniroute serve --port ${OMNIROUTE_PORT} --no-open
 4. start_service modelrelay → ~/.minions/bin/modelrelay --port ${MODELRELAY_PORT}
 5. wait_for_port + wait_for_health
-6. Touch readiness marker
-7. Print status
+6. omniroute_preconfigure (create auto-fastest combo — REQUIRES a running server)
+7. Touch readiness marker
+8. Print status
 ```
 
-**No config updates. No hermes_update_config. No pi_update_config. No omniroute_preconfigure.**
+**No config updates. No hermes_update_config. No pi_update_config.**
 
-### 5. Direct Binaries, No Wrappers
+`omniroute_preconfigure` runs **at boot, not install**, by design: it creates the
+`auto-fastest` combo via the `combo create` CLI, which is a client command that needs
+the OmniRoute server running. Login-off (`setup` + disable `requireLogin`) IS done at
+install time because it writes sqlite directly and needs no server.
 
-- `~/.minions/bin/omniroute` → symlink to npm package binary
-- `~/.minions/bin/modelrelay` → symlink to npm package binary
-- `~/.minions/bin/hermes` → symlink to Hermes-installed binary (HERMES_HOME=~/.hermes)
-- `~/.minions/bin/pi` → symlink to Pi npm binary (NODE_PATH=~/.minions/lib/pi/npm/node_modules)
+### 5. Wrappers Only Where npm Needs Vendored Node
 
-**No wrapper scripts setting env vars.** Each tool reads its own standard config location.
+- `~/.minions/bin/omniroute` → wrapper exec'ing the npm binary under vendored Node 22.22.2
+- `~/.minions/bin/modelrelay` → wrapper exec'ing the npm binary under vendored Node 22.22.2
+- `~/.minions/bin/hermes` → symlink to Hermes-installed binary
+- `~/.minions/bin/pi` → wrapper exec'ing the Pi npm binary under vendored Node 22.22.2
+- `~/.minions/bin/mnemon` → symlink to Mnemon binary
+
+The npm packages (OmniRoute, ModelRelay, Pi) require Node **22.22.2** (they have
+compatibility issues with Node 24+), so a **direct symlink is not sufficient** — a thin
+wrapper sets `PATH`/`NODE_PATH` to the vendored Node prefix and exec's the real binary.
+This is a deliberate deviation from "direct binaries only": those three need the runtime
+bootstrap. Hermes and Mnemon (standalone binaries) are plain symlinks, no wrapper.
 
 ---
 
@@ -297,10 +307,7 @@ This replaces the complex mock-based tests with real integration testing.
 
 ## Open Questions for Review
 
-1. **Boot-time OmniRoute preconfig:** Removed (done at install). Confirm this is correct?
-
-2. **Pi failover extension:** Install at install.sh (no proxy needed). Confirm?
-
-3. **Dry-run removal:** Removed (DTS is the way). Confirm?
-
-4. **Template approach:** Install copies from `etc/` to standard locations with port interpolation. Follows hermes-codespace/hermes-webtop pattern. Confirm?
+1. **Boot-time OmniRoute preconfig:** RESOLVED — runs at boot, not install. `combo create auto-fastest` needs a running server (client command).
+2. **Pi failover extension:** RESOLVED — installed at install.sh via `pi install git:...` (CLI only, no proxy).
+3. **Dry-run removal:** RESOLVED — removed; DTS is the verification path.
+4. **Config interpolation:** RESOLVED — install copies `etc/` templates to standard locations with port interpolation.

@@ -6,13 +6,8 @@ set -u
 
 MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
 
-# Source config FIRST so runtime env vars take precedence
-if [ -f "${MINIONS_HOME}/etc/minions.env" ]; then
-    # shellcheck disable=SC1090,SC1091
-    . "${MINIONS_HOME}/etc/minions.env"
-fi
-
-# Default config values (used if not set by env or minions.env)
+# Port configuration (env-overridable with defaults)
+# No runtime config file (etc/minions.env was removed) - ports come from env or defaults
 OMNIROUTE_HOST="${OMNIROUTE_HOST:-127.0.0.1}"
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
 MODELRELAY_HOST="${MODELRELAY_HOST:-127.0.0.1}"

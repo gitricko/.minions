@@ -141,7 +141,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     echo "=== Test 4: Real install (CI_REAL_INSTALL=1) ==="
 
     echo "Running real install (this downloads packages)..."
-    if sh "${PROJECT_ROOT}/install.sh" --no-hermes; then
+    if sh "${PROJECT_ROOT}/install.sh"; then
         log_info "install.sh completed without errors"
     else
         log_error "install.sh failed during real install"
@@ -159,7 +159,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     done
 
     # Verify config templates copied to standard locations
-    for cfg in pi.toml models.json settings.json; do
+    for cfg in pi.toml models.json; do
         if [ -f "${HOME}/.pi/agent/${cfg}" ]; then
             log_info "Pi config ${cfg} created at ~/.pi/agent/"
         else

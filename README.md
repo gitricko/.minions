@@ -53,10 +53,10 @@ You'll see:
 
 | Component | Kind | Runs How | v1 Status |
 |-----------|------|----------|-----------|
-| **OmniRoute** | persistent service | `setsid omniroute --no-open &` + preconfig | ✅ npm OK |
-| **ModelRelay** | persistent service | `setsid modelrelay &` | ✅ npm OK |
+| **OmniRoute** | persistent service | `setsid omniroute serve --no-open &` (vendored Node wrapper) + combo preconfig at boot | ✅ npm OK |
+| **ModelRelay** | persistent service | `setsid modelrelay &` (vendored Node wrapper) | ✅ npm OK |
 | **Pi-Agent** | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ✅ npm OK |
-| **Hermes** | CLI tool | preinstalled; used as CLI | ✅ git install OK |
+| **Hermes** | CLI tool | preinstalled to `~/.hermes`; used as CLI | ✅ git install OK |
 | **Mnemon** | memory layer | binary + seed import + extensions | ✅ available |
 
 > **Note:** Pi & Hermes are **not servers unless launched**. Only the two LLM proxies are persistent.
@@ -89,37 +89,38 @@ export MINIONS_LLM_BASE_URL=http://localhost:7352/v1
 ~/.minions/boot.sh
 ```
 
-### Custom install location (with port isolation for dev)
+### Custom ports (in preference to defaults)
 ```bash
-MINIONS_HOME=/tmp/minions-dev \
-OMNIROUTE_PORT=20129 \
-MODELRELAY_PORT=7353 \
+# Override default ports before running install.sh / boot.sh
+export OMNIROUTE_PORT=20129
+export MODELRELAY_PORT=7353
 ./install.sh
+~/.minions/boot.sh
 ```
 
 ---
 
 ## Configuration
 
-All configuration lives in `~/.minions/etc/`:
+Config templates live in `~/.minions/etc/`; **install copies them to each component's
+standard location** (no symlinks, no runtime config file).
 
-| File | Purpose |
-|------|---------|
-| `versions.env` | Pinned component versions (lockfile) + real SHA256 checksums |
-| `minions.env` | Runtime config (ports, proxy choice, log level) |
-| `pi/` | Pi-Agent config (symlinked to `~/.pi/agent/`) — `models.json`, `settings.json`, `pi.toml` |
-| `omniroute/` | OmniRoute preconfig state (sqlite, combo) |
-| `mnemon-seed-pi.json` | Mnemon seed data for Pi-Agent |
-| `mnemon-seed-hermes.json` | Mnemon seed data for Hermes |
+| File | Purpose | Installed To |
+|------|---------|--------------|
+| `versions.env` | Pinned component versions (lockfile) | `~/.minions/etc/versions.env` |
+| `pi.toml` | Pi-Agent config (port-interpolated) | `~/.pi/agent/pi.toml` |
+| `models.json` | Pi-Agent models (port-interpolated) | `~/.pi/agent/models.json` |
+| `mnemon-seed-pi.json` | Mnemon seed data for Pi-Agent | import at install |
+| `mnemon-seed-hermes.json` | Mnemon seed data for Hermes | import at install |
+| — | Hermes config (written inline w/ ports) | `~/.hermes/config.yaml` |
+| — | OmniRoute setup (login off, password) | `~/.config/omniroute/` (sqlite) |
 
-Key environment variables (in `minions.env` / shell):
+Key environment variables:
 
 ```bash
-MINIONS_HOME=~/.minions              # Relocatable root
 OMNIROUTE_PORT=20128                 # OmniRoute port (env-overridable)
 MODELRELAY_PORT=7352                 # ModelRelay port (env-overridable)
 MINIONS_LLM_BASE_URL=http://localhost:20128/v1  # Default proxy for Pi/Hermes
-MINIONS_HERMES=off                   # Gateway disabled in v1 (future work)
 ```
 
 ---
@@ -128,23 +129,23 @@ MINIONS_HERMES=off                   # Gateway disabled in v1 (future work)
 
 ```text
 ~/.minions/
-├── install.sh          # One-time bootstrap (≈ post-create-cmd.sh)
-├── boot.sh             # Runtime start (≈ start-hermes.sh) + --doctor
+├── install.sh          # One-time bootstrap: installs binaries + copies/interpolates configs
+├── boot.sh             # Starts the two services + OmniRoute combo, touches readiness marker
 ├── stop.sh             # Stop the stack
 ├── status.sh           # Health check + readiness marker
-├── bin/                # Symlinks to component CLIs (on PATH)
+├── bin/                # Entries on PATH: wrappers (omniroute/modelrelay/pi) + symlinks (hermes/mnemon)
 ├── lib/                # Helper scripts + vendored runtimes
 │   ├── detect.sh       # OS/arch + download URLs + SHA256
 │   ├── download.sh     # curl/wget + sha256 verify + extract
-│   ├── node.sh         # Node.js ≥22.22.2 vendoring
+│   ├── node.sh         # Node.js 22.22.2 vendoring
 │   ├── uv.sh           # uv vendoring (Rust triple mapping)
 │   ├── pi.sh           # Pi-Agent install (npm @earendil-works/pi-coding-agent)
 │   ├── hermes.sh       # Hermes install (official git install script)
-│   ├── npm_packages.sh # OmniRoute + ModelRelay (npm -g --prefix)
-│   ├── omniroute.sh    # OmniRoute preconfig (login off, combo, MCP)
+│   ├── npm_packages.sh # OmniRoute + ModelRelay (npm --prefix)
+│   ├── omniroute.sh    # OmniRoute combo preconfig (at boot)
 │   ├── mnemon.sh       # Mnemon binary + seed import
 │   └── process.sh      # start/stop/wait_for_port/wait_for_health
-├── etc/                # Configuration templates
+├── etc/                # Configuration templates + versions.env lockfile
 ├── var/
 │   ├── run/            # .pid files + ready marker
 │   ├── log/            # Service logs
@@ -172,52 +173,43 @@ The installer handles everything else:
 
 ## Preconfiguration (The Real Work)
 
-`install.sh` + `boot.sh` mirror the `hermes-codespace` reference:
+`install.sh` handles all config at install time; `boot.sh` only starts services and
+creates the OmniRoute `auto-fastest` combo (which needs a running server).
 
-| Component | Preconfiguration |
-|-----------|------------------|
-| **OmniRoute** | wait `/v1/models`→200; sqlite `requireLogin=false`; create combo `auto-fastest` (strategy auto); PUT models + retry config; enable MCP; `hermes mcp add omniroute` |
-| **Hermes** | `hermes config set`: model.provider=custom:omniroute, model.default=auto-fastest, base_url `localhost:${OR_PORT}/v1`, modelrelay base_url `localhost:${MR_PORT}/v1`, fallback=modelrelay, approvals off, memory=mnemon, agent.max_turns=120, kanban.failure_limit=3 |
-| **Pi** | install `pi-failover` ext; symlink tracked `etc/pi/{models,settings}.json` → `~/.pi/agent/` (`defaultProvider: omniroute`, `modelrelay` fallback); mnemon Pi extension **commented out** per user preference |
-| **Mnemon** | install binary; seed import from `etc/mnemon-seed-*.json` (dry-run validate → import) |
+| Component | Preconfiguration | When |
+|-----------|------------------|------|
+| **OmniRoute** | `setup --non-interactive --password`; disable `requireLogin` (sqlite) | install |
+| **OmniRoute** | create combo `auto-fastest` (strategy auto) via `combo create` | boot (needs running server) |
+| **Hermes** | write `~/.hermes/config.yaml`: provider omniroute, model auto-fastest, base_url `${OR_PORT}/v1`, modelrelay `${MR_PORT}/v1` | install |
+| **Pi** | copy+interpolate `etc/{pi.toml,models.json}` → `~/.pi/agent/` (omniroute provider, modelrelay fallback); install `pi-failover` ext | install |
+| **Mnemon** | install binary; seed import from `etc/mnemon-seed-*.json` | install |
 
-All preconfiguration reads `OMNIROUTE_PORT` / `MODELRELAY_PORT` / `MINIONS_HOME` so it targets the right instance.
+All preconfiguration reads `OMNIROUTE_PORT` / `MODELRELAY_PORT` (env-overridable with
+defaults) so it targets the right ports.
 
 ---
 
-## Port Configurability (Critical Dev Safety)
+## Port Configurability
 
-You are developing .minions **INSIDE hermes-codespace** where omniroute `:20128` and modelrelay `:7352` are **already running**.
+`OMNIROUTE_PORT` (default 20128) and `MODELRELAY_PORT` (default 7352) are env-overridable.
+Set them in your shell before `install.sh` **and** `boot.sh` to use non-default ports:
 
-| Env var | Default | Dev override |
-|---------|---------|--------------|
-| `OMNIROUTE_PORT` | 20128 | 20129 |
-| `MODELRELAY_PORT` | 7352 | 7353 |
-| `MINIONS_HOME` | `~/.minions` | `/tmp/minions-dev` |
-
-**Dev command:**
 ```bash
-MINIONS_HOME=/tmp/minions-dev \
-OMNIROUTE_PORT=20129 \
-MODELRELAY_PORT=7353 \
-./install.sh && ./boot.sh
+export OMNIROUTE_PORT=20129
+export MODELRELAY_PORT=7353
+./install.sh && ~/.minions/boot.sh
 ```
 
-Two full stacks coexist. Preconfiguration reads these vars.
+There is **one install location (`~/.minions`)**. For isolated dev testing, use the
+[DTS container](#development) instead of a second install — it provides clean isolation.
 
 ---
 
-## Process Safety (Critical Dev Safety)
+## Process Safety
 
-**Not just port clash.** When running `hermes` / `pi` CLI during dev:
-- They might connect to the *dev instance* (different ports/config)
-- Must avoid commands that kill the **host** hermes/pi processes that run the dev environment
-
-**Rules:**
-- Never `pkill -f hermes` or `pkill -f pi` — use targeted PID or port-specific checks
-- Dev instance processes are under `MINIONS_HOME=/tmp/minions-dev` — identify by cwd/env
-- Host stack = `MINIONS_HOME=~/.minions` (or unset), ports 20128/7352
-- CI/test scripts must scope kills to dev ports only
+`boot.sh`/`stop.sh`/`status.sh` use PID files in `~/.minions/var/run/` and targeted
+`kill` by PID — they never `pkill -f hermes` or `pkill -f pi`. Use `stop.sh` to stop the
+stack cleanly; the CLI tools (pi/hermes) are not daemons and are never killed.
 
 ---
 
@@ -230,9 +222,17 @@ Run tests:
 # Ubuntu/Debian: apt-get install shellcheck
 # macOS: brew install shellcheck
 
-./tests/test_install.sh
-./tests/test_boot.sh
+./tests/test_install.sh          # shellcheck + permissions; real install if CI_REAL_INSTALL=1
+./tests/test_boot.sh             # shellcheck + permissions; DTS if CI_DTS_TEST=1
+./tests/test_cli_integration.sh  # real-stack CLI checks (CI_REAL_INSTALL=1)
+
+# Full-stack end-to-end in a clean Docker container (DTS) - the primary test path
+bash tests/test_dts.sh           # requires docker; runs install → boot → health → chat → stop
 ```
+
+DTS (Docker Test Shell) is the recommended way to test: it runs install → boot → health
+→ chat completion → stop in a **fresh** `ubuntu:24.04` container (`scripts/dts.sh`),
+eliminating host state pollution. This is wired into CI via the `dts-integration` job.
 
 ---
 

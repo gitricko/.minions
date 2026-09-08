@@ -23,22 +23,27 @@ install_hermes() {
         }
     fi
 
-    # Run installer with custom HOME so it doesn't touch the host's ~/.hermes
-    HERMES_HOME_OVERRIDE="${install_dir}/home"
-    mkdir -p "${HERMES_HOME_OVERRIDE}"
-
-    # The installer uses bash-specific syntax; run with bash not sh
-    HOME="${HERMES_HOME_OVERRIDE}" bash "${tmp_script}" --skip-setup || {
+    # The installer uses bash-specific syntax; run with bash not sh.
+    # Install into the REAL ~/.hermes (standard location). Hermes resolves config
+    # via get_hermes_home() = $HERMES_HOME or $HOME/.hermes, so installing with a
+    # fake HOME (~/.minions/lib/hermes/home) would orphan the config we write at
+    # $HOME/.hermes/config.yaml. No HOME override = one source of truth.
+    bash "${tmp_script}" --skip-setup || {
         echo "ERROR: Hermes install script failed" >&2
         rm -f "${tmp_script}"
         return 1
     }
     rm -f "${tmp_script}"
 
-    # Find the installed hermes binary
-    hermes_bin=$(find "${HERMES_HOME_OVERRIDE}" -type f -name "hermes" 2>/dev/null | head -1)
+    # Find the installed hermes binary. Prefer the venv entrypoint (its shebang
+    # points at the venv python, which has all deps incl. python-dotenv). The
+    # source-tree `hermes` launcher uses `#!/usr/bin/env python3` and would pick
+    # the system python (which lacks dotenv) -> ModuleNotFoundError.
+    hermes_bin=$(find "${HOME}/.hermes/hermes-agent/venv/bin" -type f -name "hermes" 2>/dev/null | head -1)
     if [ -z "${hermes_bin}" ]; then
-        # Fallback: installer may have used standard ~/.hermes
+        hermes_bin=$(find "${HOME}/.hermes" "${HOME}/.local/bin" -type f -name "hermes" 2>/dev/null | head -1)
+    fi
+    if [ -z "${hermes_bin}" ]; then
         hermes_bin=$(command -v hermes 2>/dev/null || true)
     fi
 
@@ -58,14 +63,6 @@ install_hermes() {
         echo "Hermes ${version} installed and verified at ${install_dir}"
     else
         echo "WARNING: Hermes installed but binary verification (--version) failed or timed out" >&2
-    fi
-
-    # Install python-dotenv in Hermes managed venv (required for hermes_cli)
-    install_dir_guess="${HERMES_HOME_OVERRIDE}/.hermes/hermes-agent"
-    if [ -x "${install_dir_guess}/venv/bin/uv" ]; then
-        "${install_dir_guess}/venv/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
-    elif [ -x "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" ]; then
-        "${HERMES_HOME_OVERRIDE}/.hermes/bin/uv" pip install python-dotenv >/dev/null 2>&1 || true
     fi
 }
 

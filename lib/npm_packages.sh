@@ -35,13 +35,16 @@ install_npm_package() {
     mkdir -p "${npm_prefix}/lib/node_modules"
 
     echo "Installing ${pkg_name}@${pkg_version}..."
+    NODE_OPTIONS="--max-old-space-size=512" \
     "${system_npm}" install "${pkg_name}@${pkg_version}" \
         --prefix "${npm_prefix}" \
         --no-audit \
         --no-fund \
         --loglevel error \
         --no-save \
-        --legacy-peer-deps
+        --legacy-peer-deps \
+        --prefer-offline \
+        --no-optional
 
     # Fix macOS quarantine
     fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"

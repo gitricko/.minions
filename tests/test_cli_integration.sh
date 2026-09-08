@@ -42,7 +42,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
         
         # Run install.sh
-        if "${DTS_SCRIPT}" exec "cd /src && bash install.sh --no-hermes"; then
+        if "${DTS_SCRIPT}" exec "cd /src && bash install.sh"; then
             log_info "DTS: install.sh completed"
         else
             log_error "DTS: install.sh failed"
