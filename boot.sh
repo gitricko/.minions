@@ -110,25 +110,15 @@ wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
 log_info "Waiting for OmniRoute health..."
 wait_for_health "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/healthz" 120 "omniroute"
 
-# Step 4: Preconfigure OmniRoute (login off, auto-fastest combo)
+# Step 4: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
 log_info "Preconfiguring OmniRoute..."
-# Use omniroute CLI since REST API needs auth
-OMNIROUTE_BIN="${MINIONS_HOME}/bin/omniroute"
-export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
-export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
-
-# Create auto-fastest combo (retry-loop because server may still be warming up)
-retry_count=0
-while ! "${OMNIROUTE_BIN}" combo create auto-fastest --strategy auto --models '[\\"oc/deepseek-v4-flash-free\\",\\"oc/big-pickle\\",\\"opencode-zen/deepseek-v4-flash-free\\",\\"opencode-zen/hy3-free\\",\\"opencode-zen/mimo-v2.5-free\\",\\"opencode-zen/north-mini-code-free\\",\\"opencode-zen/nemotron-3-ultra-free\\",\\"opencode-zen/big-pickle\\"]' >/dev/null 2>&1; do
-    retry_count=$((retry_count + 1))
-    if [ $retry_count -gt 40 ]; then
-        log_warn "omniroute combo create timed out after 120s"
-        break
-    fi
-    echo "omniroute still not ready yet, retrying..."
-    sleep 3
-done
-log_info "OmniRoute preconfig complete"
+# shellcheck disable=SC1091
+. "${LIB_DIR}/omniroute.sh"
+if omniroute_preconfigure; then
+    log_info "OmniRoute preconfig complete"
+else
+    log_warn "OmniRoute preconfig had issues (non-fatal)"
+fi
 
 # Step 5: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"

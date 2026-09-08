@@ -11,8 +11,8 @@
 #   5. Fixes macOS quarantine where needed
 #
 # Usage:
-#   install.sh [--no-hermes]
-#
+#   install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]
+
 # Environment (set in ~/.bashrc BEFORE running):
 #   OMNIROUTE_PORT=20128   (default)
 #   MODELRELAY_PORT=7352   (default)
@@ -23,6 +23,8 @@ set -u
 # Defaults - no MINIONS_HOME override, fixed at ~/.minions
 MINIONS_HOME="${HOME}/.minions"
 INSTALL_HERMES=1
+INSTALL_OMNIROUTE=1
+INSTALL_MODELRELAY=1
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
@@ -35,8 +37,16 @@ while [ $# -gt 0 ]; do
             INSTALL_HERMES=0
             shift
             ;;
+        --no-omniroute)
+            INSTALL_OMNIROUTE=0
+            shift
+            ;;
+        --no-modelrelay)
+            INSTALL_MODELRELAY=0
+            shift
+            ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"

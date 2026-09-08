@@ -149,7 +149,7 @@ else
     exit 1
 fi
 
-if "${DTS_SCRIPT}" exec "grep -q 'omniroute_port: 20128' /home/ubuntu/.hermes/config.yaml && grep -q 'modelrelay_port: 7352' /home/ubuntu/.hermes/config.yaml"; then
+if "${DTS_SCRIPT}" exec "grep -q 'base_url: http://127.0.0.1:20128/v1' /home/ubuntu/.hermes/config.yaml && grep -q 'base_url: http://127.0.0.1:7352/v1' /home/ubuntu/.hermes/config.yaml"; then
     log_info "Hermes config has correct ports"
 else
     log_error "Hermes config missing correct ports"

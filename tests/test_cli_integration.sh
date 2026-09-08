@@ -72,7 +72,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Test Hermes config has correct ports
-        if "${DTS_SCRIPT}" exec "grep -q 'omniroute_port: 20128' /home/ubuntu/.hermes/config.yaml && grep -q 'modelrelay_port: 7352' /home/ubuntu/.hermes/config.yaml"; then
+        if "${DTS_SCRIPT}" exec "grep -q 'base_url: http://127.0.0.1:20128/v1' /home/ubuntu/.hermes/config.yaml && grep -q 'base_url: http://127.0.0.1:7352/v1' /home/ubuntu/.hermes/config.yaml"; then
             log_info "DTS: Hermes config has correct ports"
         else
             log_error "DTS: Hermes config missing correct ports"
@@ -170,17 +170,15 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     echo ""
     echo "=== CLI Integration Test (Real install mode) ==="
     
-    if [ -z "${MINIONS_HOME:-}" ] || [ ! -d "${MINIONS_HOME}" ]; then
-        log_error "MINIONS_HOME not set or doesn't exist"
+    if [ ! -d "${HOME}/.minions" ]; then
+        log_error "${HOME}/.minions not found"
         exit 1
     fi
     
-    REAL_HOME="${MINIONS_HOME}"
-    export PATH="${REAL_HOME}/bin:${PATH}"
-    export MINIONS_HOME="${REAL_HOME}"
+    export PATH="${HOME}/.minions/bin:${PATH}"
     
     # Test Hermes CLI
-    if "${REAL_HOME}/bin/hermes" --version >/dev/null 2>&1; then
+    if "${HOME}/.minions/bin/hermes" --version >/dev/null 2>&1; then
         log_info "hermes --version works"
     else
         log_error "hermes --version failed"
@@ -190,7 +188,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     # Test Hermes config (now at ~/.hermes/config.yaml)
     HERMES_CONFIG="${HOME}/.hermes/config.yaml"
     if [ -f "${HERMES_CONFIG}" ]; then
-        if grep -q "omniroute_port: 20128" "${HERMES_CONFIG}" && grep -q "modelrelay_port: 7352" "${HERMES_CONFIG}"; then
+        if grep -q "base_url: http://127.0.0.1:20128/v1" "${HERMES_CONFIG}" && grep -q "base_url: http://127.0.0.1:7352/v1" "${HERMES_CONFIG}"; then
             log_info "Hermes config has correct ports"
         else
             log_error "Hermes config missing correct ports"
@@ -203,7 +201,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     fi
     
     # Test Pi-Agent CLI
-    if "${REAL_HOME}/bin/pi" --version >/dev/null 2>&1; then
+    if "${HOME}/.minions/bin/pi" --version >/dev/null 2>&1; then
         log_info "pi --version works"
     else
         log_error "pi --version failed"

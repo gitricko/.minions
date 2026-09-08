@@ -139,25 +139,21 @@ fi
 if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     echo ""
     echo "=== Test 4: Real install (CI_REAL_INSTALL=1) ==="
-    REAL_HOME=$(mktemp -d)
-    export MINIONS_HOME="${REAL_HOME}"
 
     echo "Running real install (this downloads packages)..."
     if sh "${PROJECT_ROOT}/install.sh" --no-hermes; then
         log_info "install.sh completed without errors"
     else
         log_error "install.sh failed during real install"
-        rm -rf "${REAL_HOME}"
         exit 1
     fi
 
-    # Verify binaries exist
+    # Verify binaries exist in fixed install location
     for bin in omniroute modelrelay pi; do
-        if [ -x "${REAL_HOME}/bin/${bin}" ]; then
+        if [ -x "${HOME}/.minions/bin/${bin}" ]; then
             log_info "${bin} installed"
         else
-            log_error "${bin} not found in ${REAL_HOME}/bin"
-            rm -rf "${REAL_HOME}"
+            log_error "${bin} not found in ${HOME}/.minions/bin"
             exit 1
         fi
     done
@@ -176,8 +172,6 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     else
         log_warn "Hermes config not found at ~/.hermes/config.yaml"
     fi
-
-    rm -rf "${REAL_HOME}"
 fi
 
 echo ""
