@@ -1,13 +1,13 @@
 # Docker Test Iteration: Learnings & Pitfalls
 
 **Date:** September 2026
-**Context:** First-time docker-test.sh creation and iteration for .minions
+**Context:** First-time docker-based testing iteration for .minions (originally via `docker-test.sh`, now via the `dts` skill/primitive)
 
 ---
 
 ## Summary
 
-Created `docker-test.sh` for testing .minions install/boot in a fresh Ubuntu container. Iterated through 5 issues during local testing. This document captures all root causes and fixes for future captains/firstmates.
+Tested .minions install/boot in a fresh Ubuntu container (via `dts`: `dts up` → `dts apt` → `dts exec install.sh` → `dts exec boot.sh`). Iterated through several issues during local testing. This document captures all root causes and fixes for future captains/firstmates.
 
 ---
 
@@ -21,7 +21,7 @@ tar (child): Error is not recoverable: exiting now
 
 **Root cause:** Ubuntu 24.04 base image does not include `xz-utils`. The Node.js tarball is `.tar.xz` format.
 
-**Fix:** Add `xz-utils` to apt-get install in docker-test.sh.
+**Fix:** Add `xz-utils` to the apt install (e.g. `dts apt "curl git ca-certificates xz-utils g++ make sqlite3 python3 python3-yaml"`).
 
 **Lesson:** Bare Ubuntu containers need explicit `xz-utils` for tar.xz extraction.
 
@@ -33,7 +33,7 @@ tar (child): Error is not recoverable: exiting now
 
 **Root cause:** Hermes install compiles `node-pty` native module via `node-gyp`, which requires `g++` and `make`. Ubuntu 24.04 has `gcc-14-base` but not the full compiler toolchain.
 
-**Fix:** Add `g++ make` to apt-get install in docker-test.sh.
+**Fix:** Add `g++ make` to the apt install (Hermes node-pty compilation).
 
 **Lesson:** Native Node module compilation (node-pty, better-sqlite3, etc.) needs build-essential. The Hermes install silently fails without it.
 
@@ -67,9 +67,9 @@ Even though `.bashrc` has the correct PATH.
 
 **Root cause:** `docker exec ... bash -c` runs non-interactive shell, which doesn't source `.bashrc`. `.profile` is only sourced by login shells.
 
-**Fix in docker-test.sh:**
-- Changed `docker_exec_user` to use `bash -l -c` (login shell)
-- Updated `install.sh` to write PATH snippet to `.profile` too (not just `.bashrc/.zshrc`)
+**Fix (in `dts`):**
+- `dts` uses `bash -l -c` (login shell) — done
+- `install.sh` writes the PATH snippet to `.profile` too (not just `.bashrc/.zshrc`)
 
 **Lesson:** For Docker dev-prod parity, always use `bash -l` (login shell) or write to `/etc/environment`. CI workflows use `export` in the step, which Docker doesn't have.
 
@@ -79,7 +79,7 @@ Even though `.bashrc` has the correct PATH.
 
 **Symptom:** Boot failed silently (no clear error, just timeout).
 
-**Root cause:** docker-test.sh ran `bash /src/boot.sh` but `install.sh` copies boot.sh to `${MINIONS_HOME}/boot.sh`. The `/src/boot.sh` is the source, not the installed copy. Using the installed copy ensures it runs with the correct environment.
+**Root cause:** The container ran `bash /src/boot.sh` but `install.sh` copies boot.sh to `${MINIONS_HOME}/boot.sh`. The `/src/boot.sh` is the source, not the installed copy. Using the installed copy ensures it runs with the correct environment.
 
 **Fix:** Changed `bash ${SRC_MOUNT}/boot.sh` → `bash ${CONTAINER_HOME}/boot.sh` (same for status.sh).
 
@@ -156,7 +156,7 @@ No API key found for the selected model.
 | `lib/pi.sh` wrapper | Sets PATH to pi node_modules | Yes — path structure varies by npm version |
 | `lib/hermes.sh` hermes_update_config | Writes custom_providers to config.yaml | Yes — Python yaml vs sed fallback can produce broken YAML |
 | `install.sh` PATH snippet | Writes MINIONS_HOME to shell rc files | Fixed — now writes to .profile too |
-| `docker-test.sh` docker_exec_user | Runs commands as non-root user | Was non-interactive — fixed to use bash -l |
+| `dts` exec (uid 1000) | Runs commands as non-root user | Uses `bash -l` (login shell) — required |
 
 ---
 
@@ -185,7 +185,7 @@ docker exec -e MINIONS_HOME=/home/ubuntu/.minions -e PATH=/home/ubuntu/.minions/
 
 **Root cause:** Free tier upstream providers (used by OmniRoute/ModelRelay) are transiently unavailable. Both proxies return the same 503 — it's the same upstream being down. Pi-Agent's fallback chain only triggers on connection errors (timeout/refused), not HTTP 503 responses.
 
-**Fix:** Added retry logic (3 attempts, 10s delay) to both CI test (`test_cli_integration.sh`) and docker test (`docker-test.sh`). Retry masks transient upstream outages while still catching real configuration bugs.
+**Fix:** Added retry logic (3 attempts, 10s delay) to the CI test (`test_cli_integration.sh`). Retry masks transient upstream outages while still catching real configuration bugs.
 
 ---
 
