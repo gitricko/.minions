@@ -84,14 +84,15 @@ install_pi() {
     # Fix macOS quarantine
     fix_macos_quarantine "${npm_prefix}/lib/node_modules/.bin"
 
-    # Create wrapper script - sets NODE_PATH and PATH for npm modules
-    # Use MINIONS_HOME-based paths so wrapper works regardless of install location
+    # Create wrapper script - hardcode MINIONS_HOME at install time (like
+    # lib/npm_packages.sh does), so it works regardless of whether MINIONS_HOME
+    # is exported in the runtime env (it is NOT by default).
     cat > "${install_dir}/pi" << EOF
 #!/usr/bin/env sh
-export PATH="\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin:\${MINIONS_HOME}/lib/node/bin:\${PATH}"
-export NODE_PATH="\${MINIONS_HOME}/lib/pi/npm/node_modules"
-cd "\${MINIONS_HOME}/lib/pi/npm"
-exec "\${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi" "\$@"
+export PATH="${MINIONS_HOME}/lib/pi/npm/node_modules/.bin:${MINIONS_HOME}/lib/node/bin:\${PATH}"
+export NODE_PATH="${MINIONS_HOME}/lib/pi/npm/node_modules"
+cd "${MINIONS_HOME}/lib/pi/npm"
+exec "${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi" "\$@"
 EOF
     make_executable "${install_dir}/pi"
 

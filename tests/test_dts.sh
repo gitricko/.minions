@@ -240,12 +240,12 @@ else
     exit 1
 fi
 
-# 8b. pi -p (needs its wrapper PATH to node_modules/.bin; dts exec uses bash -l)
+# 8b. pi -p chat through the auto-fastest combo. The pi wrapper hardcodes MINIONS_HOME
+# at install time (lib/pi.sh), so it works keyless via OmniRoute just like hermes chat -q.
 if "${DTS_SCRIPT}" exec "${PI_BIN} -p 'Reply with exactly: OK' --provider omniroute --model omniroute/auto-fastest 2>&1 | grep -q OK"; then
     log_info "pi -p returns OK (keyless via OmniRoute)"
 else
     log_error "pi -p did not return OK"
-    log_info "(see DOCKER-TEST-LEARNINGS.md: pi keyless auth model differs from hermes; may need provider note)"
     cleanup
     exit 1
 fi
