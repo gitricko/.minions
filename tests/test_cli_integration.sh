@@ -237,11 +237,24 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         fi
     fi
     
-    # Test OmniRoute endpoint
-    if curl -sf http://127.0.0.1:20128/v1/models >/dev/null; then
+    # Test OmniRoute endpoint (retry briefly — omniroute's /v1/models can lag its startup
+    # health check by a moment on a busy runner; boot.sh only confirms /healthz first)
+    _models_ok=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if curl -sf http://127.0.0.1:20128/v1/models >/dev/null; then
+            _models_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "${_models_ok}" -eq 1 ]; then
         log_info "OmniRoute /v1/models endpoint responds"
     else
         log_error "OmniRoute /v1/models endpoint failed"
+        if [ -f "${HOME}/.minions/var/log/omniroute.log" ]; then
+            echo "--- omniroute.log ---" >&2
+            tail -25 "${HOME}/.minions/var/log/omniroute.log" >&2
+        fi
         exit 1
     fi
     
