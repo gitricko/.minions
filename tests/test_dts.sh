@@ -93,10 +93,24 @@ log_info "System prerequisites installed"
 # Test 1: install.sh
 echo ""
 echo "=== Test 1: install.sh ==="
-if "${DTS_SCRIPT}" exec "cd /src && bash install.sh"; then
-    log_info "install.sh completed without errors"
+# Capture install.sh stderr to verify it doesn't attempt connections to
+# OmniRoute/ModelRelay (services aren't up yet). The pi-failover extension
+# install previously triggered 'pi extensions reload' which connected to
+# 20128/7352 and spammed "Connection error".
+install_out=$("${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1")
+install_rc=$?
+if [ $install_rc -eq 0 ]; then
+    # Check for connection attempts during install (should be none)
+    if echo "$install_out" | grep -qE "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352"; then
+        log_error "install.sh attempted connections to OmniRoute/ModelRelay (services not up yet)"
+        echo "$install_out" | grep -E "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352" | head -5
+        cleanup
+        exit 1
+    fi
+    log_info "install.sh completed without errors (no connection attempts)"
 else
     log_error "install.sh failed"
+    echo "$install_out" | tail -20
     cleanup
     exit 1
 fi

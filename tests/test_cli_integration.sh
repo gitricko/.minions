@@ -42,10 +42,21 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
         
         # Run install.sh
-        if "${DTS_SCRIPT}" exec "cd /src && bash install.sh"; then
-            log_info "DTS: install.sh completed"
+        # Capture install.sh stderr to verify it doesn't attempt connections to
+        # OmniRoute/ModelRelay (services aren't up yet).
+        install_out=$("${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1")
+        install_rc=$?
+        if [ $install_rc -eq 0 ]; then
+            if echo "$install_out" | grep -qE "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352"; then
+                log_error "DTS: install.sh attempted connections to OmniRoute/ModelRelay (services not up yet)"
+                echo "$install_out" | grep -E "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352" | head -5
+                "${DTS_SCRIPT}" clean
+                exit 1
+            fi
+            log_info "DTS: install.sh completed (no connection attempts)"
         else
             log_error "DTS: install.sh failed"
+            echo "$install_out" | tail -20
             "${DTS_SCRIPT}" clean
             exit 1
         fi
