@@ -240,9 +240,26 @@ fi
 log_info "Preconfiguring OmniRoute defaults..."
 export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
 export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
+# NOTE: login-off is a direct sqlite write (requireLogin=false) — the documented
+# mechanism that works WITHOUT a running server at install time. The REST api
+# calls (`post-api-auth-login`, `post-api-settings-require-login`) that were here
+# before silently failed (`|| true`) because no omniroute server is up during
+# install, leaving requireLogin=true — which makes /v1/models return 401 on the
+# booted stack (real-install CI failure). setup --non-interactive creates the DB;
+# the UPDATE then flips the flag. Verified in DTS: requireLogin=false -> GET
+# /v1/models returns 200 keyless.
 "${MINIONS_HOME}/bin/omniroute" setup --non-interactive --password 'minions123' >/dev/null 2>&1 || true
-"${MINIONS_HOME}/bin/omniroute" api system post-api-auth-login --body '{"password":"minions123"}' >/dev/null 2>&1 || true
-"${MINIONS_HOME}/bin/omniroute" api settings post-api-settings-require-login >/dev/null 2>&1 || true
+# Disable login by writing the flag directly to the storage DB (needs no server).
+OR_DB="${HOME}/.omniroute/storage.sqlite"
+if [ -f "${OR_DB}" ]; then
+    if sqlite3 "${OR_DB}" "UPDATE key_value SET value='false' WHERE key='requireLogin';" >/dev/null 2>&1; then
+        log_info "OmniRoute login disabled (requireLogin=false)"
+    else
+        log_warn "Could not disable OmniRoute login (sqlite update failed)"
+    fi
+else
+    log_warn "OmniRoute storage DB not found at ${OR_DB}; login not disabled"
+fi
 
 # Step 8: Set up PATH snippet
 # shellcheck disable=SC2016
