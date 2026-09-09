@@ -203,7 +203,7 @@ else
     log_warn "pi --version failed (known upstream issue)"
 fi
 
-if "${DTS_SCRIPT}" exec "grep -q 'base_url = \"http://127.0.0.1:20128/v1\"' /home/ubuntu/.pi/agent/pi.toml"; then
+if "${DTS_SCRIPT}" exec "grep -q 'base_url = \"http://localhost:20128/v1\"' /home/ubuntu/.pi/agent/pi.toml"; then
     log_info "Pi pi.toml has correct omniroute base_url (20128)"
 else
     log_error "Pi pi.toml missing correct omniroute base_url"

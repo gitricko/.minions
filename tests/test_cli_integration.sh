@@ -89,7 +89,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Test Pi config auto-detection (pi.toml and models.json have actual ports)
-        if "${DTS_SCRIPT}" exec "grep -q 'base_url = \"http://127.0.0.1:20128/v1\"' /home/ubuntu/.pi/agent/pi.toml"; then
+        if "${DTS_SCRIPT}" exec "grep -q 'base_url = \"http://localhost:20128/v1\"' /home/ubuntu/.pi/agent/pi.toml"; then
             log_info "DTS: Pi pi.toml has correct omniroute base_url (20128)"
         else
             log_error "DTS: Pi pi.toml missing correct omniroute base_url"
@@ -210,7 +210,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     PI_MODELS="${HOME}/.pi/agent/models.json"
     
     if [ -f "${PI_TOML}" ]; then
-        if grep -q 'base_url = "http://127.0.0.1:20128/v1"' "${PI_TOML}"; then
+        if grep -q 'base_url = "http://localhost:20128/v1"' "${PI_TOML}"; then
             log_info "Pi pi.toml has correct omniroute base_url (20128)"
         else
             log_error "Pi pi.toml missing correct omniroute base_url"
