@@ -251,9 +251,15 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         log_info "OmniRoute /v1/models endpoint responds"
     else
         log_error "OmniRoute /v1/models endpoint failed"
-        if [ -f "${HOME}/.minions/var/log/omniroute.log" ]; then
-            echo "--- omniroute.log ---" >&2
-            tail -25 "${HOME}/.minions/var/log/omniroute.log" >&2
+        # Distinguish "connection refused / server dead" (curl exit 7) from
+        # "server alive but /v1/models returns non-2xx" (curl exit 22). -sS not -sf
+        # so we see the real HTTP status/body instead of a silent failure.
+        echo "--- curl probe (127.0.0.1:20128) ---" >&2
+        curl -sS -w '\nHTTP_STATUS=%{http_code} EXIT=%{exitcode}\n' \
+            http://127.0.0.1:20128/v1/models 2>&1 || true
+        if [ -f "${MINIONS_HOME:-${HOME}/.minions}/var/log/omniroute.log" ]; then
+            echo "--- omniroute.log (tail) ---" >&2
+            tail -25 "${MINIONS_HOME:-${HOME}/.minions}/var/log/omniroute.log" >&2
         fi
         exit 1
     fi
