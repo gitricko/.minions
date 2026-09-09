@@ -94,7 +94,7 @@ start_service "omniroute" \
     serve --port "${OMNIROUTE_PORT}" --no-open \
     >> "${boot_log}" 2>&1 || log_error "Failed to start OmniRoute"
 
-wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 15 "omniroute"
+wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 300 "omniroute"
 
 # Step 2: ModelRelay
 log_info "Starting ModelRelay (${MODELRELAY_HOST}:${MODELRELAY_PORT})..."
@@ -104,7 +104,7 @@ start_service "modelrelay" \
     --port "${MODELRELAY_PORT}" \
     >> "${boot_log}" 2>&1 || log_error "Failed to start ModelRelay"
 
-wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
+wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 300 "modelrelay"
 
 # Step 3: Wait for OmniRoute health (needed for any post-boot checks)
 log_info "Waiting for OmniRoute health..."
