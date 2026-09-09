@@ -215,13 +215,30 @@ cat > "${HOME}/.hermes/config.yaml" << YAMLEOF
 model:
   provider: omniroute
   default: auto-fastest
-omniroute:
-  login_required: false
-custom_providers:
-  - name: omniroute
+providers:
+  omniroute:
     base_url: http://127.0.0.1:${OMNIROUTE_PORT}/v1
-  - name: modelrelay
+    api_key: no-key-needed
+  modelrelay:
     base_url: http://127.0.0.1:${MODELRELAY_PORT}/v1
+    api_key: no-key-needed
+fallback_providers:
+  - provider: modelrelay
+    model: auto-fastest
+approvals:
+  mode: "off"
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  provider: mnemon
+agent:
+  max_turns: 120
+kanban:
+  failure_limit: 3
+display:
+  busy_input_mode: steer
+terminal:
+  cwd: ${HOME}
 YAMLEOF
 log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
 
