@@ -195,12 +195,17 @@ fi
 # Test 7: Pi-Agent CLI
 echo ""
 echo "=== Test 7: Pi-Agent CLI ==="
-# Known upstream: pi --version hangs/times out, so warn instead of fail. The real
-# end-to-end pi test is Test 8b (pi -p chat through the auto-fastest combo).
+# NOTE: pi --version was briefly downgraded to a warning (commit 291e99a) on a
+# mistaken "upstream hang" diagnosis. Investigation showed the flag is deterministic
+# (0.85.1, ~400ms) and the CI false-positive was the OOM/constrained container, now
+# fixed via NODE_OPTIONS in lib/npm_packages.sh. Restore to hard-fail so a broken
+# wrapper/binary fails CI instead of silently warning.
 if "${DTS_SCRIPT}" exec "/home/ubuntu/.minions/bin/pi --version >/dev/null 2>&1"; then
     log_info "pi --version works"
 else
-    log_warn "pi --version failed (known upstream issue)"
+    log_error "pi --version failed"
+    cleanup
+    exit 1
 fi
 
 if "${DTS_SCRIPT}" exec "grep -q 'base_url = \"http://localhost:20128/v1\"' /home/ubuntu/.pi/agent/pi.toml"; then

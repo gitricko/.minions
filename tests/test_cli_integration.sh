@@ -81,11 +81,15 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
             exit 1
         fi
         
-        # Test Pi-Agent CLI (known upstream: --version hangs, so warn instead of fail)
+        # Test Pi-Agent CLI. NOTE: --version was briefly a warning (see test_dts.sh
+        # Test 7) on a mistaken "upstream hang" diagnosis; it is deterministic, so
+        # hard-fail on a broken wrapper/binary.
         if "${DTS_SCRIPT}" exec "/home/ubuntu/.minions/bin/pi --version >/dev/null 2>&1"; then
             log_info "DTS: pi --version works"
         else
-            log_warn "DTS: pi --version failed (known upstream issue)"
+            log_error "DTS: pi --version failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
         fi
         
         # Test Pi config auto-detection (pi.toml and models.json have actual ports)
@@ -198,11 +202,14 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         exit 1
     fi
     
-    # Test Pi-Agent CLI (known upstream: --version hangs, so warn instead of fail)
+    # Test Pi-Agent CLI. NOTE: --version was briefly a warning (see test_dts.sh
+    # Test 7) on a mistaken "upstream hang" diagnosis; it is deterministic, so
+    # hard-fail on a broken wrapper/binary.
     if "${HOME}/.minions/bin/pi" --version >/dev/null 2>&1; then
         log_info "pi --version works"
     else
-        log_warn "pi --version failed (known upstream issue)"
+        log_error "pi --version failed"
+        exit 1
     fi
     
     # Test Pi config auto-detection
