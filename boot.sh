@@ -4,7 +4,6 @@
 # Boot sequence:
 #   1. OmniRoute (port OMNIROUTE_PORT) - LLM proxy
 #   2. ModelRelay (port MODELRELAY_PORT) - LLM proxy (alternative)
-#   3. OmniRoute preconfiguration (login off, auto-fastest combo, MCP)
 #
 # Pi-Agent, Hermes, and Mnemon are CLI tools (invoked on demand), not servers.
 # No --daemon flag - services are backgrounded with setsid and boot returns.
@@ -14,12 +13,10 @@
 set -e
 set -u
 
-# Defaults
-MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
-DRY_RUN=0
-DOCTOR=0
+# Defaults - fixed install location
+MINIONS_HOME="${HOME}/.minions"
 
-# Default config values (all env-overridable; minions.env may refine them)
+# Port configuration (env-overridable with defaults)
 OMNIROUTE_HOST="${OMNIROUTE_HOST:-127.0.0.1}"
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
 MODELRELAY_HOST="${MODELRELAY_HOST:-127.0.0.1}"
@@ -33,20 +30,14 @@ while [ $# -gt 0 ]; do
             DOCTOR=1
             shift
             ;;
-        --dry-run)
-            DRY_RUN=1
-            shift
-            ;;
         -h|--help)
-            echo "Usage: boot.sh [--doctor] [--dry-run]"
+            echo "Usage: boot.sh [--doctor]"
             echo "  --doctor    Repair a broken component"
-            echo "  --dry-run   Print actions without executing"
             exit 0
             ;;
         *)
             echo "Unknown option: $1" >&2
             exit 1
-            ;;
     esac
 done
 
@@ -66,49 +57,12 @@ fi
 log_info() { echo "${GREEN}[INFO]${NC} $*"; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo "${RED}[ERROR]${NC} $*" >&2; }
-log_dry() { echo "${YELLOW}[DRY-RUN]${NC} $*"; }
 
 # Source lib functions
 LIB_DIR="${MINIONS_HOME}/lib"
 
 # shellcheck disable=SC1091
 . "${LIB_DIR}/process.sh"
-
-# In dry-run mode, override start_service
-if [ "${DRY_RUN}" -eq 1 ]; then
-    log_dry "Running in dry-run mode - services will not actually start"
-    start_service() {
-        name=$1
-        shift
-        echo "  [DRY-RUN] Would start ${name}: $*"
-        # Create pid file with fake pid
-        (sleep 3600) &
-        pid=$!
-        echo "${pid}" > "${MINIONS_HOME}/var/run/${name}.pid"
-    }
-    wait_for_port() {
-        log_dry "Would wait for $4 on $1:$2 (timeout ${3}s)"
-        return 0
-    }
-    wait_for_health() {
-        log_dry "Would wait for $3 health at $1 (timeout ${2}s)"
-        return 0
-    }
-fi
-
-# Source config (overrides defaults)
-if [ -f "${MINIONS_HOME}/etc/minions.env" ]; then
-    # shellcheck disable=SC1090,SC1091
-    . "${MINIONS_HOME}/etc/minions.env"
-fi
-
-# Re-derive composite URLs after sourcing config
-OMNIROUTE_ROOT_URL="http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}"
-OMNIROUTE_BASE_URL="${OMNIROUTE_ROOT_URL}/v1"
-MODELRELAY_BASE_URL="http://${MODELRELAY_HOST}:${MODELRELAY_PORT}/v1"
-
-# Ensure PATH includes our bins
-export PATH="${MINIONS_HOME}/bin:${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/uv:${PATH}"
 
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
@@ -118,8 +72,8 @@ boot_log="${MINIONS_HOME}/var/log/boot.log"
 {
     echo "=== boot.sh started at $(date) ==="
     echo "MINIONS_HOME=${MINIONS_HOME}"
-    echo "DRY_RUN=${DRY_RUN}"
-    echo "DOCTOR=${DOCTOR}"
+    echo "DRY_RUN=${DRY_RUN:-0}"
+    echo "DOCTOR=${DOCTOR:-0}"
     echo "OMNIROUTE_PORT=${OMNIROUTE_PORT}"
     echo "MODELRELAY_PORT=${MODELRELAY_PORT}"
 } >> "${boot_log}" 2>&1
@@ -152,46 +106,30 @@ start_service "modelrelay" \
 
 wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 15 "modelrelay"
 
-# Step 3: Wait for OmniRoute health (needed for preconfig)
+# Step 3: Wait for OmniRoute health (needed for any post-boot checks)
 log_info "Waiting for OmniRoute health..."
-wait_for_health "${OMNIROUTE_ROOT_URL}/healthz" 120 "omniroute"
+wait_for_health "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/healthz" 120 "omniroute"
 
-# Step 4: OmniRoute preconfiguration
-if [ "${DRY_RUN}" -eq 0 ]; then
-    log_info "Preconfiguring OmniRoute..."
-    # shellcheck disable=SC1091
-    . "${LIB_DIR}/omniroute.sh"
-    omniroute_preconfigure "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" >> "${boot_log}" 2>&1 || log_warn "OmniRoute preconfig had issues (non-fatal)"
+# Step 4: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
+log_info "Preconfiguring OmniRoute..."
+# shellcheck disable=SC1091
+. "${LIB_DIR}/omniroute.sh"
+if omniroute_preconfigure; then
+    log_info "OmniRoute preconfig complete"
+else
+    log_warn "OmniRoute preconfig had issues (non-fatal)"
 fi
 
 # Step 5: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"
-
-# Step 5b: Update Hermes config with actual ports
-if [ "${DRY_RUN}" -eq 0 ] && [ "${INSTALL_HERMES:-1}" -eq 1 ]; then
-    # Set HERMES_HOME so hermes_update_config finds the right config
-    export HERMES_HOME="${MINIONS_HOME}/lib/hermes/home"
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/lib/hermes.sh"
-    hermes_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
-    # Preconfigure Hermes (auto-fastest model, login off)
-    hermes_preconfigure
-fi
-
-# Step 5c: Update Pi config with actual ports
-if [ "${DRY_RUN}" -eq 0 ]; then
-    # shellcheck disable=SC1091
-    . "${MINIONS_HOME}/lib/pi.sh"
-    pi_update_config "${OMNIROUTE_PORT}" "${MODELRELAY_PORT}"
-fi
 
 # Step 6: Print READY message
 echo ""
 echo "=============================================="
 echo "  .minions stack is UP"
 echo ""
-echo "  ✅ omniroute    ${OMNIROUTE_BASE_URL}"
-echo "  ✅ modelrelay   ${MODELRELAY_BASE_URL}"
+echo "  ✅ omniroute    http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
+echo "  ✅ modelrelay   http://${MODELRELAY_HOST}:${MODELRELAY_PORT}/v1"
 echo "  ✅ pi-agent     CLI ready (invoked on demand)"
 echo "  ✅ hermes       CLI ready (preinstalled)"
 echo "  ✅ mnemon       memory layer ready"

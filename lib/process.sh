@@ -22,9 +22,12 @@ start_service() {
     fi
 
     echo "Starting ${name}..."
-    # Run detached in a new session via setsid so the service survives the
-    # boot shell exiting and is not killed when boot.sh returns.
-    setsid "${cmd}" "$@" >>"${log_file}" 2>&1 </dev/null &
+    # Run detached in a new session via setsid + nohup so the service survives the
+    # boot shell exiting AND ignores SIGHUP when its parent shell/step terminates.
+    # setsid alone creates a new session, but on GitHub Actions/CI a background
+    # child is still killed when the invoking step's shell exits; nohup makes it
+    # ignore the SIGHUP delivered on process-group teardown.
+    nohup setsid "${cmd}" "$@" >>"${log_file}" 2>&1 </dev/null &
     pid=$!
 
     # Write PID file

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
-# tests/test_boot.sh - Tests for boot.sh with mock services
+# tests/test_boot.sh - Tests for boot.sh (DTS-based integration)
+# Uses Docker Test Shell for real container verification
 
 set -e
 set -u
@@ -24,228 +25,172 @@ log_info() { echo "${GREEN}[PASS]${NC} $*"; }
 log_error() { echo "${RED}[FAIL]${NC} $*"; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
-# Create a test environment with mock services
-TEST_HOME=$(mktemp -d)
-export MINIONS_HOME="${TEST_HOME}"
-
-mkdir -p "${TEST_HOME}/lib"
-mkdir -p "${TEST_HOME}/etc"
-mkdir -p "${TEST_HOME}/var/run"
-mkdir -p "${TEST_HOME}/var/log"
-mkdir -p "${TEST_HOME}/bin"
-
-# Copy scripts
-cp "${PROJECT_ROOT}/boot.sh" "${TEST_HOME}/boot.sh"
-cp "${PROJECT_ROOT}/stop.sh" "${TEST_HOME}/stop.sh"
-cp "${PROJECT_ROOT}/status.sh" "${TEST_HOME}/status.sh"
-cp "${PROJECT_ROOT}/lib"/*.sh "${TEST_HOME}/lib/"
-cp "${PROJECT_ROOT}/etc"/*.env "${TEST_HOME}/etc/"
-cp "${PROJECT_ROOT}/etc"/*.toml "${TEST_HOME}/etc/"
-
-# Create mock binaries for services that ARE persistent
-for bin in omniroute modelrelay; do
-    cat > "${TEST_HOME}/bin/${bin}" << 'EOF'
-#!/usr/bin/env sh
-# Mock service - prints startup message and sleeps
-echo "Mock $0 started with args: $*"
-sleep 30
-EOF
-    chmod +x "${TEST_HOME}/bin/${bin}"
-done
-
-# Also create a mock nc (netcat) for port checking
-cat > "${TEST_HOME}/bin/nc" << 'EOF'
-#!/usr/bin/env sh
-# Mock nc - succeeds if we're checking a known port
-# Usage: nc -z host port
-if [ "$1" = "-z" ]; then
-    port=$3
-    # Accept connections on ports we know about
-    case "$port" in
-        20128|7352)
-            exit 0
-            ;;
-        *)
+# Test 1: shellcheck all shell scripts
+echo "=== Test 1: shellcheck ==="
+for script in boot.sh stop.sh lib/*.sh; do
+    if [ -f "${PROJECT_ROOT}/${script}" ]; then
+        if shellcheck "${PROJECT_ROOT}/${script}"; then
+            log_info "shellcheck ${script}"
+        else
+            log_error "shellcheck ${script} failed"
             exit 1
-    esac
-fi
-exit 1
-EOF
-chmod +x "${TEST_HOME}/bin/nc"
-
-# Create mock curl for health checks
-cat > "${TEST_HOME}/bin/curl" << 'EOF'
-#!/usr/bin/env sh
-# Mock curl - succeeds for health checks
-if echo "$*" | grep -q "/models"; then
-    echo '{"data":[]}'
-    exit 0
-fi
-if echo "$*" | grep -q "/health"; then
-    echo '{"status":"ok"}'
-    exit 0
-fi
-exit 1
-EOF
-chmod +x "${TEST_HOME}/bin/curl"
-
-# Mock sqlite3 for OmniRoute preconfig
-cat > "${TEST_HOME}/bin/sqlite3" << 'EOF'
-#!/usr/bin/env sh
-exit 0
-EOF
-chmod +x "${TEST_HOME}/bin/sqlite3"
-
-# Mock hermes (CLI stub; MCP add removed from preconfig per captain)
-cat > "${TEST_HOME}/bin/hermes" << 'EOF'
-#!/usr/bin/env sh
-exit 0
-EOF
-chmod +x "${TEST_HOME}/bin/hermes"
-
-# Mock pi for CLI tool test
-cat > "${TEST_HOME}/bin/pi" << 'EOF'
-#!/usr/bin/env sh
-if echo "$*" | grep -q "extensions"; then
-    echo "pi-failover"
-    exit 0
-fi
-if echo "$*" | grep -q "version"; then
-    echo "pi-agent 0.84.2"
-    exit 0
-fi
-echo "Mock pi invoked with: $*"
-exit 0
-EOF
-chmod +x "${TEST_HOME}/bin/pi"
-
-# Put our mock bin first in PATH
-export PATH="${TEST_HOME}/bin:${PATH}"
-
-echo "=== Test 1: boot.sh --dry-run ==="
-# Test dry-run mode
-if sh "${TEST_HOME}/boot.sh" --dry-run 2>&1 | grep -q "READY FOR FIRSTMATE DISPATCH"; then
-    log_info "boot.sh --dry-run prints READY message"
-else
-    log_error "boot.sh --dry-run failed"
-    cat "${TEST_HOME}/var/log/boot.log" 2>/dev/null || true
-    exit 1
-fi
-
-# Check that PID files were created for persistent services ONLY
-for service in omniroute modelrelay; do
-    if [ -f "${TEST_HOME}/var/run/${service}.pid" ]; then
-        log_info "PID file created for ${service}"
-    else
-        log_error "PID file missing for ${service}"
-        exit 1
+        fi
     fi
 done
 
-# Check Pi-Agent PID file NOT created (CLI tool now)
-if [ ! -f "${TEST_HOME}/var/run/pi.pid" ]; then
-    log_info "Pi-Agent PID file NOT created (CLI tool)"
-else
-    log_error "Pi-Agent PID file should NOT exist (CLI tool)"
-    exit 1
-fi
-
-# Check Hermes PID file NOT created (CLI tool now)
-if [ ! -f "${TEST_HOME}/var/run/hermes.pid" ]; then
-    log_info "Hermes PID file NOT created (CLI tool)"
-else
-    log_error "Hermes PID file should NOT exist (CLI tool)"
-    exit 1
-fi
-
-# Test 2: boot.sh --dry-run with readiness marker
+# Test 2: Verify scripts have correct shebang and are executable
 echo ""
-echo "=== Test 2: Readiness marker ==="
-if [ -f "${TEST_HOME}/var/run/ready" ]; then
-    log_info "Readiness marker created"
-else
-    log_error "Readiness marker missing"
-    exit 1
-fi
-
-# Test 3: stop.sh
-echo ""
-echo "=== Test 3: stop.sh ==="
-sh "${TEST_HOME}/stop.sh" 2>&1 | grep -q "All services stopped" && log_info "stop.sh runs successfully" || log_error "stop.sh failed"
-
-# Verify PID files removed
-for service in omniroute modelrelay; do
-    if [ ! -f "${TEST_HOME}/var/run/${service}.pid" ]; then
-        log_info "PID file removed for ${service}"
+echo "=== Test 2: Script permissions ==="
+for script in boot.sh stop.sh; do
+    if [ -x "${PROJECT_ROOT}/${script}" ]; then
+        log_info "${script} is executable"
     else
-        log_error "PID file still exists for ${service}"
-        exit 1
+        log_warn "${script} not executable - fixing"
+        chmod +x "${PROJECT_ROOT}/${script}"
     fi
+    head -1 "${PROJECT_ROOT}/${script}" | grep -q "^#!/usr/bin/env sh" && log_info "${script} has correct shebang" || log_error "${script} missing shebang"
 done
 
-# Verify readiness marker removed
-if [ ! -f "${TEST_HOME}/var/run/ready" ]; then
-    log_info "Readiness marker removed"
-else
-    log_error "Readiness marker still exists"
-    exit 1
+# Test 3: DTS integration test (requires Docker)
+# This is the primary test path - replaces old dry-run/mock tests
+if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
+    echo ""
+    echo "=== Test 3: DTS integration test (CI_DTS_TEST=1) ==="
+    
+    DTS_SCRIPT="${PROJECT_ROOT}/scripts/dts.sh"
+    if [ ! -x "${DTS_SCRIPT}" ]; then
+        log_warn "DTS script not found or not executable, skipping DTS test"
+    else
+        # Clean any existing container
+        "${DTS_SCRIPT}" clean >/dev/null 2>&1 || true
+        
+        # Start container and install prerequisites
+        "${DTS_SCRIPT}" up
+        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
+        
+        # Run install.sh first (needed for boot.sh to find binaries)
+        if "${DTS_SCRIPT}" exec "cd /src && bash install.sh"; then
+            log_info "DTS: install.sh completed without errors"
+        else
+            log_error "DTS: install.sh failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Test boot.sh starts services
+        if "${DTS_SCRIPT}" exec "cd /src && bash boot.sh"; then
+            log_info "DTS: boot.sh completed without errors"
+        else
+            log_error "DTS: boot.sh failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify PID files created for persistent services
+        for service in omniroute modelrelay; do
+            if "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
+                log_info "DTS: PID file created for ${service}"
+            else
+                log_error "DTS: PID file missing for ${service}"
+                "${DTS_SCRIPT}" clean
+                exit 1
+            fi
+        done
+        
+        # Verify Pi-Agent and Hermes are NOT tracked as services (CLI tools)
+        for service in pi hermes; do
+            if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
+                log_info "DTS: ${service} correctly NOT tracked as service (CLI tool)"
+            else
+                log_error "DTS: ${service} should NOT have PID file (CLI tool)"
+                "${DTS_SCRIPT}" clean
+                exit 1
+            fi
+        done
+        
+        # Verify readiness marker
+        if "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/ready"; then
+            log_info "DTS: Readiness marker created"
+        else
+            log_error "DTS: Readiness marker missing"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify OmniRoute health check passes
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/dev/null"; then
+            log_info "DTS: OmniRoute health check passes"
+        else
+            log_error "DTS: OmniRoute health check failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify ModelRelay responds
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
+            log_info "DTS: ModelRelay models endpoint responds"
+        else
+            log_error "DTS: ModelRelay models endpoint failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify auto-fastest combo configured
+        if "${DTS_SCRIPT}" exec "export PATH=\"/home/ubuntu/.minions/lib/node/bin:/home/ubuntu/.minions/lib/omniroute/npm/lib/node_modules/.bin:\${PATH}\" && export NODE_PATH=\"/home/ubuntu/.minions/lib/omniroute/npm/lib/node_modules\" && /home/ubuntu/.minions/bin/omniroute combo list 2>/dev/null | grep -q auto-fastest"; then
+            log_info "DTS: auto-fastest combo configured"
+        else
+            log_error "DTS: auto-fastest combo not found"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify login disabled
+        if "${DTS_SCRIPT}" exec "sqlite3 /home/ubuntu/.omniroute/storage.sqlite \"SELECT value FROM key_value WHERE key='requireLogin';\" 2>/dev/null | grep -q false"; then
+            log_info "DTS: OmniRoute login disabled"
+        else
+            # REST API fallback check
+            log_warn "DTS: Could not verify login via sqlite (DB locked), checking via REST API"
+            if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings 2>/dev/null | grep -q 'requireLogin.*false'"; then
+                log_info "DTS: OmniRoute login disabled (REST API)"
+            else
+                log_warn "DTS: Could not verify login disabled"
+            fi
+        fi
+        
+        # Test stop.sh
+        if "${DTS_SCRIPT}" exec "cd /src && bash stop.sh"; then
+            log_info "DTS: stop.sh completed without errors"
+        else
+            log_error "DTS: stop.sh failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify PID files removed
+        for service in omniroute modelrelay; do
+            if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
+                log_info "DTS: PID file removed for ${service}"
+            else
+                log_error "DTS: PID file still exists for ${service}"
+                "${DTS_SCRIPT}" clean
+                exit 1
+            fi
+        done
+        
+        # Verify readiness marker removed
+        if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/ready"; then
+            log_info "DTS: Readiness marker removed"
+        else
+            log_error "DTS: Readiness marker still exists"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Clean up
+        "${DTS_SCRIPT}" clean
+        log_info "DTS: All boot integration tests passed"
+    fi
 fi
-
-# Test 4: status.sh
-echo ""
-echo "=== Test 4: status.sh ==="
-# Re-run boot in dry-run to create PID files
-sh "${TEST_HOME}/boot.sh" --dry-run >/dev/null 2>&1
-
-# Run status
-output=$(sh "${TEST_HOME}/status.sh" 2>&1)
-echo "${output}" | grep -q "omniroute" && log_info "status.sh checks omniroute" || log_error "status.sh missing omniroute"
-echo "${output}" | grep -q "modelrelay" && log_info "status.sh checks modelrelay" || log_error "status.sh missing modelrelay"
-echo "${output}" | grep -q "pi-agent" && log_info "status.sh checks pi-agent (CLI)" || log_error "status.sh missing pi-agent"
-echo "${output}" | grep -q "hermes" && log_info "status.sh checks hermes (CLI)" || log_error "status.sh missing hermes"
-echo "${output}" | grep -q "READY FOR FIRSTMATE DISPATCH" && log_info "status.sh shows READY" || log_error "status.sh missing READY"
-
-# Test 5: Verify config values are used
-echo ""
-echo "=== Test 5: Config values from minions.env ==="
-# Check that OmniRoute port 20128 is used
-grep -q "20128" "${TEST_HOME}/etc/minions.env" && log_info "OmniRoute port 20128 in config" || log_error "OmniRoute port not in config"
-grep -q "7352" "${TEST_HOME}/etc/minions.env" && log_info "ModelRelay port 7352 in config" || log_error "ModelRelay port not in config"
-grep -q "MINIONS_LLM_BASE_URL" "${TEST_HOME}/etc/minions.env" && log_info "MINIONS_LLM_BASE_URL in config" || log_error "MINIONS_LLM_BASE_URL not in config"
-
-# Test 6: OmniRoute preconfig runs in dry-run
-echo ""
-echo "=== Test 6: OmniRoute preconfig dry-run ==="
-output=$(sh "${TEST_HOME}/boot.sh" --dry-run 2>&1)
-echo "${output}" | grep -q "Preconfiguring OmniRoute" && log_info "Preconfig step runs" || log_warn "Preconfig step not found in output (may be fine in dry-run)"
-
-# Test 7: Pi-Agent can be invoked with config
-echo ""
-echo "=== Test 7: Pi-Agent CLI with config ==="
-if sh "${TEST_HOME}/boot.sh" --dry-run 2>&1 | grep -q "pi-agent.*CLI ready"; then
-    log_info "boot.sh shows pi-agent CLI ready"
-else
-    log_error "boot.sh missing pi-agent CLI ready"
-    exit 1
-fi
-
-# Verify pi extensions command works
-if "${TEST_HOME}/bin/pi" extensions list 2>&1 | grep -q "pi-failover"; then
-    log_info "pi extensions list shows pi-failover"
-else
-    log_warn "pi extensions list may not show pi-failover in dry-run"
-fi
-
-# Verify pi --version works
-if "${TEST_HOME}/bin/pi" --version 2>&1 | grep -q "0.84.2"; then
-    log_info "pi --version works"
-else
-    log_error "pi --version failed"
-    exit 1
-fi
-
-# Cleanup
-rm -rf "${TEST_HOME}"
 
 echo ""
 echo "=== All boot tests passed ==="

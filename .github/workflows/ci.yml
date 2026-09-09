@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -41,13 +41,27 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
+  dts-integration:
+    name: DTS Integration (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run full-stack DTS integration test
+        run: |
+          set -e
+          bash tests/test_dts.sh
+
   real-install:
     name: Real Install (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -71,36 +85,52 @@ jobs:
           CI_REAL_INSTALL: 1
         run: |
           set -e
-          # First run the real install test (but don't cleanup)
-          REAL_HOME=$(mktemp -d)
-          export MINIONS_HOME="${REAL_HOME}"
+          # Install to fixed location ~/.minions (multi-instance support removed)
           echo "Running real install..."
-          bash install.sh --minions-home "${REAL_HOME}"
+          bash install.sh
           echo "Install complete"
 
-          # Verify binaries
-          for bin in omniroute modelrelay pi hermes; do
-              if [ -x "${REAL_HOME}/bin/${bin}" ]; then
-                  if timeout 10s "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
+          # Verify binaries. Hard-fail: a component installed but unusable is a real
+          # defect, not a warning. NOTE: modelrelay does NOT support --version (no such
+          # flag upstream; it would start the server and hang), so it is verified by
+          # booting + hitting its /v1/models endpoint in the CLI integration test below.
+          for bin in omniroute pi hermes; do
+              if [ -x "${HOME}/.minions/bin/${bin}" ]; then
+                  if timeout 10s "${HOME}/.minions/bin/${bin}" --version >/dev/null 2>&1; then
                       echo "✓ ${bin} installed and --version works"
                   else
-                      echo "WARN: ${bin} installed but --version failed"
+                      echo "FAIL: ${bin} installed but --version failed (broken wrapper/binary)"
+                      exit 1
                   fi
               else
                   echo "FAIL: ${bin} not found"
                   exit 1
               fi
           done
-          if [ -x "${REAL_HOME}/bin/mnemon" ]; then
+          if [ -x "${HOME}/.minions/bin/modelrelay" ]; then
+              echo "✓ modelrelay binary present (no --version flag upstream; verified via /v1/models in CLI test)"
+          else
+              echo "FAIL: modelrelay not found"
+              exit 1
+          fi
+          if [ -x "${HOME}/.minions/bin/mnemon" ]; then
               echo "✓ mnemon installed"
           else
               echo "FAIL: mnemon not found"
               exit 1
           fi
 
+          # Verify Hermes reads the standard ~/.hermes/config.yaml (not a fake HOME)
+          if grep -q "base_url: http://127.0.0.1:20128/v1" "${HOME}/.hermes/config.yaml"; then
+              echo "✓ hermes config at ~/.hermes/config.yaml"
+          else
+              echo "FAIL: ~/.hermes/config.yaml missing expected ports"
+              exit 1
+          fi
+
           # Now boot the stack
-          export PATH="${REAL_HOME}/bin:${PATH}"
-          timeout 300s bash "${REAL_HOME}/boot.sh" >/tmp/boot.log 2>&1
+          export PATH="${HOME}/.minions/bin:${PATH}"
+          timeout 300s bash "${HOME}/.minions/boot.sh" >/tmp/boot.log 2>&1
           BOOT_EXIT=$?
           echo "boot.sh exit code: ${BOOT_EXIT}"
           if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/boot.log; then
@@ -110,6 +140,6 @@ jobs:
           fi
           echo "Stack booted successfully"
 
-          # Now run CLI integration test using the same MINIONS_HOME
-          export PATH="${REAL_HOME}/bin:${PATH}"
+          # Now run CLI integration test using the same HOME
+          export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh

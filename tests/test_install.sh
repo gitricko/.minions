@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # tests/test_install.sh - Tests for install.sh
-# Runs shellcheck, dry-run simulation, and (optionally) real install if CI_REAL_INSTALL=1
+# Runs shellcheck and DTS-based integration test
 
 set -e
 set -u
@@ -27,7 +27,7 @@ log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
 # Test 1: shellcheck all shell scripts
 echo "=== Test 1: shellcheck ==="
-for script in install.sh boot.sh stop.sh status.sh lib/*.sh; do
+for script in install.sh boot.sh stop.sh lib/*.sh; do
     if [ -f "${PROJECT_ROOT}/${script}" ]; then
         if shellcheck "${PROJECT_ROOT}/${script}"; then
             log_info "shellcheck ${script}"
@@ -38,65 +38,10 @@ for script in install.sh boot.sh stop.sh status.sh lib/*.sh; do
     fi
 done
 
-# Test 2: Dry-run install.sh
+# Test 2: Verify install.sh has correct shebang and is executable
 echo ""
-echo "=== Test 2: install.sh --dry-run ==="
-TEST_HOME=$(mktemp -d)
-export MINIONS_HOME="${TEST_HOME}"
-
-# Copy the scripts to test location
-mkdir -p "${TEST_HOME}/lib"
-mkdir -p "${TEST_HOME}/etc"
-cp "${PROJECT_ROOT}/install.sh" "${TEST_HOME}/install.sh"
-cp "${PROJECT_ROOT}/lib"/*.sh "${TEST_HOME}/lib/"
-cp "${PROJECT_ROOT}/etc"/*.env "${TEST_HOME}/etc/"
-cp "${PROJECT_ROOT}/etc"/*.toml "${TEST_HOME}/etc/"
-
-# Run install.sh in dry-run mode
-if sh "${TEST_HOME}/install.sh" --dry-run --minions-home "${TEST_HOME}" 2>&1 | grep -q "DRY-RUN"; then
-    log_info "install.sh --dry-run executes and shows DRY-RUN messages"
-else
-    log_error "install.sh --dry-run failed"
-    exit 1
-fi
-
-# Verify directory structure was created
-for dir in lib etc var/run var/log bin workspace var/cache; do
-    if [ -d "${TEST_HOME}/${dir}" ]; then
-        log_info "Directory ${dir} created"
-    else
-        log_error "Directory ${dir} not created"
-        exit 1
-    fi
-done
-
-# Verify config files copied
-for cfg in versions.env minions.env pi.toml; do
-    if [ -f "${TEST_HOME}/etc/${cfg}" ]; then
-        log_info "${cfg} copied"
-    else
-        log_error "${cfg} not copied"
-        exit 1
-    fi
-done
-
-# Verify lib scripts copied
-for lib in detect.sh download.sh node.sh uv.sh pi.sh hermes.sh npm_packages.sh process.sh mnemon.sh; do
-    if [ -f "${TEST_HOME}/lib/${lib}" ]; then
-        log_info "lib/${lib} copied"
-    else
-        log_error "lib/${lib} not copied"
-        exit 1
-    fi
-done
-
-# Cleanup
-rm -rf "${TEST_HOME}"
-
-# Test 3: Verify install.sh has correct shebang and is executable
-echo ""
-echo "=== Test 3: Script permissions ==="
-for script in install.sh boot.sh stop.sh status.sh; do
+echo "=== Test 2: Script permissions ==="
+for script in install.sh boot.sh stop.sh; do
     if [ -x "${PROJECT_ROOT}/${script}" ]; then
         log_info "${script} is executable"
     else
@@ -112,62 +57,121 @@ for lib in lib/*.sh; do
     fi
 done
 
-# Test 4: Real install (only if CI_REAL_INSTALL=1)
+# Test 3: DTS integration test (requires Docker)
+# This is the primary test path now - replaces old dry-run
+if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
+    echo ""
+    echo "=== Test 3: DTS integration test (CI_DTS_TEST=1) ==="
+    
+    # Use the dts.sh script from repo
+    DTS_SCRIPT="${PROJECT_ROOT}/scripts/dts.sh"
+    if [ ! -x "${DTS_SCRIPT}" ]; then
+        log_warn "DTS script not found or not executable, skipping DTS test"
+    else
+        # Clean any existing container
+        "${DTS_SCRIPT}" clean >/dev/null 2>&1 || true
+        
+        # Start container and install prerequisites
+        "${DTS_SCRIPT}" up
+        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
+        
+        # Run install.sh
+        if "${DTS_SCRIPT}" exec "cd /src && bash install.sh --no-hermes"; then
+            log_info "DTS: install.sh completed without errors"
+        else
+            log_error "DTS: install.sh failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Run boot.sh
+        if "${DTS_SCRIPT}" exec "cd /src && bash boot.sh"; then
+            log_info "DTS: boot.sh completed without errors"
+        else
+            log_error "DTS: boot.sh failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify OmniRoute API responds
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/dev/null"; then
+            log_info "DTS: OmniRoute health check passes"
+        else
+            log_error "DTS: OmniRoute health check failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify ModelRelay API responds
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
+            log_info "DTS: ModelRelay models endpoint responds"
+        else
+            log_error "DTS: ModelRelay models endpoint failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify auto-fastest combo works
+        if "${DTS_SCRIPT}" exec "export PATH=\"/home/ubuntu/.minions/lib/node/bin:/home/ubuntu/.minions/lib/omniroute/npm/lib/node_modules/.bin:\${PATH}\" && export NODE_PATH=\"/home/ubuntu/.minions/lib/omniroute/npm/lib/node_modules\" && /home/ubuntu/.minions/bin/omniroute combo list 2>/dev/null | grep -q auto-fastest"; then
+            log_info "DTS: auto-fastest combo configured"
+        else
+            log_error "DTS: auto-fastest combo not found"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Verify chat completion works
+        if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}],\"max_tokens\":5}' >/dev/null"; then
+            log_info "DTS: Chat completion via auto-fastest works"
+        else
+            log_error "DTS: Chat completion failed"
+            "${DTS_SCRIPT}" clean
+            exit 1
+        fi
+        
+        # Clean up
+        "${DTS_SCRIPT}" clean
+        log_info "DTS: All integration tests passed"
+    fi
+fi
+
+# Test 4: Real install (only if CI_REAL_INSTALL=1) - kept for backward compat
 if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     echo ""
     echo "=== Test 4: Real install (CI_REAL_INSTALL=1) ==="
-    REAL_HOME=$(mktemp -d)
-    export MINIONS_HOME="${REAL_HOME}"
 
     echo "Running real install (this downloads packages)..."
-    if sh "${PROJECT_ROOT}/install.sh" --minions-home "${REAL_HOME}"; then
+    if sh "${PROJECT_ROOT}/install.sh"; then
         log_info "install.sh completed without errors"
     else
         log_error "install.sh failed during real install"
-        rm -rf "${REAL_HOME}"
         exit 1
     fi
 
-    # Verify binaries exist and run (with timeout)
-    for bin in omniroute modelrelay pi hermes; do
-        if [ -x "${REAL_HOME}/bin/${bin}" ]; then
-            if timeout 10s "${REAL_HOME}/bin/${bin}" --version >/dev/null 2>&1; then
-                log_info "${bin} installed and --version works"
-            else
-                log_warn "${bin} installed but --version failed or timed out"
-            fi
+    # Verify binaries exist in fixed install location
+    for bin in omniroute modelrelay pi; do
+        if [ -x "${HOME}/.minions/bin/${bin}" ]; then
+            log_info "${bin} installed"
         else
-            log_error "${bin} not found in ${REAL_HOME}/bin"
-            rm -rf "${REAL_HOME}"
+            log_error "${bin} not found in ${HOME}/.minions/bin"
             exit 1
         fi
     done
 
-    # Mnemon is REQUIRED - fail if not installed
-    if [ -x "${REAL_HOME}/bin/mnemon" ]; then
-        if timeout 10s "${REAL_HOME}/bin/mnemon" --version >/dev/null 2>&1; then
-            log_info "mnemon installed and --version works"
+    # Verify config templates copied to standard locations
+    for cfg in pi.toml models.json; do
+        if [ -f "${HOME}/.pi/agent/${cfg}" ]; then
+            log_info "Pi config ${cfg} created at ~/.pi/agent/"
         else
-            log_error "mnemon installed but --version failed"
-            rm -rf "${REAL_HOME}"
-            exit 1
+            log_warn "Pi config ${cfg} not found at ~/.pi/agent/"
         fi
+    done
+    
+    if [ -f "${HOME}/.hermes/config.yaml" ]; then
+        log_info "Hermes config created at ~/.hermes/config.yaml"
     else
-        log_error "mnemon not found in ${REAL_HOME}/bin - Mnemon is REQUIRED"
-        rm -rf "${REAL_HOME}"
-        exit 1
+        log_warn "Hermes config not found at ~/.hermes/config.yaml"
     fi
-
-    # Verify Pi config symlinks
-    for cfg in pi.toml models.json settings.json; do
-        if [ -L "${HOME}/.pi/${cfg}" ]; then
-            log_info "Pi config symlink ${cfg} created"
-        else
-            log_warn "Pi config symlink ${cfg} not found (may not exist in etc/)"
-        fi
-    done
-
-    rm -rf "${REAL_HOME}"
 fi
 
 echo ""
