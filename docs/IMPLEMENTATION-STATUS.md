@@ -1,11 +1,11 @@
 # Simplification Implementation Status
 
 **Branch:** `refactor/simplify-install-boot`
-**Last updated:** 2026-09-08 (after DTS verification)
+**Last updated:** 2026-09-09 (all CI green: DTS Integration ✅, Real Install ✅, Test ✅)
 
 This doc is the authoritative record of what the simplification proposal actually
 changed, what works, and what remains for a follow-up agent. Read `SIMPLIFICATION-PROPOSAL.md`
-for the design intent; this file tracks reality (verified by shellcheck + a real DTS
+for the design intent; this file tracks reality (verified by shellcheck + real DTS
 container install → boot → chat run).
 
 ---
@@ -115,6 +115,49 @@ follow-up should confirm seeds actually land in the mnemon store.
 - **`real-install` job**: now runs `bash install.sh` (full, incl. Hermes) instead of
   `--no-hermes`, and verifies `~/.hermes/config.yaml` has the expected ports (guards against
   the fake-HOME regression).
+- **Binary verification hardened:** real-install now hard-fails on `omniroute/pi/hermes --version`
+  failure (was a warn). modelrelay has no `--version` flag upstream; it's verified by binary
+  presence + `/v1/models` endpoint (hard-fail in CLI test).
+
+---
+
+## Fixes Since Initial DTS Verification (2026-09-09)
+
+### 1. modelrelay `--version` warning → HARD FAIL on real-install
+**Problem:** CI real-install loop ran `--version` on all 4 binaries; modelrelay has **no `--version`
+flag** upstream (it starts the server and hangs). Every run printed `WARN: modelrelay installed but
+--version failed` and continued. A genuinely broken omniroute/pi/hermes would also only warn.
+
+**Fix (`.github/workflows/ci.yml`):** Split the loop. omniroute/pi/hermes: `--version` is a **hard
+fail** (exit 1). modelrelay: binary presence check + functional validation via `/v1/models` in
+`test_cli_integration.sh` (already hard-fail).
+
+### 2. pi `--version` restored to hard-fail (was incorrectly weakened)
+**Problem:** Commit `291e99a` downgraded pi `--version` to a warning claiming "upstream hang".
+Investigation proved this was **wrong**: the `--version` arg parser is synchronous
+(`pkg.version` → `console.log`, no network), and `pi --version` returns `0.85.1` in ~400ms
+reliably on dev host and clean DTS container. The original CI failure was OOM/low-memory starving
+Node startup, now fixed by `NODE_OPTIONS=--max-old-space-size=512` + `--prefer-offline --no-optional`
+in `lib/npm_packages.sh`.
+
+**Fix (`tests/test_dts.sh`, `tests/test_cli_integration.sh`):** Restored hard-fail on pi `--version`
+failure in both test files.
+
+### 3. `pi extensions reload` removed from install.sh (source of "Connection error" spam)
+**Problem:** After installing pi-failover extension, `install.sh` ran `pi extensions reload`,
+which starts the Pi REPL and immediately tries to connect to OmniRoute (20128) and ModelRelay (7352)
+— but those services aren't up until `boot.sh` runs. Users saw "Connection error" spam during install.
+
+**Fix (`install.sh`):** Removed the reload call. Extension is registered on disk; it loads
+automatically when the user runs `pi` after `boot.sh`.
+
+### 4. Test assertions added to catch install.sh connection attempts
+**Problem:** The tests ran `install.sh` → `boot.sh` → validate endpoints. The connection errors
+during install were printed but didn't fail the test (reload had `|| true`, install.sh exited 0).
+
+**Fix (`tests/test_dts.sh`, `tests/test_cli_integration.sh`):** Both DTS test paths now capture
+`install.sh` stderr and **fail** if any "Connection error" or connection attempt to 20128/7352
+appears. This validates the install/boot split is clean.
 
 ---
 
@@ -126,12 +169,9 @@ follow-up should confirm seeds actually land in the mnemon store.
    `[WARN] pi-failover extension install failed`. It's non-fatal (logged warning) and the doc
    says "may not exist yet." Verify whether `github.com/gitricko/pi-failover@hermes-impl` is
    reachable/installable; if not, it's an expected-on-first-run case.
-3. **DTS harness on GH runner** — `dts-integration` job added but NOT yet run in real CI on
-   this branch. Push to a PR to confirm the job passes (Docker-in-GH-actions works, but the
-   apt package set + install time ~7 min must be within the 60-min cap — it is).
-4. **`boot.sh --doctor`** is parsed but has no distinct behavior in the simplified boot —
+3. **`boot.sh --doctor`** is parsed but has no distinct behavior in the simplified boot —
    confirm that's intended (it may be vestigial from the old flow).
-5. **`scripts/dts.sh` family of SC2046 warnings** (word-splitting on `docker_env_flags`) are
+4. **`scripts/dts.sh` family of SC2046 warnings** (word-splitting on `docker_env_flags`) are
    intentional (needed to expand the flags into separate `docker exec` args). Leave them;
    they're not in the CI shellcheck path.
 
@@ -148,7 +188,7 @@ bash tests/test_dts.sh --no-clean   # same, but leave the container up afterward
 This runs install (full, incl. hermes) → boot → health → auto-fastest combo → chat
 completion → **hermes chat -q + pi -p CLI chat** → stop → clean, all in a fresh container.
 
-### New in test_dts.sh (added 2026-09-08)
+### New in test_dts.sh (added 2026-09-08/09)
 - **Test 8 (CLI chat):** the final end-to-end check — `hermes chat -q 'Reply with exactly:
   OK'` and `pi -p 'Reply with exactly: OK' --provider omniroute --model
   omniroute/auto-fastest`, both keyless via the auto-fastest combo. These exercise the
@@ -158,6 +198,8 @@ completion → **hermes chat -q + pi -p CLI chat** → stop → clean, all in a 
   `dts shell` / `dts exec "<cmd>"` / `dts clean`. Note: the test runs `stop.sh` at the end,
   so with `--no-clean` services are STOPPED — run `dts exec "cd /src && bash boot.sh"` again
   before manual CLI testing.
+- **install.sh connection guard:** Test 1 now captures install.sh output and fails on any
+  "Connection error" or connection attempt to 20128/7352.
 
 ### Pitfall (environment, not code)
 On a resource-limited container, `npm install omniroute@3.8.50` can be **OOM-killed**
@@ -172,4 +214,40 @@ installs fine with adequate RAM.
 These flags let omniroute install within the container's memory limits. With adequate RAM (>6GB) these flags are harmless; on low-RAM environments they're essential.
 
 OmiRoute installs fine with 6GB+ RAM without the flags; on 2-4GB containers the flags are required.
+
+---
+
+## Key Commits (chronological)
+
+| Commit | Change |
+|--------|--------|
+| `d77b4ee` | Refactor installation and boot for simplification and clarity |
+| `9cfaedf` | Simplify installation and boot by removing temporary directories |
+| `f390d35` | Update actions/checkout to v7 |
+| `fb4fa7b` | Refactor integration tests to use DTS for verification |
+| `abc8a40` | docs: add simplification proposal |
+| `291e99a` | pi `--version` → warn (WRONG diagnosis — upstream hang) |
+| `60160d9` | pi.toml test greps `localhost` (template uses localhost) |
+| `eb6d83a` | nohup service starts + pi wrapper hardcodes MINIONS_HOME |
+| `bd7cf48` | 10s retry + omniroute.log dump on `/v1/models` failure |
+| `5721e59` | Capture real HTTP status when `/v1/models` fails |
+| `8b2acfb` | Fix OmniRoute login via direct sqlite write, not REST api |
+| `d3be56e` | **Restore pi --version to hard-fail** (proved deterministic) |
+| `4d366b0` | **CI binary verification hard-fail** (modelrelay verified via /v1/models) |
+| `0850968` | **Remove pi extensions reload** from install.sh (source of Connection error) |
+| `1c1f9d0` | **Test assertions** for install.sh connection attempts |
+
+---
+
+## Verification Checklist (all passing)
+
+- [x] DTS Integration: fresh container → install → boot → health → chat → hermes/pi CLI → stop
+- [x] Real Install (Linux): install → boot → CLI integration (including `/v1/models` for modelrelay)
+- [x] Test (Linux): lint + unit checks
+- [x] shellcheck clean on all modified scripts
+- [x] `pi --version` works in DTS container (0.85.1, rc=0)
+- [x] `modelrelay --version` correctly not checked (no upstream flag); verified via `/v1/models`
+- [x] `install.sh` produces no "Connection error" or port connection attempts
+- [x] Mnemon seed files copied to `~/.minions/etc/`
+- [x] Hermes reads `~/.hermes/config.yaml` (single source of truth)
 
