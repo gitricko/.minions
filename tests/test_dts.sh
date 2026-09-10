@@ -155,6 +155,31 @@ else
     exit 1
 fi
 
+# Test 3.5: self-check.sh (full mode — services are up, validates the whole stack)
+echo ""
+echo "=== Test 3.5: self-check.sh (full stack health) ==="
+# Need set +e: self-check can exit 1 (warnings) — with set -e the capture
+# would abort the script before we read $? (the shell exits on the failing
+# command substitution as if it were the last command).
+set +e
+DTS_SELFCHECK_OUT=$("${DTS_SCRIPT}" exec "cd /src && bash self-check.sh 2>&1")
+DTS_SELFCHECK_RC=$?
+set -e
+echo "$DTS_SELFCHECK_OUT"
+if [ "$DTS_SELFCHECK_RC" -eq 2 ]; then
+    log_error "self-check.sh reported CRITICAL failures (exit 2)"
+    cleanup
+    exit 1
+elif [ "$DTS_SELFCHECK_RC" -eq 0 ]; then
+    log_info "self-check.sh all green (exit 0)"
+elif [ "$DTS_SELFCHECK_RC" -eq 1 ]; then
+    log_warn "self-check.sh warnings only (exit 1)"
+else
+    log_error "self-check.sh crashed (exit $DTS_SELFCHECK_RC)"
+    cleanup
+    exit 1
+fi
+
 # Test 4: OmniRoute preconfig (auto-fastest combo, login disabled)
 echo ""
 echo "=== Test 4: OmniRoute preconfig ==="

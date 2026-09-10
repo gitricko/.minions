@@ -41,17 +41,16 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
-      - name: Self-check (CI mode)
+      - name: Knowledge layer global checks (F1 shell syntax, F3 JSON, F5 no .devcontainer refs)
         run: |
-          # self-check --ci returns 1 for warnings (expected: no mnemon, no config,
-          # no knowledge in test job context). Only fail on exit 2 (critical).
-          bash self-check.sh --ci
-          EXIT=$?
-          if [ "$EXIT" -eq 2 ]; then
-            echo "FAIL: self-check reported critical failures"
-            exit 1
-          fi
-          echo "Self-check passed (exit $EXIT — warnings acceptable in test job)"
+          # These validate file integrity without needing services/install.
+          # self-check.sh --ci returns exit 1 for warnings (no mnemon, no config,
+          # no knowledge in unit test context) — that belongs in real-install/DTS
+          # where the stack actually runs, not here.
+          set -e
+          bash scripts/verify-knowledge.sh F1
+          bash scripts/verify-knowledge.sh F3
+          bash scripts/verify-knowledge.sh F5
 
   dts-integration:
     name: DTS Integration (Linux)
