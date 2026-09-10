@@ -53,6 +53,8 @@ jobs:
           bash scripts/verify-knowledge.sh F5
           # Phase 22: two-mode detection unit tests (dev + standalone + env override)
           bash tests/test_knowledge_mode.sh
+          # Phase 22.5: bootstrap unit tests (piped detection, tarball standalone, git dev)
+          bash tests/test_bootstrap.sh
 
   dts-integration:
     name: DTS Integration (Linux)

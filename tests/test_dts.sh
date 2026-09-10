@@ -325,6 +325,106 @@ else
     exit 1
 fi
 
+# Test 9.5: Standalone piped install (curl|bash) — Phase 22.5
+echo ""
+echo "=== Test 9.5: Standalone piped install (curl|bash) ==="
+# Run the literal one-liner from an EMPTY cwd (no /src bind mount context).
+# Uses BOOTSTRAP_URL to point at the local repo tarball (avoids network flake).
+# We create a tarball of the current repo and serve it via file:// for speed.
+TARBALL="/tmp/minions-main.tar.gz"
+"${DTS_SCRIPT}" exec "cd /src && git archive --format=tar.gz -o $TARBALL main" || {
+    log_warn "git archive failed, trying tar fallback"
+    "${DTS_SCRIPT}" exec "cd / && tar czf $TARBALL -C /src ."
+}
+
+# Run piped install from empty dir with temp HOME
+# We use BOOTSTRAP_URL=file://$TARBALL to avoid GitHub network
+# The piped stdin is the raw install.sh from the tarball
+# This tests the FULL bootstrap flow: fetch -> extract -> re-exec -> knowledge copy
+STANDALONE_HOME="/home/ubuntu/.minions-standalone"
+"${DTS_SCRIPT}" exec "rm -rf $STANDALONE_HOME"
+# Build the piped command: cat the install.sh from tarball | bash
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && BOOTSTRAP_URL=file://$TARBALL HOME=$STANDALONE_HOME bash -c 'cat $TARBALL | tar xz -O .minions/install.sh 2>/dev/null || cat $TARBALL | tar xz -O .minions-main/install.sh 2>/dev/null' | bash 2>&1 | tee /tmp/standalone_install.log"
+STANDALONE_RC=$?
+if [ $STANDALONE_RC -eq 0 ]; then
+    log_info "Standalone piped install exit 0"
+else
+    log_error "Standalone piped install failed (exit $STANDALONE_RC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/standalone_install.log"
+    cleanup
+    exit 1
+fi
+
+# Verify MODE=standalone and knowledge copied
+if "${DTS_SCRIPT}" exec "grep -q 'Knowledge mode: standalone' /tmp/standalone_install.log"; then
+    log_info "Standalone mode detected in piped install"
+else
+    log_error "Standalone mode NOT detected in piped install"
+    "${DTS_SCRIPT}" exec "cat /tmp/standalone_install.log"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "test -d $STANDALONE_HOME/.minions/skills && test -f $STANDALONE_HOME/.minions/etc/knowledge.env"; then
+    log_info "Standalone assets copied to ~/.minions-standalone"
+else
+    log_error "Standalone assets NOT copied"
+    "${DTS_SCRIPT}" exec "ls -la $STANDALONE_HOME/.minions/ 2>/dev/null || echo 'no .minions'"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'MODE=standalone' $STANDALONE_HOME/.minions/etc/knowledge.env"; then
+    log_info "Standalone knowledge.env persisted"
+else
+    log_error "Standalone knowledge.env MODE not standalone"
+    cleanup
+    exit 1
+fi
+
+# Test 9.6: Dev mode in repo (git checkout with .git + skills + wiki)
+echo ""
+echo "=== Test 9.6: Dev mode in repo ==="
+DEV_HOME="/home/ubuntu/.minions-dev"
+"${DTS_SCRIPT}" exec "rm -rf $DEV_HOME"
+# Run install.sh from /src (the bind-mounted repo WITH .git)
+"${DTS_SCRIPT}" exec "HOME=$DEV_HOME bash /src/install.sh --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/dev_install.log"
+DEV_RC=$?
+if [ $DEV_RC -eq 0 ]; then
+    log_info "Dev install exit 0"
+else
+    log_error "Dev install failed (exit $DEV_RC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/dev_install.log"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'Knowledge mode: dev' /tmp/dev_install.log"; then
+    log_info "Dev mode detected in repo install"
+else
+    log_error "Dev mode NOT detected in repo install"
+    "${DTS_SCRIPT}" exec "cat /tmp/dev_install.log"
+    cleanup
+    exit 1
+fi
+
+# In dev mode, skills/wiki should NOT be copied to ~/.minions (symlinks via boot.sh)
+if ! "${DTS_SCRIPT}" exec "test -d $DEV_HOME/.minions/skills" || [ -z "$("${DTS_SCRIPT}" exec "ls -A $DEV_HOME/.minions/skills 2>/dev/null")" ]; then
+    log_info "Dev mode: skills NOT copied (correct)"
+else
+    log_error "Dev mode: skills incorrectly copied"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'MODE=dev' $DEV_HOME/.minions/etc/knowledge.env"; then
+    log_info "Dev knowledge.env persisted"
+else
+    log_error "Dev knowledge.env MODE not dev"
+    cleanup
+    exit 1
+fi
+
 # Clean up
 cleanup
 log_info "DTS container cleaned up"
