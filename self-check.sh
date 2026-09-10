@@ -24,7 +24,6 @@ SKIP_CHECKS="${MINIONS_SKIP_CHECKS:-}"
 DISK_WARN_PCT="${MINIONS_DISK_WARN_PCT:-85}"
 
 HERMES_CONFIG="${HERMES_CONFIG:-$HOME/.hermes/config.yaml}"
-HERMES_GATEWAY_URL="${HERMES_GATEWAY_URL:-http://localhost:9119}"
 REPORT_FILE="/tmp/health-report.json"
 MINIONS_HOME="${MINIONS_HOME:-$HOME/.minions}"
 
@@ -95,7 +94,7 @@ if ! should_skip "services" && [ "$CI_MODE" = "false" ]; then
   PORT_POLL_TIMEOUT=30
   POLL_STARTED_AT=$(date +%s)
 
-  for pair in "7352:ModelRelay" "20128:OmniRoute" "9119:HermesGateway"; do
+  for pair in "7352:ModelRelay" "20128:OmniRoute"; do
     PORT="${pair%%:*}"
     NAME="${pair##*:}"
     RESPONDED=false
@@ -186,20 +185,6 @@ if ! should_skip "hermes"; then
     else
       _warn "Config" "model not set (fresh install?)"
       json_add "hermes:config" "warn" "model not configured" "{}"
-    fi
-
-    if [ "$CI_MODE" = "false" ]; then
-      has_gateway=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "$HERMES_GATEWAY_URL" 2>/dev/null || true)
-      has_gateway="${has_gateway:-000}"
-      if [ "$has_gateway" != "000" ]; then
-        _ok "Gateway" "HTTP ${has_gateway}"
-        json_add "hermes:gateway" "ok" "gateway HTTP ${has_gateway}" "{\"http_code\":${has_gateway}}"
-      else
-        _fail "Gateway" "no response from ${HERMES_GATEWAY_URL}"
-        json_add "hermes:gateway" "fail" "gateway unreachable" "{}"
-      fi
-    else
-      _ok "Gateway" "(skipped in CI mode)"
     fi
   else
     _fail "Config" "no config at ${HERMES_CONFIG}"
