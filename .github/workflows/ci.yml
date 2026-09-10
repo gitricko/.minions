@@ -43,8 +43,15 @@ jobs:
 
       - name: Self-check (CI mode)
         run: |
-          set -e
+          # self-check --ci returns 1 for warnings (expected: no mnemon, no config,
+          # no knowledge in test job context). Only fail on exit 2 (critical).
           bash self-check.sh --ci
+          EXIT=$?
+          if [ "$EXIT" -eq 2 ]; then
+            echo "FAIL: self-check reported critical failures"
+            exit 1
+          fi
+          echo "Self-check passed (exit $EXIT — warnings acceptable in test job)"
 
   dts-integration:
     name: DTS Integration (Linux)
