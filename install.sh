@@ -286,6 +286,12 @@ fi
 } > "${MINIONS_HOME}/etc/knowledge.env"
 log_info "Knowledge mode persisted to ${MINIONS_HOME}/etc/knowledge.env"
 
+# Phase 23: dev-mode symlinks (so dev users get them immediately after install)
+# Source the lib and run symlink setup
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/knowledge-symlinks.sh"
+setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
+
 # Step 5: Copy and interpolate config templates
 log_info "Copying and configuring templates..."
 
