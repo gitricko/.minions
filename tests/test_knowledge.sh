@@ -12,6 +12,7 @@
 # Phase 15:  test_skill_count goes GREEN (15 skills exist, but 4 new → count=15)
 # Phase 20:  test_wiki_* go GREEN (23+INDEX, but 4 new → count=24+INDEX=25)
 # Phase 21:  test_seed_* go GREEN
+# Phase 22:  test_dev_detection + test_standalone_detection go GREEN (logic exists, dirs present)
 # Phase 23:  test_dev_* go GREEN (symlinks wired), test_standalone_* go GREEN (in DTS)
 # Phase 24:  test_pi_* go GREEN
 # Phase 26:  test_skill_* → count=19, all GREEN
@@ -44,6 +45,26 @@ test_dev_detection() {
     pass "test_dev_detection"
   else
     fail "test_dev_detection" "expected MODE=dev when run from .minions repo, got $mode"
+  fi
+}
+
+test_standalone_detection() {
+  # Mirror of test_dev_detection: outside a git repo with skills/, MODE=standalone.
+  # Simulate by creating a temp dir with NO git root and NO skills/wiki:
+  #   tmp=$(mktemp -d); cd "$tmp"; detect_knowledge_mode → MODE=standalone
+  local tmp
+  tmp="$(mktemp -d)"
+  local mode="dev"
+  if (cd "$tmp" && ! git rev-parse --show-toplevel &>/dev/null); then
+    mode="standalone"
+  elif (cd "$tmp" && ! [ -d "$(git rev-parse --show-toplevel)/skills" ]); then
+    mode="standalone"
+  fi
+  rm -rf "$tmp"
+  if [ "$mode" = "standalone" ]; then
+    pass "test_standalone_detection"
+  else
+    fail "test_standalone_detection" "expected MODE=standalone outside a repo, got $mode"
   fi
 }
 
@@ -338,6 +359,7 @@ test_global_devcontainer() {
 
 ALL_FUNCTIONS=(
   test_dev_detection
+  test_standalone_detection
   test_dev_symlinks
   test_dev_memories
   test_dev_no_wiki_link

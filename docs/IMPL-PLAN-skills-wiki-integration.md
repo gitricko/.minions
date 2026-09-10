@@ -129,6 +129,7 @@ Shared helpers (P22): `lib/knowledge-detection.sh` + `lib/install-mnemon-plugin.
      ```
      # Phase 0.5 — expected RED (symlinks not wired yet)
      test_dev_detection()      → detection output contains MODE=dev
+     test_standalone_detection() → MODE=standalone outside a git repo with skills/ (new, Phase 22)
      test_dev_symlinks()       → ~/.hermes/skills/minions symlink exists, points to REPO/skills
      test_dev_memories()       → ~/.hermes/memories symlink exists, points to REPO/memories
      test_dev_no_wiki_link()   → ~/.hermes/wiki does NOT exist as symlink
@@ -258,6 +259,14 @@ notes below, verify. **One PR per skill** — each is independently reviewable.
 
 ## Phases 16–20 — Port the 23 wiki articles (batches of 5, last batch 3 + INDEX.md)
 
+**REORDER NOTE (2026-09-10):** Phases 22/23 (two-mode detection + symlink wiring) now run
+BEFORE these wiki phases. Detection is pure logic (git-root probe + dir existence) with no
+dependency on wiki/mnemon CONTENT — only on the dirs existing (they do since Phase 0).
+Skills (15) exist since Phases 1–15, so the skills symlink wires immediately. Wiki/memories/
+mnemon symlinks wire as no-op guards ("not yet present") until their content drops in below.
+This lets `test_dev_detection` + the new `test_standalone_detection` go GREEN early (TDD:
+logic first, content later). See updated Phases 22/23.
+
 All articles: copy from upstream wiki/, apply checklist (link fixes, path rewrites). Keep
 article-to-article relative links intact. Target ~"agent-readable + human reference" per
 proposal §10 Q5 — no content rewrite beyond paths.
@@ -295,6 +304,11 @@ proposal §10 Q5 — no content rewrite beyond paths.
 ---
 
 ## Phase 22 — install.sh: two-mode detection + knowledge asset copy (+ seed memories)
+
+**REORDER NOTE (2026-09-10):** This phase runs AFTER Phases 1–15 (skills ported) but BEFORE
+Phases 16–21 (wiki/mnemon content). The detection block + symlink wiring is pure logic and
+wires no-op guards for wiki/memories/mnemon until their content lands. install.sh's
+standalone copy block tolerates absent source dirs (copies what exists).
 
 - **Goal:** Installer detects dev vs standalone, copies knowledge assets in standalone mode, installs the mnemon plugin, and seeds default memories (needed so the Phase 23 memories symlink has a target). Extracts shared helpers to avoid duplication with Phase 23.
 - **Files:** modify `install.sh`; add `memories/MEMORY.md` + `memories/USER.md`; add `lib/knowledge-detection.sh` + `lib/install-mnemon-plugin.sh` (5 files total).
@@ -385,6 +399,10 @@ proposal §10 Q5 — no content rewrite beyond paths.
 ---
 
 ## Phase 23 — boot.sh: two-mode detection + symlink wiring + seed import
+
+**REORDER NOTE (2026-09-10):** This phase now runs right after Phase 22 (both are logic-first).
+The symlink wiring emits "not yet present" WARNs for wiki/memories/mnemon until their
+content phases land. Boot stays functional — the wiring is non-fatal.
 
 - **Goal:** Every boot asserts the knowledge wiring (works after fresh install AND after rebuild).
 - **Files:** modify `boot.sh` (1 file).
