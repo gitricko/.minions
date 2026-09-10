@@ -205,8 +205,11 @@ test_git_dev_mode() {
         FAIL=$((FAIL + 1))
     fi
 
-    # Check assets NOT copied (skills dir should not exist or be empty in ~/.minions)
-    if [ ! -d "$TEST_HOME/.minions/skills" ] || [ -z "$(ls -A "$TEST_HOME/.minions/skills" 2>/dev/null)" ]; then
+    # Check assets NOT copied (skills dir should be a symlink in dev mode, not a copied dir)
+    if [ -L "$TEST_HOME/.minions/skills" ]; then
+        echo "  PASS: skills is symlink (dev mode)"
+        PASS=$((PASS + 1))
+    elif [ ! -d "$TEST_HOME/.minions/skills" ] || [ -z "$(ls -A "$TEST_HOME/.minions/skills" 2>/dev/null)" ]; then
         echo "  PASS: skills NOT copied (dev mode)"
         PASS=$((PASS + 1))
     else
