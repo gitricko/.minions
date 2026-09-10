@@ -17,7 +17,7 @@ F1() {
   local checked=0
   for f in install.sh boot.sh status.sh stop.sh lib/*.sh skills/*/scripts/*.sh; do
     [ -f "$f" ] || continue
-    if sh -n "$f" 2>/dev/null; then
+    if bash -n "$f" 2>/dev/null; then
       pass "$f"
     else
       fail "$f"
