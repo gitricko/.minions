@@ -41,6 +41,11 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
+      - name: Self-check (CI mode)
+        run: |
+          set -e
+          bash self-check.sh --ci
+
   dts-integration:
     name: DTS Integration (Linux)
     runs-on: ubuntu-latest
@@ -139,6 +144,13 @@ jobs:
               exit 1
           fi
           echo "Stack booted successfully"
+
+          # Run full self-check with services running
+          echo "Running self-check..."
+          bash self-check.sh || {
+            echo "WARNING: self-check reported issues (exit $?)"
+            cat /tmp/health-report.json
+          }
 
           # Now run CLI integration test using the same HOME
           export PATH="${HOME}/.minions/bin:${PATH}"

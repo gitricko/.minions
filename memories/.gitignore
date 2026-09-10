@@ -1,0 +1,3 @@
+# Agent-negotiated memory; do not commit PR-branch edits
+*.lock
+*.log
