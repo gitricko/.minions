@@ -344,8 +344,8 @@ TARBALL="/tmp/minions-main.tar.gz"
 STANDALONE_HOME="/home/ubuntu/.minions-standalone"
 "${DTS_SCRIPT}" exec "rm -rf $STANDALONE_HOME"
 # Build the piped command: cat the install.sh from tarball | bash
-# IMPORTANT: export BOOTSTRAP_URL so the outer piped bash inherits it
-"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && export BOOTSTRAP_URL=file://$TARBALL && HOME=$STANDALONE_HOME bash -c 'cat $TARBALL | tar xz -O .minions/install.sh 2>/dev/null || cat $TARBALL | tar xz -O .minions-main/install.sh 2>/dev/null' | bash 2>&1 | tee /tmp/standalone_install.log"
+# Use a temp file to avoid pipeline subshell export issues
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && cat $TARBALL | tar xz -O .minions/install.sh 2>/dev/null || cat $TARBALL | tar xz -O .minions-main/install.sh 2>/dev/null > /tmp/empty/install.sh && chmod +x /tmp/empty/install.sh && export BOOTSTRAP_URL=file://$TARBALL && HOME=$STANDALONE_HOME bash /tmp/empty/install.sh 2>&1 | tee /tmp/standalone_install.log"
 STANDALONE_RC=$?
 if [ $STANDALONE_RC -eq 0 ]; then
     log_info "Standalone piped install exit 0"
