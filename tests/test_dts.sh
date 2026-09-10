@@ -347,11 +347,17 @@ fi
 # This tests the FULL bootstrap flow: fetch -> extract -> re-exec -> knowledge copy
 STANDALONE_HOME="/home/ubuntu/.minions-standalone"
 "${DTS_SCRIPT}" exec "rm -rf $STANDALONE_HOME"
-# Build the piped command: cat the install.sh from tarball | bash
-# Use a temp file to avoid pipeline subshell export issues
-"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && (tar xzf $TARBALL -O .minions-main/install.sh > /tmp/empty/install.sh 2>/dev/null || tar xzf $TARBALL -O .minions/install.sh > /tmp/empty/install.sh 2>/dev/null) && chmod +x /tmp/empty/install.sh && export BOOTSTRAP_URL=file://$TARBALL && HOME=$STANDALONE_HOME bash /tmp/empty/install.sh 2>&1 | tee /tmp/standalone_install.log"
-STANDALONE_RC=$?
-if [ $STANDALONE_RC -eq 0 ]; then
+# Extract the FULL repo tree (not just install.sh) to /tmp/repo — this is what
+# curl|bash receives: the whole tarball, executed from a piped -s stdin so the
+# bootstrap preamble triggers exactly like the real one-liner.
+"${DTS_SCRIPT}" exec "rm -rf /tmp/repo && mkdir -p /tmp/repo && tar xzf $TARBALL -C /tmp/repo 2>/dev/null && ls /tmp/repo/.minions-main/install.sh >/dev/null 2>&1 || (echo 'tarball layout check failed'; exit 1)"
+"${DTS_SCRIPT}" exec "chmod +x /tmp/repo/.minions-main/install.sh"
+# Run the literal one-liner: cat install.sh | bash -s — $0=bash triggers the preamble,
+# which fetches BOOTSTRAP_URL (the file:// tarball) and re-execs the full installer.
+# RC captured via marker file because exec over ssh masks $?.
+"${DTS_SCRIPT}" exec "export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-modelrelay > /tmp/standalone_install.log 2>&1; echo \$? > /tmp/standalone_install.rc)"
+STANDALONE_RC=$("${DTS_SCRIPT}" exec "cat /tmp/standalone_install.rc")
+if [ "$STANDALONE_RC" -eq 0 ]; then
     log_info "Standalone piped install exit 0"
 else
     log_error "Standalone piped install failed (exit $STANDALONE_RC)"
