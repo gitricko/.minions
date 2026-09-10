@@ -9,7 +9,7 @@
 ## 0. How to Use This Plan
 
 This plan breaks the work into the smallest independently testable/mergeable phases
-(Phase 0 → Phase 32). **Each phase is a self-contained PR.** An agent can start at any
+(Phase 0 → Phase 31). **Each phase is a self-contained PR.** An agent can start at any
 phase if the listed prerequisites are satisfied.
 
 - Work happens in the repo at `/workspaces/.minions/` (this environment; `<REPO_ROOT>`
@@ -77,12 +77,11 @@ phase if the listed prerequisites are satisfied.
 
 **Dependency map:**
 ```
+P0 → P0.5 (test contract) + P0.6 (self-check)
 P0 → P1..P15 (skills) ─┐
-P0 → P16..P20 (wiki) ──┤→ P22 (install.sh copies) → P23 (boot.sh) → P24 (Pi) → P32 (smoke)
+P0 → P16..P20 (wiki) ──┤→ P22 (install.sh copies) → P23 (boot.sh) → P24 (Pi) → P31 (smoke)
 P0 → P21 (seed) ───────┘                                                ↓
-P25..P28 (new content) ─┘                                    P29 (self-check) → P30 (CI workflow)
-                                                                  ↑                    ↓
-                                                         P1..P15 (ci-lint-check)  P31 (mnemon test)
+P25..P28 (new content) ─┘                                    P29 (CI workflow) → P30 (mnemon CI)
 ```
 
 ---
@@ -95,6 +94,44 @@ P25..P28 (new content) ─┘                                    P29 (self-check
 - **Verify:** `git status` shows the 4 files; `ls -d skills wiki mnemon memories` all exist; F3 passes on `.gitignore` (n/a — trivial).
 - **Prerequisites:** None.
 - **Rollback:** `git rm -r skills wiki mnemon memories` (files only; dirs vanish with them).
+
+---
+
+## Phase 0.5 — Smoke test contract (test-first)
+
+- **Goal:** Write the end-to-end knowledge layer test **before** any wiring exists. This defines the contract every subsequent phase must satisfy. The test starts RED and phases turn it GREEN incrementally.
+- **Files (new):** `tests/test_knowledge.sh` (1 file).
+- **Steps:**
+  1. Create `tests/test_knowledge.sh` that accepts `KNOWLEDGE_TEST_MODE=dev|standalone` and asserts:
+     - **Dev mode:** detection → MODE=dev; `~/.hermes/skills/minions` is a symlink to `<REPO_ROOT>/skills`; `~/.hermes/memories` → `<REPO_ROOT>/memories`; `readlink -f` targets exist; no `~/.hermes/wiki` symlink; Hermes sees 15 skill dirs under the symlink.
+     - **Standalone mode** (fresh DTS container): run full install.sh + boot.sh; assert knowledge-mode line, `~/.minions/skills` count == 15, wiki count == 27 (23+4), seed imported (log line), settings.json skills array correct, memories copied and NOT clobbered on reinstall, `mnemon import --dry-run` passes on `~/.minions/mnemon/seed.json`.
+     - **Global:** F1–F5 run clean from repo root; `python3 mnemon/validate-seed.py mnemon/seed.json` OK; `ls wiki/ | wc -l` == 27; INDEX reverse-link check.
+  2. Make it executable: `chmod +x tests/test_knowledge.sh`.
+  3. Run locally in dev mode: `KNOWLEDGE_TEST_MODE=dev bash tests/test_knowledge.sh` → EXPECTED TO FAIL (RED).
+- **Verify:** Test file exists, parses (`bash -n`), runs and produces readable output (RED is expected).
+- **Prerequisites:** Phase 0.
+- **Rollback:** `git rm tests/test_knowledge.sh`.
+
+---
+
+## Phase 0.6 — self-check.sh (boot-time health probe, ported early)
+
+- **Goal:** Port hermes-codespace's `self-check.sh` for .minions. This becomes the **runtime guard** — runs on every boot and fails fast if wiring is broken. Written early so it can validate every subsequent wiring phase.
+- **Files (new/modified):** `self-check.sh` (1 file).
+- **Steps:**
+  1. Fetch upstream `.devcontainer/self-check.sh` from `gitricko/hermes-codespace`.
+  2. Adapt for .minions:
+     - Service ports: ModelRelay (:7352), OmniRoute (:20128) — same as upstream
+     - Add Hermes gateway (:9119) probe
+     - Config path: `~/.hermes/config.yaml` (same)
+     - Symlink checks: `~/.hermes/skills/minions` (not `codespace`), `~/.hermes/memories`
+     - Remove Telegram delivery (not configured in .minions by default)
+     - Keep JSON report output at `/tmp/health-report.json`
+  3. All path references updated from `.devcontainer/` to repo root or `~/.minions/`
+- **Verify:** F1; run `bash self-check.sh` locally — should print health report and
+  exit 0 (or 1 for warnings). JSON report file created.
+- **Prerequisites:** Phase 0. Works best after Phase 23 (boot.sh wiring) for full symlinks.
+- **Rollback:** `git rm self-check.sh`.
 
 ---
 
@@ -273,29 +310,7 @@ proposal §10 Q5 — no content rewrite beyond paths.
 
 ---
 
-## Phase 29 — Port self-check.sh (boot-time health probe)
-
-- **Goal:** Adapt hermes-codespace's `self-check.sh` for .minions. Runs at boot after all
-  services start. Reports health of every component.
-- **Files (new):** `self-check.sh` (root level — mirrors hermes-codespace pattern).
-- **Steps:**
-  1. Copy upstream `self-check.sh` from `.devcontainer/self-check.sh`.
-  2. Adapt for .minions:
-     - Service ports: ModelRelay (:7352), OmniRoute (:20128) — same as upstream
-     - Add Hermes gateway (:9119) probe
-     - Config path: `~/.hermes/config.yaml` (same)
-     - Symlink checks: `~/.hermes/skills/minions` (not `codespace`), `~/.hermes/memories`
-     - Remove Telegram delivery (not configured in .minions by default)
-     - Keep JSON report output at `/tmp/health-report.json`
-  3. All path references updated from `.devcontainer/` to repo root or `~/.minions/`
-- **Verify:** F1; run `bash self-check.sh` locally — should print health report and
-  exit 0 (or 1 for warnings). JSON report file created.
-- **Prerequisites:** Phase 0. Works best after Phase 23 (boot.sh wiring) for full symlinks.
-- **Rollback:** `git rm self-check.sh`.
-
----
-
-## Phase 30 — GitHub Actions workflow
+## Phase 29 — GitHub Actions workflow
 
 - **Goal:** Create `.github/workflows/ci.yml` with 3 jobs: detect-changes, full-build,
   lint-check. Mirrors hermes-codespace's `devcontainer-ci.yml` adapted for .minions.
@@ -311,8 +326,8 @@ proposal §10 Q5 — no content rewrite beyond paths.
      - Checkout, setup Node.js 24
      - Run `install.sh` (standalone mode in fresh container)
      - Run `boot.sh`
-     - Run `self-check.sh` (Phase 29)
-     - Run mnemon integration test (Phase 31)
+     - Run `self-check.sh` (Phase 0.6)
+     - Run mnemon integration test (Phase 30)
      - Collect diagnostic logs on failure (upload as artifact)
   3. `lint-check` job (runs when runtime or docs changed):
      - Install `markdownlint-cli`
@@ -321,13 +336,13 @@ proposal §10 Q5 — no content rewrite beyond paths.
 - **Verify:** `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` parses;
   push to test branch, verify GitHub Actions triggers. Lint-check should run on
   any `skills/` or `wiki/` change; full-build only on infra changes.
-- **Prerequisites:** Phases 1–15 (skills exist, including ci-lint-check), Phase 29
+- **Prerequisites:** Phases 1–15 (skills exist, including ci-lint-check), Phase 0.6
   (self-check.sh).
 - **Rollback:** `git rm .github/workflows/ci.yml` or restore previous workflow.
 
 ---
 
-## Phase 31 — Mnemon integration test (CI)
+## Phase 30 — Mnemon integration test (CI)
 
 - **Goal:** Add mnemon integration test to the full-build CI job. Validates the
   mnemon plugin → hermes-plugin-mnemon → mnemon binary pipeline end-to-end.
@@ -347,22 +362,23 @@ proposal §10 Q5 — no content rewrite beyond paths.
   2. This test only runs in the full-build job (infrastructure changes), not lint-check.
   3. Validates: mnemon_remember tool → mnemon recall CLI → end-to-end pipeline.
 - **Verify:** Push to test branch; verify full-build job includes mnemon test step.
-- **Prerequisites:** Phase 30 (workflow exists), Phase 22 (mnemon plugin installed).
+- **Prerequisites:** Phase 29 (workflow exists), Phase 22 (mnemon plugin installed).
 - **Rollback:** Remove the mnemon test step from ci.yml.
 
 ---
 
-## Phase 32 — Smoke test: full end-to-end verification
+## Phase 31 — Smoke test: full end-to-end verification
 
-- **Goal:** Prove the whole knowledge layer works in BOTH modes with one repeatable script.
-- **Files (new):** `tests/test_knowledge.sh` (1 file).
-- **Steps:** Write a bash test that, given a mode (`KNOWLEDGE_TEST_MODE=dev|standalone`):
-  1. `dev` local: detection → MODE=dev; `~/.hermes/skills/minions` is a symlink to `<REPO_ROOT>/skills`; `~/.hermes/memories` → `<REPO_ROOT>/memories`; `readlink -f` targets exist; no `~/.hermes/wiki` symlink; Hermes skill visibility: run `hermes` skill-list equivalent available in the pinned version (`hermes config get`/`skills` subcommand if it exists; else assert the 15 skill dirs are readable under the symlink).
-  2. `standalone` (fresh DTS Ubuntu 24.04 container): run full install.sh + boot.sh; assert knowledge-mode line, `~/.minions/skills` count == 15, wiki count == 27 (23+4), seed imported (log line), settings.json skills array correct, memories copied and NOT clobbered on reinstall, `mnemon import --dry-run` passes on `~/.minions/mnemon/seed.json`.
-  3. Global: F1–F5 run clean from repo root; `python3 mnemon/validate-seed.py mnemon/seed.json` OK; `ls wiki/ | wc -l` == 27; INDEX reverse-link check.
-- **Verify:** `bash tests/test_knowledge.sh` green in dev mode locally, green in standalone inside DTS (`dts up` → mount repo → `dts exec bash tests/test_knowledge.sh` with standalone env, reusing the DOCKER-TEST flow). Also run existing suites (`tests/test_install.sh`, `tests/test_boot.sh`, `tests/test_cli_integration.sh`) — must stay green.
-- **Prerequisites:** All of Phases 0–31.
-- **Rollback:** `git rm tests/test_knowledge.sh`. (If a script change surfaced a bug, fix forward — knowledge wiring is additive; the only destructive operations are the guarded `rm -rf` on symlink paths, which are restored on next boot.)
+- **Goal:** Re-run the Phase 0.5 test contract end-to-end. All assertions should now be
+  GREEN in both dev and standalone modes. This proves the full knowledge layer works.
+- **Files:** `tests/test_knowledge.sh` (already written in Phase 0.5; this phase runs it).
+- **Steps:**
+  1. Run in dev mode locally: `KNOWLEDGE_TEST_MODE=dev bash tests/test_knowledge.sh` — expect GREEN.
+  2. Run in standalone mode inside DTS (`dts up` → mount repo → `dts exec bash tests/test_knowledge.sh` with standalone env) — expect GREEN.
+  3. Run existing test suites to ensure nothing is broken: `tests/test_install.sh`, `tests/test_boot.sh`, `tests/test_cli_integration.sh` — all GREEN.
+- **Verify:** `bash tests/test_knowledge.sh` green in both modes. All existing suites pass.
+- **Prerequisites:** All of Phases 0–30.
+- **Rollback:** N/A (test file was already written; this phase is verification-only).
 
 ---
 
@@ -372,5 +388,5 @@ proposal §10 Q5 — no content rewrite beyond paths.
 2. **Seed schema drift** (`content` vs `text`, Phase 21) — new seed uses `content`; old `etc/mnemon-seed-*.json` migrate later; confirm `mnemon import` accepts both during Phase 21 verification.
 3. **Pi settings.json discovery** (Phase 24) — proposal asserts settings.json `skills` array; confirm against the pinned Pi version (`PI_VERSION=0.85.1`) during that phase; if unsupported, fall back to documenting `pi --skill` usage in the skill.
 4. **dts.sh reconciliation** (Phase 7) — repo `scripts/dts.sh` wins unless upstream is newer; state the diff in the PR.
-5. **CI self-check adaptation** (Phase 29) — upstream self-check uses Telegram delivery and Ollama checks; .minions may not have these configured. Make those checks optional/warn-only rather than fail.
-6. **GitHub Actions runner** (Phase 30) — full-build job runs `install.sh` which needs network access for npm/curl; verify Actions runner has outbound access. Mnemon integration test needs `hermes` CLI available — confirm it's on PATH after install.sh.
+5. **CI self-check adaptation** (Phase 0.6) — upstream self-check uses Telegram delivery and Ollama checks; .minions may not have these configured. Make those checks optional/warn-only rather than fail.
+6. **GitHub Actions runner** (Phase 29) — full-build job runs `install.sh` which needs network access for npm/curl; verify Actions runner has outbound access. Mnemon integration test needs `hermes` CLI available — confirm it's on PATH after install.sh.
