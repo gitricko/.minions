@@ -258,15 +258,13 @@ section "Persistence"
 if ! should_skip "persistence"; then
   PERSIST_FAIL=0
 
-  # 7a. Skills symlink: ~/.hermes/skills/minions
-  SKILLS_LINK="${HOME}/.hermes/skills/minions"
+  # 7a. Skills symlink: ~/.minions/skills -> MINIONS_REPO_ROOT/skills
   if [ -d "${MINIONS_HOME}/skills" ]; then
-    # Knowledge assets exist — symlink should be present
-    if [ -L "$SKILLS_LINK" ]; then
-      _ok "Skills" "symlink → $(readlink "$SKILLS_LINK")"
-      json_add "skills_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "$SKILLS_LINK")\"}"
+    if [ -L "${MINIONS_HOME}/skills" ]; then
+      _ok "Skills" "symlink -> $(readlink "${MINIONS_HOME}/skills")"
+      json_add "skills_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/skills")\"}"
     else
-      _fail "Skills" "knowledge exists but no symlink at $SKILLS_LINK"
+      _fail "Skills" "knowledge exists but no symlink at ${MINIONS_HOME}/skills"
       json_add "skills_symlink" "fail" "symlink missing" "{}"
       PERSIST_FAIL=1
     fi
@@ -275,29 +273,47 @@ if ! should_skip "persistence"; then
     json_add "skills_symlink" "warn" "knowledge not installed" "{}"
   fi
 
-  # 7b. Memories symlink: ~/.hermes/memories
-  MEMORIES_LINK="${HOME}/.hermes/memories"
-  if [ -d "${MINIONS_HOME}/memories" ]; then
-    if [ -L "$MEMORIES_LINK" ]; then
-      _ok "Memories" "symlink → $(readlink "$MEMORIES_LINK")"
-      json_add "memories_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "$MEMORIES_LINK")\"}"
+  # 7b. Wiki: ~/.minions/wiki -> MINIONS_REPO_ROOT/wiki (NOT symlinked in standalone, symlinked in dev)
+  if [ -d "${MINIONS_HOME}/wiki" ]; then
+    if [ -L "${MINIONS_HOME}/wiki" ]; then
+      _ok "Wiki" "symlink -> $(readlink "${MINIONS_HOME}/wiki")"
+      json_add "wiki_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/wiki")\"}"
     else
-      _fail "Memories" "knowledge exists but no symlink at $MEMORIES_LINK"
+      _ok "Wiki" "${MINIONS_HOME}/wiki exists (copied in standalone mode)"
+      json_add "wiki_symlink" "ok" "wiki dir exists (copied)" "{}"
+    fi
+  else
+    _warn "Wiki" "knowledge not installed (${MINIONS_HOME}/wiki missing)"
+    json_add "wiki_symlink" "warn" "knowledge not installed" "{}"
+  fi
+
+  # 7c. Mnemon symlink: ~/.minions/mnemon -> MINIONS_REPO_ROOT/mnemon
+  if [ -d "${MINIONS_HOME}/mnemon" ]; then
+    if [ -L "${MINIONS_HOME}/mnemon" ]; then
+      _ok "Mnemon" "symlink -> $(readlink "${MINIONS_HOME}/mnemon")"
+      json_add "mnemon_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/mnemon")\"}"
+    else
+      _ok "Mnemon" "${MINIONS_HOME}/mnemon exists (copied in standalone mode)"
+      json_add "mnemon_symlink" "ok" "mnemon dir exists (copied)" "{}"
+    fi
+  else
+    _warn "Mnemon" "knowledge not installed (${MINIONS_HOME}/mnemon missing)"
+    json_add "mnemon_symlink" "warn" "knowledge not installed" "{}"
+  fi
+
+  # 7d. Memories symlink: ~/.minions/memories -> MINIONS_REPO_ROOT/memories
+  if [ -d "${MINIONS_HOME}/memories" ]; then
+    if [ -L "${MINIONS_HOME}/memories" ]; then
+      _ok "Memories" "symlink -> $(readlink "${MINIONS_HOME}/memories")"
+      json_add "memories_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/memories")\"}"
+    else
+      _fail "Memories" "knowledge exists but no symlink at ${MINIONS_HOME}/memories"
       json_add "memories_symlink" "fail" "symlink missing" "{}"
       PERSIST_FAIL=1
     fi
   else
     _warn "Memories" "knowledge not installed (${MINIONS_HOME}/memories missing)"
     json_add "memories_symlink" "warn" "knowledge not installed" "{}"
-  fi
-
-  # 7c. Wiki — NOT symlinked (by design), just verify it exists
-  if [ -d "${MINIONS_HOME}/wiki" ]; then
-    _ok "Wiki" "${MINIONS_HOME}/wiki exists (not symlinked, by design)"
-    json_add "wiki" "ok" "wiki dir exists" "{}"
-  else
-    _warn "Wiki" "knowledge not installed (${MINIONS_HOME}/wiki missing)"
-    json_add "wiki" "warn" "knowledge not installed" "{}"
   fi
 else
   echo "   (skipped)"
