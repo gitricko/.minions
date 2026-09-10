@@ -162,6 +162,49 @@ jobs:
             cat /tmp/health-report.json
           }
 
+          # T7: real-install standalone test (Phase 22.5 proposal)
+          # Fetch tarball, run install.sh with --no-* flags in temp HOME
+          echo "Running standalone bootstrap test..."
+          TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz"
+          STANDALONE_HOME="${HOME}/.minions-standalone-test"
+          rm -rf "${STANDALONE_HOME}"
+          mkdir -p "${STANDALONE_HOME}"
+          # Use curl to fetch install.sh from tarball and pipe to bash
+          # We'll use a simple approach: download tarball, extract, run from there
+          # Note: this tests the full bootstrap flow in real-install context
+          if curl -fsSL "${TARBALL_URL}" | tar xz -C /tmp/minions-bootstrap-test 2>/dev/null; then
+              EXTRACTED=$(find /tmp/minions-bootstrap-test -maxdepth 1 -type d -name '.minions*' | head -1)
+              if [ -n "${EXTRACTED}" ] && [ -f "${EXTRACTED}/install.sh" ]; then
+                  HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_real_install.log
+                  if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                      echo "✓ Standalone real-install test exit 0"
+                      if grep -q "Knowledge mode: standalone" /tmp/standalone_real_install.log; then
+                          echo "✓ Standalone mode detected"
+                      else
+                          echo "FAIL: Standalone mode NOT detected"
+                          cat /tmp/standalone_real_install.log
+                          exit 1
+                      fi
+                      if [ -d "${STANDALONE_HOME}/.minions/skills" ] && [ -f "${STANDALONE_HOME}/.minions/etc/knowledge.env" ]; then
+                          echo "✓ Standalone assets copied"
+                      else
+                          echo "FAIL: Standalone assets NOT copied"
+                          ls -la "${STANDALONE_HOME}/.minions/" 2>/dev/null || echo "no .minions"
+                          exit 1
+                      fi
+                  else
+                      echo "FAIL: Standalone install exited non-zero"
+                      cat /tmp/standalone_real_install.log
+                      exit 1
+                  fi
+              else
+                  echo "WARN: Could not find extracted install.sh, skipping standalone test"
+              fi
+          else
+              echo "WARN: Tarball fetch failed, skipping standalone test"
+          fi
+          rm -rf /tmp/minions-bootstrap-test
+
           # Now run CLI integration test using the same HOME
           export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh

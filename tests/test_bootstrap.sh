@@ -102,22 +102,25 @@ test_piped_detection() {
 test_tarball_standalone() {
     log_info "T2: Tarball extract -> standalone mode"
 
+    # Find project root (works in CI and locally)
+    PROJECT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
     # Create a clean staging dir that mimics a tarball extract: skills/ wiki/ lib/ etc/ but NO .git
     STAGE_DIR="/tmp/p225_tarball_$(date +%s)"
     mkdir -p "$STAGE_DIR"
     mkdir -p "$STAGE_DIR/skills" "$STAGE_DIR/wiki" "$STAGE_DIR/mnemon" "$STAGE_DIR/memories" "$STAGE_DIR/lib" "$STAGE_DIR/etc"
 
     # Copy essential content from real repo
-    cp -r /workspaces/.minions/skills/* "$STAGE_DIR/skills/" 2>/dev/null || true
-    cp -r /workspaces/.minions/wiki/* "$STAGE_DIR/wiki/" 2>/dev/null || true
-    cp -r /workspaces/.minions/mnemon/* "$STAGE_DIR/mnemon/" 2>/dev/null || true
-    cp -r /workspaces/.minions/memories/* "$STAGE_DIR/memories/" 2>/dev/null || true
-    cp -r /workspaces/.minions/lib/* "$STAGE_DIR/lib/" 2>/dev/null || true
-    cp -r /workspaces/.minions/etc/* "$STAGE_DIR/etc/" 2>/dev/null || true
-    cp /workspaces/.minions/install.sh "$STAGE_DIR/install.sh" 2>/dev/null || true
-    cp /workspaces/.minions/boot.sh "$STAGE_DIR/boot.sh" 2>/dev/null || true
-    cp /workspaces/.minions/stop.sh "$STAGE_DIR/stop.sh" 2>/dev/null || true
-    cp /workspaces/.minions/status.sh "$STAGE_DIR/status.sh" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/skills"/* "$STAGE_DIR/skills/" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/wiki"/* "$STAGE_DIR/wiki/" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/mnemon"/* "$STAGE_DIR/mnemon/" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/memories"/* "$STAGE_DIR/memories/" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/lib"/* "$STAGE_DIR/lib/" 2>/dev/null || true
+    cp -r "$PROJECT_ROOT/etc"/* "$STAGE_DIR/etc/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/install.sh" "$STAGE_DIR/install.sh" 2>/dev/null || true
+    cp "$PROJECT_ROOT/boot.sh" "$STAGE_DIR/boot.sh" 2>/dev/null || true
+    cp "$PROJECT_ROOT/stop.sh" "$STAGE_DIR/stop.sh" 2>/dev/null || true
+    cp "$PROJECT_ROOT/status.sh" "$STAGE_DIR/status.sh" 2>/dev/null || true
 
     # Ensure NO .git directory
     rm -rf "$STAGE_DIR/.git"
@@ -174,11 +177,13 @@ test_tarball_standalone() {
 test_git_dev_mode() {
     log_info "T3: Git checkout -> dev mode"
 
+    PROJECT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
     TEST_HOME="/tmp/p225_test_home_dev_$(date +%s)"
     rm -rf "$TEST_HOME"
     mkdir -p "$TEST_HOME"
 
-    OUTPUT=$(HOME="$TEST_HOME" bash /workspaces/.minions/install.sh --no-hermes --no-omniroute --no-modelrelay 2>&1)
+    OUTPUT=$(HOME="$TEST_HOME" bash "$PROJECT_ROOT/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1)
     EC=$?
 
     assert_exit_code 0 "$EC" "install.sh exit 0"
