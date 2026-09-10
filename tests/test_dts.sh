@@ -355,8 +355,8 @@ STANDALONE_HOME="/home/ubuntu/.minions-standalone"
 # Run the literal one-liner: cat install.sh | bash -s — $0=bash triggers the preamble,
 # which fetches BOOTSTRAP_URL (the file:// tarball) and re-execs the full installer.
 # RC captured via marker file because exec over ssh masks $?.
-"${DTS_SCRIPT}" exec "export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-modelrelay > /tmp/standalone_install.log 2>&1; echo \$? > /tmp/standalone_install.rc)"
-STANDALONE_RC=$("${DTS_SCRIPT}" exec "cat /tmp/standalone_install.rc")
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-modelrelay > /tmp/standalone_install.log 2>&1; echo \$? > /tmp/standalone_install.rc)"
+STANDALONE_RC=$("${DTS_SCRIPT}" exec "cat /tmp/standalone_install.rc 2>/dev/null || echo 999")
 if [ "$STANDALONE_RC" -eq 0 ]; then
     log_info "Standalone piped install exit 0"
 else
