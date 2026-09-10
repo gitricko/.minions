@@ -419,13 +419,17 @@ else
     exit 1
 fi
 
-# In dev mode, skills/wiki should NOT be copied to ~/.minions (symlinks via boot.sh)
-if ! "${DTS_SCRIPT}" exec "test -d $DEV_HOME/.minions/skills" || [ -z "$("${DTS_SCRIPT}" exec "ls -A $DEV_HOME/.minions/skills 2>/dev/null")" ]; then
-    log_info "Dev mode: skills NOT copied (correct)"
-else
-    log_error "Dev mode: skills incorrectly copied"
+# In dev mode, skills/wiki should NOT be copied to ~/.minions; install.sh
+# (Phase 23) creates a SYMLINK ~/.minions/skills -> /src/skills instead.
+# Accept either: a symlink (new Phase 23 behavior) or an absent dir (pre-23).
+if "${DTS_SCRIPT}" exec "test -L $DEV_HOME/.minions/skills"; then
+    log_info "Dev mode: skills is a symlink (correct)"
+elif "${DTS_SCRIPT}" exec "test -d $DEV_HOME/.minions/skills" && [ -n "$("${DTS_SCRIPT}" exec "ls -A $DEV_HOME/.minions/skills 2>/dev/null")" ]; then
+    log_error "Dev mode: skills incorrectly copied (real dir, not symlink)"
     cleanup
     exit 1
+else
+    log_info "Dev mode: skills not present (correct, pre-23 behavior)"
 fi
 
 if "${DTS_SCRIPT}" exec "grep -q 'MODE=dev' $DEV_HOME/.minions/etc/knowledge.env"; then
