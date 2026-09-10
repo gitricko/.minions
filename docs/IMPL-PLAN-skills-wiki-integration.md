@@ -361,8 +361,12 @@ standalone copy block tolerates absent source dirs (copies what exists).
      ```
 
   4. **F09: Resolve standalone asset source** — standalone `curl|bash` one-liner has no
-     repo on disk. Resolution: **Option A — tarball download.** The standalone bootstrap
-     downloads a tarball of the knowledge assets:
+     repo on disk. **SUPERSEDED by Phase 22.5** (bootstrap fetches the WHOLE repo tarball
+     and re-execs, so the checkout has skills/wiki/mnemon/memories natively — no
+     knowledge-assets-only tarball needed). Keep the copy block below (step 5) which now
+     copies from `${SCRIPT_DIR}/skills` etc — present in both dev checkout and bootstrap
+     scratch. (Original snippet preserved for archaeology only; do not implement F09
+     separately.)
      ```sh
      if [ "$MODE" = "standalone" ] && [ ! -d "${MINIONS_HOME}/skills" ]; then
        TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz"
@@ -395,6 +399,78 @@ standalone copy block tolerates absent source dirs (copies what exists).
   consistent logic (byte-identical detection pattern, F13 verification).
 - **Prerequisites:** Phases 0, 0.1, 1–15, 16–20, 21 (assets to copy).
 - **Rollback:** `git checkout -- install.sh`; `git rm lib/knowledge-detection.sh lib/install-mnemon-plugin.sh memories/MEMORY.md memories/USER.md`. In a container: `rm -rf ~/.minions/{skills,wiki,memories,mnemon} ~/.hermes/plugins/mnemon`.
+
+---
+
+## Phase 22.5 — self-contained curl|bash bootstrap (one-liner install)
+
+**See:** `docs/PROPOSAL-bootstrap-curl-bash.md` for full design. This phase makes
+`curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh | bash`
+actually work, end-to-end, from a clean HOME.
+
+- **Goal:** `install.sh` becomes self-contained when piped: detects piped invocation →
+  fetches the repo tarball → re-execs the checkout's `install.sh`. Standalone mode
+  (the curl|bash path) becomes real. Supersedes Phase 22 F09 (whole-repo fetch instead
+  of knowledge-assets-only tarball).
+- **Files:** modify `install.sh` (preamble only); add `tests/test_bootstrap.sh`; add
+  `.github/workflows/ci.yml` step (Test job); extend `tests/test_dts.sh` (T4/T5);
+  extend real-install job (T6/T7); update `README.md` one-liner URL. (6 files, ~150 lines new.)
+- **Steps:**
+  1. **PIPED detection** in install.sh, before SCRIPT_DIR resolution:
+     ```sh
+     # Bootstrap preamble — only when piped via curl|bash / bash <(curl ...)
+     PIPED=0
+     case "${0:-}" in
+       ""|"-"|bash|*/bash|/dev/stdin|/dev/fd/*) PIPED=1 ;;
+     esac
+     if [ "$PIPED" -eq 1 ]; then
+       BOOTSTRAP_URL="${BOOTSTRAP_URL:-https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz}"
+       SCRATCH="$(mktemp -d)"
+       log_info "Bootstrap: fetching ${BOOTSTRAP_URL}"
+       curl -fsSL "$BOOTSTRAP_URL" | tar xz -C "$SCRATCH" --strip-components=1
+       # Re-exec from the checkout so SCRIPT_DIR resolves to a real dir
+       exec bash "$SCRATCH/install.sh" "$@"
+     fi
+     ```
+     Notes: tarball has NO `.git` → mode detection correctly yields standalone.
+     `exec` replaces the process; stdin is now free (no more SIGPIPE).
+     `BOOTSTRAP_URL` env override for mirrors/tests (local file:// or test server).
+  2. **Unit test** `tests/test_bootstrap.sh`:
+     - T1: `bash <(cat "$REPO/install.sh")` with `HOME=$(mktemp -d)` and
+       `BOOTSTRAP_URL=file://<local tar>` → exit 0, `~/.minions` populated.
+       (Use a local file URL to avoid network flake.)
+     - Actually tar of the repo: `tar czf /tmp/bootstrap-test.tar.gz --exclude=.git -C "$REPO" .`
+       then T1 sets `BOOTSTRAP_URL=file:///tmp/bootstrap-test.tar.gz`.
+     - T2: extract tar → run `install.sh` (no .git) → assert `Knowledge mode: standalone`
+       + `~/.minions/skills` populated (after Phase 22; before, assert dirs created).
+     - T3 (dev): from the git checkout run `bash install.sh` → assert `Knowledge mode: dev`.
+       THIS is the test that links bootstrap to mode detection.
+  3. **DTS** `tests/test_dts.sh` (inside clean container, two new tests after Test 9):
+     - T4 (standalone piped): `cd /tmp && curl -fsSL "$RAW_URL/install.sh" | bash` with
+       clean `HOME=/tmp/boot_home` → assert exit 0, `/tmp/boot_home/.minions` populated,
+       log contains `Knowledge mode: standalone`, knowledge copied (post-22).
+       Use local path mirror if network flake risk: `curl file://` not possible —
+       instead copy the checkout locally and serve via `python3 -m http.server` OR
+       point BOOTSTRAP_URL at a local tar.
+     - T5 (dev in repo): `bash /src/install.sh` (bind-mounted repo HAS .git) →
+       assert `Knowledge mode: dev`.
+  4. **Real-install CI** (linux job):
+     - T6: after the existing `bash install.sh` (git checkout) → grep install log for
+       `Knowledge mode: dev`. (Proves dev-mode in real CI.)
+     - T7 (real standalone, light): fetch the tarball (`BOOTSTRAP_URL`), extract to a
+       scratch dir (no .git), run the checkout's `install.sh` with `HOME=$(mktemp -d)`
+       AND a lightweight flag (e.g. `--bootstrap-test` that stops after the knowledge
+       copy — no full stack reinstall) → assert `MODE=standalone` + `~/.minions/skills`
+       populated. This is the real-linux standalone proof without doubling the
+       install cost. (Full standalone stack install is covered by DTS T4.)
+  5. Update `README.md` line 21-22: change one-liner to the raw GitHub URL
+     (minions.sh placeholder noted), document `BOOTSTRAP_URL`.
+- **Verify:** `bash -n install.sh`; T1–T3 pass locally; full CI (Test, DTS, Real Install)
+  green. DTS T4/T5 and real-install T6/T7 are the definitive "it works in real" checks.
+- **Prerequisites:** Phase 22 (mode detection + knowledge copy must exist so T2/T4/T7
+  can assert standalone copies; Phase 23 not required for bootstrap itself).
+- **Rollback:** `git checkout -- install.sh README.md`; `git rm tests/test_bootstrap.sh`;
+  revert ci.yml + test_dts.sh hunks.
 
 ---
 
