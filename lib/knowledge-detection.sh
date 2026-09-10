@@ -17,8 +17,8 @@ detect_knowledge_mode() {
     # 1) Persisted repo root (written by install.sh in dev mode) — lets boot.sh
     #    detect dev even when run from ~/.minions/boot.sh (no .git in sight).
     if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
-        # shellcheck disable=SC1090
-        . "${MINIONS_HOME}/etc/knowledge.env"
+        # shellcheck disable=SC1091
+        . "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null || true
         if [ -n "${MINIONS_REPO_ROOT:-}" ] && [ -d "${MINIONS_REPO_ROOT}/skills" ]; then
             MODE="dev"
             log_info "Knowledge mode: ${MODE} (from ${MINIONS_HOME}/etc/knowledge.env)"

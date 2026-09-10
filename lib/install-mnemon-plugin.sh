@@ -6,8 +6,8 @@
 # Non-fatal: network/plugin failures must never fail an install or boot.
 
 install_mnemon_plugin() {
-    local PLUGIN_DIR="${HOME}/.hermes/plugins/mnemon"
-    if [ -d "$PLUGIN_DIR" ]; then
+    _MNT_PLUGIN_DIR="${HOME}/.hermes/plugins/mnemon"
+    if [ -d "$_MNT_PLUGIN_DIR" ]; then
         log_info "mnemon plugin already installed"
         return 0
     fi
@@ -23,8 +23,8 @@ install_mnemon_plugin() {
         rm -rf /tmp/hermes-plugin-mnemon
         return 0
     fi
-    mkdir -p "$PLUGIN_DIR"
-    cp -r /tmp/hermes-plugin-mnemon/mnemon/* "$PLUGIN_DIR/" 2>/dev/null || true
+    mkdir -p "$_MNT_PLUGIN_DIR"
+    cp -r /tmp/hermes-plugin-mnemon/mnemon/* "$_MNT_PLUGIN_DIR/" 2>/dev/null || true
     rm -rf /tmp/hermes-plugin-mnemon
 
     # Point Hermes at the mnemon provider (best-effort; PATH first, then bin)
