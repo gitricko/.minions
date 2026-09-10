@@ -331,11 +331,15 @@ echo "=== Test 9.5: Standalone piped install (curl|bash) ==="
 # Run the literal one-liner from an EMPTY cwd (no /src bind mount context).
 # Uses BOOTSTRAP_URL to point at the local repo tarball (avoids network flake).
 # We create a tarball of the current repo and serve it via file:// for speed.
+# NOTE: use HEAD, not 'main' — CI checks out the PR branch, no local 'main' exists.
+# Use --prefix=.minions-main/ so the tar layout matches GitHub's tarball exactly.
 TARBALL="/tmp/minions-main.tar.gz"
-"${DTS_SCRIPT}" exec "cd /src && git archive --format=tar.gz -o $TARBALL main" || {
-    log_warn "git archive failed, trying tar fallback"
-    "${DTS_SCRIPT}" exec "cd / && tar czf $TARBALL -C /src ."
-}
+if "${DTS_SCRIPT}" exec "cd /src && git archive --format=tar.gz --prefix=.minions-main/ -o $TARBALL HEAD"; then
+    log_info "git archive (HEAD) tarball created"
+else
+    log_warn "git archive failed, trying cp+tar fallback"
+    "${DTS_SCRIPT}" exec "rm -rf /tmp/tarsrc && mkdir -p /tmp/tarsrc && cp -a /src /tmp/tarsrc/.minions-main && tar czf $TARBALL -C /tmp/tarsrc .minions-main"
+fi
 
 # Run piped install from empty dir with temp HOME
 # We use BOOTSTRAP_URL=file://$TARBALL to avoid GitHub network
@@ -345,7 +349,7 @@ STANDALONE_HOME="/home/ubuntu/.minions-standalone"
 "${DTS_SCRIPT}" exec "rm -rf $STANDALONE_HOME"
 # Build the piped command: cat the install.sh from tarball | bash
 # Use a temp file to avoid pipeline subshell export issues
-"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && cat $TARBALL | tar xz -O .minions/install.sh 2>/dev/null || cat $TARBALL | tar xz -O .minions-main/install.sh 2>/dev/null > /tmp/empty/install.sh && chmod +x /tmp/empty/install.sh && export BOOTSTRAP_URL=file://$TARBALL && HOME=$STANDALONE_HOME bash /tmp/empty/install.sh 2>&1 | tee /tmp/standalone_install.log"
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && cd /tmp/empty && (tar xzf $TARBALL -O .minions-main/install.sh > /tmp/empty/install.sh 2>/dev/null || tar xzf $TARBALL -O .minions/install.sh > /tmp/empty/install.sh 2>/dev/null) && chmod +x /tmp/empty/install.sh && export BOOTSTRAP_URL=file://$TARBALL && HOME=$STANDALONE_HOME bash /tmp/empty/install.sh 2>&1 | tee /tmp/standalone_install.log"
 STANDALONE_RC=$?
 if [ $STANDALONE_RC -eq 0 ]; then
     log_info "Standalone piped install exit 0"
