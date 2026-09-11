@@ -216,12 +216,15 @@ jobs:
           echo "Running piped INSTALL_URL auto-derivation test..."
           # Use the branch name from the PR head ref or fallback
           BRANCH_NAME="${GITHUB_HEAD_REF:-fix/dev-mode-hermes-wiring}"
-          INSTALL_URL="https://github.com/gitricko/.minions/raw/refs/heads/${BRANCH_NAME}/install.sh"
+          export INSTALL_URL="https://github.com/gitricko/.minions/raw/refs/heads/${BRANCH_NAME}/install.sh"
           STANDALONE_HOME2="${HOME}/.minions-standalone-test2"
           rm -rf "${STANDALONE_HOME2}"
           mkdir -p "${STANDALONE_HOME2}"
-          # Simulate the exact user command pattern
-          if HOME="${STANDALONE_HOME2}" export INSTALL_URL && bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_piped_test.log; then
+          # Simulate the exact user command pattern:
+          #   export INSTALL_URL="..."
+          #   HOME=/custom/home bash -c "$(curl -fsSL "$INSTALL_URL")"
+          # INSTALL_URL exported in parent shell; HOME set for bash -c
+          if HOME="${STANDALONE_HOME2}" bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_piped_test.log; then
               echo "✓ Piped INSTALL_URL test exit 0"
               if grep -q "Knowledge mode: standalone" /tmp/standalone_piped_test.log; then
                   echo "✓ Standalone mode detected"
