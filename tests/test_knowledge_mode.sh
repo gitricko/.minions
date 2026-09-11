@@ -77,12 +77,12 @@ test_live_checkout_wins() {
     (
         cd "${REPO_ROOT}" || exit 1  # real checkout with skills/ + wiki/
         # bash -c so $0 is "bash" (not the test script) -> probe uses cwd only
-        MINIONS_HOME="${fake_home}/.minions" bash -c '
-            source /workspaces/.minions/lib/knowledge-detection.sh 2>/dev/null
+        ROOT="${REPO_ROOT}" MINIONS_HOME="${fake_home}/.minions" bash -c '
+            source "$ROOT/lib/knowledge-detection.sh" 2>/dev/null
             log_info() { :; }
             detect_knowledge_mode >/dev/null 2>&1
             [ "$MODE" = "dev" ] || { echo "mode=$MODE"; exit 1; }
-            [ "$MINIONS_REPO_ROOT" = "/workspaces/.minions" ] || { echo "root=$MINIONS_REPO_ROOT"; exit 1; }
+            [ "$MINIONS_REPO_ROOT" = "$ROOT" ] || { echo "root=$MINIONS_REPO_ROOT"; exit 1; }
         '
     )
     local rc=$?
