@@ -70,7 +70,39 @@ actually works end-to-end.** Do NOT assume it works because CI is green — the 
 this exercise is that you confirm it in the real environment. Run these in order; stop
 and investigate anything that fails.
 
-### 0. Orientation
+### 0. Load the required skills FIRST
+
+Before touching anything, load the skills this work depends on. There are **two places**
+skills live — check both:
+
+1. **Hermes skills** (your own agent skills, if running inside Hermes): the TDD and
+   coding-guidelines workflows are not in this repo — you likely already have them as
+   Hermes skills (`test-driven-development`, `karpathy-coding-guidelines`). If not, load
+   them from the repo copy (see below) or your Hermes skill store.
+2. **Repo skills** (this project's ported skills, under `skills/` — these are the
+   authoritative copies): `karpathy-coding-guidelines`, `docker-test-shell`,
+   `test-driven-development` if it lives in the repo, plus anything task-relevant.
+
+**Load these skill files from the repo:**
+```bash
+# From <REPO_ROOT>:
+#   skills/karpathy-coding-guidelines/SKILL.md        — Karpathy coding guidelines (VERIFIED: ported, present)
+#   skills/test-driven-development/SKILL.md           — TDD workflow (check presence; not in the 48-file listing above)
+#   skills/docker-test-shell/SKILL.md                 — DTS workflow (present: references/dts-usage.md)
+```
+- If `test-driven-development` is NOT in the repo listing, load it from your Hermes
+  skill store instead (it's a standard Hermes skill used throughout this project's CI).
+- `karpathy-coding-guidelines` IS in the repo (ported Phase 15) — read
+  `skills/karpathy-coding-guidelines/SKILL.md`.
+- Also relevant if the task touches them: `memory-automation`, `persistent-knowledge`,
+  `mnemon-seed-persistence`, `mnemon-graph-export`, `codespace-gh-auth` (git push auth),
+  `ci-lint-check`.
+
+> These skills define the HOW (TDD: red-green-refactor, Karpathy: minimal diffs, test
+> the behavior not the implementation). The verification below is the WHAT. Do the work
+> their way.
+
+### Orientation
 - Repo checkout: `<REPO_ROOT>` (this repo, branch `minion-knowledge-base`, PR #22).
 - `.minions` installs to `~/.minions` (i.e. `$HOME/.minions`).
 - Mode + repo-root are persisted in `~/.minions/etc/knowledge.env` — that file is the
