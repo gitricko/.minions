@@ -34,7 +34,11 @@ detect_knowledge_mode() {
     # 2) If the live probe found NO repo (e.g. boot.sh run from ~/.minions/boot.sh
     #    with no .git in cwd), FALL BACK to the persisted knowledge.env written by
     #    install.sh — it remembered dev mode + repo root for exactly this case.
-    if [ -z "${MINIONS_REPO_ROOT}" ] && [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
+    #    BUT when invoked via the curl|bash bootstrap re-exec (MINIONS_BOOTSTRAPPED=1
+    #    and running from a tarball extract with no .git), NEVER trust a stale
+    #    knowledge.env — a prior dev-mode install must not hijack the standalone path.
+    if [ -z "${MINIONS_REPO_ROOT}" ] && [ "${MINIONS_BOOTSTRAPPED:-0}" != "1" ] \
+        && [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
         # shellcheck disable=SC1091
         . "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null || true
         if [ -n "${MINIONS_REPO_ROOT:-}" ] && [ -d "${MINIONS_REPO_ROOT}/skills" ]; then

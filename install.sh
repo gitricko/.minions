@@ -49,6 +49,14 @@ if [ -z "${MINIONS_BOOTSTRAPPED:-}" ]; then
         log_info "Bootstrap: piped install detected, fetching repository..."
 
         # Resolve bootstrap URL (overrideable)
+        # Allow INSTALL_URL to be set (raw URL of install.sh) and auto-derive BOOTSTRAP_URL
+        # Example: INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/fix/dev-mode-hermes-wiring/install.sh
+        # Derives:  https://github.com/gitricko/.minions/archive/refs/heads/fix/dev-mode-hermes-wiring.tar.gz
+        if [ -n "${INSTALL_URL:-}" ] && [ -z "${BOOTSTRAP_URL:-}" ]; then
+            # Transform: /raw/ -> /archive/, /install.sh -> .tar.gz
+            BOOTSTRAP_URL=$(echo "$INSTALL_URL" | sed 's|/raw/|/archive/|; s|/install\.sh$|.tar.gz|')
+            log_info "Bootstrap: derived BOOTSTRAP_URL from INSTALL_URL -> $BOOTSTRAP_URL"
+        fi
         BOOTSTRAP_URL="${BOOTSTRAP_URL:-https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz}"
 
         # Create scratch dir
@@ -74,6 +82,10 @@ if [ -z "${MINIONS_BOOTSTRAPPED:-}" ]; then
         log_info "Bootstrap: re-executing from $EXTRACTED/install.sh"
 
         # Re-exec with flag to skip bootstrap + preserve all args + env
+        # Pass MINIONS_BOOTSTRAPPED so detect_knowledge_mode() skips the stale
+        # persisted knowledge.env fallback (the tarball has no .git — we must
+        # not read a dev-mode knowledge.env left by a prior install).
+        unset MINIONS_HOME
         MINIONS_BOOTSTRAPPED=1 exec "$EXTRACTED/install.sh" "$@"
     fi
 fi
