@@ -155,6 +155,31 @@ else
     exit 1
 fi
 
+# Test 3.5: self-check.sh (full mode — services are up, validates the whole stack)
+echo ""
+echo "=== Test 3.5: self-check.sh (full stack health) ==="
+# Need set +e: self-check can exit 1 (warnings) — with set -e the capture
+# would abort the script before we read $? (the shell exits on the failing
+# command substitution as if it were the last command).
+set +e
+DTS_SELFCHECK_OUT=$("${DTS_SCRIPT}" exec "cd /src && bash self-check.sh 2>&1")
+DTS_SELFCHECK_RC=$?
+set -e
+echo "$DTS_SELFCHECK_OUT"
+if [ "$DTS_SELFCHECK_RC" -eq 2 ]; then
+    log_error "self-check.sh reported CRITICAL failures (exit 2)"
+    cleanup
+    exit 1
+elif [ "$DTS_SELFCHECK_RC" -eq 0 ]; then
+    log_info "self-check.sh all green (exit 0)"
+elif [ "$DTS_SELFCHECK_RC" -eq 1 ]; then
+    log_warn "self-check.sh warnings only (exit 1)"
+else
+    log_error "self-check.sh crashed (exit $DTS_SELFCHECK_RC)"
+    cleanup
+    exit 1
+fi
+
 # Test 4: OmniRoute preconfig (auto-fastest combo, login disabled)
 echo ""
 echo "=== Test 4: OmniRoute preconfig ==="
@@ -296,6 +321,121 @@ if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/ready"; then
     log_info "Readiness marker removed"
 else
     log_error "Readiness marker still exists"
+    cleanup
+    exit 1
+fi
+
+# Test 9.5: Standalone piped install (curl|bash) — Phase 22.5
+echo ""
+echo "=== Test 9.5: Standalone piped install (curl|bash) ==="
+# Run the literal one-liner from an EMPTY cwd (no /src bind mount context).
+# Uses BOOTSTRAP_URL to point at the local repo tarball (avoids network flake).
+# We create a tarball of the current repo and serve it via file:// for speed.
+# NOTE: use HEAD, not 'main' — CI checks out the PR branch, no local 'main' exists.
+# Use --prefix=.minions-main/ so the tar layout matches GitHub's tarball exactly.
+TARBALL="/tmp/minions-main.tar.gz"
+if "${DTS_SCRIPT}" exec "cd /src && git archive --format=tar.gz --prefix=.minions-main/ -o $TARBALL HEAD"; then
+    log_info "git archive (HEAD) tarball created"
+else
+    log_warn "git archive failed, trying cp+tar fallback"
+    "${DTS_SCRIPT}" exec "rm -rf /tmp/tarsrc && mkdir -p /tmp/tarsrc && cp -a /src /tmp/tarsrc/.minions-main && tar czf $TARBALL -C /tmp/tarsrc .minions-main"
+fi
+
+# Run piped install from empty dir with temp HOME
+# We use BOOTSTRAP_URL=file://$TARBALL to avoid GitHub network
+# The piped stdin is the raw install.sh from the tarball
+# This tests the FULL bootstrap flow: fetch -> extract -> re-exec -> knowledge copy
+STANDALONE_HOME="/home/ubuntu/.minions-standalone"
+"${DTS_SCRIPT}" exec "rm -rf $STANDALONE_HOME"
+# Extract the FULL repo tree (not just install.sh) to /tmp/repo — this is what
+# curl|bash receives: the whole tarball, executed from a piped -s stdin so the
+# bootstrap preamble triggers exactly like the real one-liner.
+"${DTS_SCRIPT}" exec "rm -rf /tmp/repo && mkdir -p /tmp/repo && tar xzf $TARBALL -C /tmp/repo 2>/dev/null && ls /tmp/repo/.minions-main/install.sh >/dev/null 2>&1 || (echo 'tarball layout check failed'; exit 1)"
+"${DTS_SCRIPT}" exec "chmod +x /tmp/repo/.minions-main/install.sh"
+# Run the literal one-liner: cat install.sh | bash -s — $0=bash triggers the preamble,
+# which fetches BOOTSTRAP_URL (the file:// tarball) and re-execs the full installer.
+# RC captured via marker file because exec over ssh masks $?.
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-modelrelay > /tmp/standalone_install.log 2>&1; echo \$? > /tmp/standalone_install.rc)"
+STANDALONE_RC=$("${DTS_SCRIPT}" exec "cat /tmp/standalone_install.rc 2>/dev/null || echo 999")
+if [ "$STANDALONE_RC" -eq 0 ]; then
+    log_info "Standalone piped install exit 0"
+else
+    log_error "Standalone piped install failed (exit $STANDALONE_RC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/standalone_install.log"
+    cleanup
+    exit 1
+fi
+
+# Verify MODE=standalone and knowledge copied
+if "${DTS_SCRIPT}" exec "grep -q 'Knowledge mode: standalone' /tmp/standalone_install.log"; then
+    log_info "Standalone mode detected in piped install"
+else
+    log_error "Standalone mode NOT detected in piped install"
+    "${DTS_SCRIPT}" exec "cat /tmp/standalone_install.log"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "test -d $STANDALONE_HOME/.minions/skills && test -f $STANDALONE_HOME/.minions/etc/knowledge.env"; then
+    log_info "Standalone assets copied to ~/.minions-standalone"
+else
+    log_error "Standalone assets NOT copied"
+    "${DTS_SCRIPT}" exec "ls -la $STANDALONE_HOME/.minions/ 2>/dev/null || echo 'no .minions'"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'MODE=standalone' $STANDALONE_HOME/.minions/etc/knowledge.env"; then
+    log_info "Standalone knowledge.env persisted"
+else
+    log_error "Standalone knowledge.env MODE not standalone"
+    cleanup
+    exit 1
+fi
+
+# Test 9.6: Dev mode in repo (git checkout with .git + skills + wiki)
+echo ""
+echo "=== Test 9.6: Dev mode in repo ==="
+DEV_HOME="/home/ubuntu/.minions-dev"
+"${DTS_SCRIPT}" exec "rm -rf $DEV_HOME"
+# Run install.sh from /src (the bind-mounted repo WITH .git)
+"${DTS_SCRIPT}" exec "HOME=$DEV_HOME bash /src/install.sh --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/dev_install.log"
+DEV_RC=$?
+if [ $DEV_RC -eq 0 ]; then
+    log_info "Dev install exit 0"
+else
+    log_error "Dev install failed (exit $DEV_RC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/dev_install.log"
+    cleanup
+    exit 1
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'Knowledge mode: dev' /tmp/dev_install.log"; then
+    log_info "Dev mode detected in repo install"
+else
+    log_error "Dev mode NOT detected in repo install"
+    "${DTS_SCRIPT}" exec "cat /tmp/dev_install.log"
+    cleanup
+    exit 1
+fi
+
+# In dev mode, skills/wiki should NOT be copied to ~/.minions; install.sh
+# (Phase 23) creates a SYMLINK ~/.minions/skills -> /src/skills instead.
+# Accept either: a symlink (new Phase 23 behavior) or an absent dir (pre-23).
+if "${DTS_SCRIPT}" exec "test -L $DEV_HOME/.minions/skills"; then
+    log_info "Dev mode: skills is a symlink (correct)"
+elif "${DTS_SCRIPT}" exec "test -d $DEV_HOME/.minions/skills" && [ -n "$("${DTS_SCRIPT}" exec "ls -A $DEV_HOME/.minions/skills 2>/dev/null")" ]; then
+    log_error "Dev mode: skills incorrectly copied (real dir, not symlink)"
+    cleanup
+    exit 1
+else
+    log_info "Dev mode: skills not present (correct, pre-23 behavior)"
+fi
+
+if "${DTS_SCRIPT}" exec "grep -q 'MODE=dev' $DEV_HOME/.minions/etc/knowledge.env"; then
+    log_info "Dev knowledge.env persisted"
+else
+    log_error "Dev knowledge.env MODE not dev"
     cleanup
     exit 1
 fi

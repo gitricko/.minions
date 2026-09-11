@@ -64,6 +64,18 @@ LIB_DIR="${MINIONS_HOME}/lib"
 # shellcheck disable=SC1091
 . "${LIB_DIR}/process.sh"
 
+# Phase 23: knowledge symlink wiring (dev mode)
+# shellcheck disable=SC1091
+. "${LIB_DIR}/knowledge-symlinks.sh"
+
+# Phase 22: knowledge mode detection (shared with install.sh)
+# shellcheck disable=SC1091
+. "${LIB_DIR}/knowledge-detection.sh"
+detect_knowledge_mode
+
+# Dev-mode symlinks (from knowledge.env MODE + MINIONS_REPO_ROOT)
+setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
+
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
 

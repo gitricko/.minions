@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # .minions bootstrap installer
 # One-liner: curl -fsSL https://minions.sh/install.sh | bash
+# (minions.sh domain pending; GitHub raw URL works: https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh)
 #
 # This script:
 #   1. Detects OS/arch
@@ -12,10 +13,70 @@
 #
 # Usage:
 #   install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]
-
+#
 # Environment (set in ~/.bashrc BEFORE running):
 #   OMNIROUTE_PORT=20128   (default)
 #   MODELRELAY_PORT=7352   (default)
+#   BOOTSTRAP_URL=...       (override tarball source, default: main.tar.gz)
+
+# Phase 22.5: Bootstrap preamble for curl|bash one-liner
+# Runs ONLY when install.sh is piped (stdin). Detects piped mode, fetches
+# the repo tarball, extracts to scratch, and re-execs install.sh from there.
+# This fixes SCRIPT_DIR resolution and stdin collision (exit 141).
+#
+# Piped detection: $0 is bash, -, /dev/fd/*, /dev/stdin, or non-existent file.
+# Re-exec gives a real $0 with proper SCRIPT_DIR, free stdin, and full asset tree.
+
+# Only run bootstrap when NOT already in a re-exec (flag: MINIONS_BOOTSTRAPPED=1)
+if [ -z "${MINIONS_BOOTSTRAPPED:-}" ]; then
+    case "$0" in
+        bash|-|/dev/fd/*|/dev/stdin)
+            PIPED=1
+            ;;
+        *)
+            if [ ! -f "$0" ]; then
+                PIPED=1
+            fi
+            ;;
+    esac
+
+    if [ "${PIPED:-0}" -eq 1 ]; then
+        # Bootstrap: fetch repo tarball and re-exec from extracted checkout
+        log_info() { echo "[INFO] $*"; }
+        log_warn() { echo "[WARN] $*" >&2; }
+        log_error() { echo "[ERROR] $*" >&2; }
+
+        log_info "Bootstrap: piped install detected, fetching repository..."
+
+        # Resolve bootstrap URL (overrideable)
+        BOOTSTRAP_URL="${BOOTSTRAP_URL:-https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz}"
+
+        # Create scratch dir
+        SCRATCH="$(mktemp -d -t minions-bootstrap.XXXXXX)"
+        trap 'rm -rf "$SCRATCH"' EXIT INT TERM
+
+        # Fetch + extract (curl + tar; git clone fallback if curl fails)
+        if ! curl -fsSL "$BOOTSTRAP_URL" | tar xz -C "$SCRATCH" 2>/dev/null; then
+            log_warn "Tarball fetch failed, trying git clone..."
+            if ! git clone --depth 1 --branch main https://github.com/gitricko/.minions "$SCRATCH" 2>/dev/null; then
+                log_error "Both tarball and git clone failed"
+                exit 1
+            fi
+        fi
+
+        # Find extracted dir (tarball creates .minions-main/, git clone creates .minions/)
+        EXTRACTED="$(find "$SCRATCH" -maxdepth 1 -type d -name '.minions*' | head -1)"
+        if [ -z "$EXTRACTED" ] || [ ! -f "$EXTRACTED/install.sh" ]; then
+            log_error "Extracted install.sh not found"
+            exit 1
+        fi
+
+        log_info "Bootstrap: re-executing from $EXTRACTED/install.sh"
+
+        # Re-exec with flag to skip bootstrap + preserve all args + env
+        MINIONS_BOOTSTRAPPED=1 exec "$EXTRACTED/install.sh" "$@"
+    fi
+fi
 
 set -e
 set -u
@@ -78,6 +139,13 @@ log_error() { echo "${RED}[ERROR]${NC} $*" >&2; }
 
 # Source lib functions (relative to script location)
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+# Phase 22: two-mode knowledge detection (shared with boot.sh)
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/knowledge-detection.sh"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/install-mnemon-plugin.sh"
+detect_knowledge_mode
 
 # Detect platform FIRST (needs detect.sh)
 if [ -d "${SCRIPT_DIR}/lib" ]; then
@@ -183,6 +251,46 @@ if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes..."
     ensure_hermes
 fi
+
+# Phase 22: install mnemon plugin (idempotent)
+install_mnemon_plugin
+
+# Phase 22: knowledge asset copy
+#   dev        → skip (assets live in repo; boot.sh will symlink)
+#   standalone → copy skills/wiki/memories/mnemon into MINIONS_HOME
+if [ "${MODE}" = "standalone" ]; then
+    log_info "Knowledge mode: standalone — copying knowledge assets to ${MINIONS_HOME}"
+    mkdir -p "${MINIONS_HOME}/skills" "${MINIONS_HOME}/wiki" \
+             "${MINIONS_HOME}/memories" "${MINIONS_HOME}/mnemon"
+    # Skills + wiki + mnemon: force-copy (code/config, fixes propagate)
+    cp -r "${SCRIPT_DIR}/skills/." "${MINIONS_HOME}/skills/" 2>/dev/null || true
+    cp -r "${SCRIPT_DIR}/wiki/." "${MINIONS_HOME}/wiki/" 2>/dev/null || true
+    cp -r "${SCRIPT_DIR}/mnemon/." "${MINIONS_HOME}/mnemon/" 2>/dev/null || true
+    # Memories: copy only if absent — USER.md/MEMORY.md survive reinstall
+    for m in MEMORY.md USER.md; do
+        if [ -f "${SCRIPT_DIR}/memories/${m}" ] && [ ! -f "${MINIONS_HOME}/memories/${m}" ]; then
+            cp -f "${SCRIPT_DIR}/memories/${m}" "${MINIONS_HOME}/memories/${m}"
+        fi
+    done
+    log_info "Knowledge assets copied (skills/wiki/mnemon; memories preserved)"
+else
+    log_info "Knowledge mode: dev — assets live in repo, symlinked at boot"
+fi
+
+# Persist knowledge mode for boot.sh (it may run from ${MINIONS_HOME} with no .git)
+{
+    echo "# Generated by install.sh — don't edit"
+    echo "MINIONS_HOME=${MINIONS_HOME}"
+    echo "MODE=${MODE}"
+    echo "MINIONS_REPO_ROOT=${MINIONS_REPO_ROOT}"
+} > "${MINIONS_HOME}/etc/knowledge.env"
+log_info "Knowledge mode persisted to ${MINIONS_HOME}/etc/knowledge.env"
+
+# Phase 23: dev-mode symlinks (so dev users get them immediately after install)
+# Source the lib and run symlink setup
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/knowledge-symlinks.sh"
+setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
 
 # Step 5: Copy and interpolate config templates
 log_info "Copying and configuring templates..."
