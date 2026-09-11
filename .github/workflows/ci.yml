@@ -165,14 +165,19 @@ jobs:
           # T7: real-install standalone test (Phase 22.5 proposal)
           # Fetch tarball, run install.sh with --no-* flags in temp HOME
           echo "Running standalone bootstrap test..."
-          TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz"
+          # Fetch from the PR branch (minion-knowledge-base) — the bootstrap +
+          # knowledge-detection code lives there until the PR merges. Pointing at
+          # refs/heads/main here would fetch code WITHOUT Phase 22/22.5 and the
+          # grep assertions below would fail / the test would be a no-op.
+          TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/${GITHUB_HEAD_REF:-minion-knowledge-base}.tar.gz"
           STANDALONE_HOME="${HOME}/.minions-standalone-test"
-          rm -rf "${STANDALONE_HOME}"
-          mkdir -p "${STANDALONE_HOME}"
+          BOOTSTRAP_DIR="/tmp/minions-bootstrap-test"
+          rm -rf "${STANDALONE_HOME}" "${BOOTSTRAP_DIR}"
+          mkdir -p "${STANDALONE_HOME}" "${BOOTSTRAP_DIR}"
           # Use curl to fetch install.sh from tarball and pipe to bash
           # We'll use a simple approach: download tarball, extract, run from there
           # Note: this tests the full bootstrap flow in real-install context
-          if curl -fsSL "${TARBALL_URL}" | tar xz -C /tmp/minions-bootstrap-test 2>/dev/null; then
+          if curl -fsSL "${TARBALL_URL}" | tar xz -C "${BOOTSTRAP_DIR}" 2>/dev/null; then
               EXTRACTED=$(find /tmp/minions-bootstrap-test -maxdepth 1 -type d -name '.minions*' | head -1)
               if [ -n "${EXTRACTED}" ] && [ -f "${EXTRACTED}/install.sh" ]; then
                   HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_real_install.log
@@ -201,7 +206,8 @@ jobs:
                   echo "WARN: Could not find extracted install.sh, skipping standalone test"
               fi
           else
-              echo "WARN: Tarball fetch failed, skipping standalone test"
+              echo "FAIL: Tarball fetch failed (T7 standalone test could not run)"
+              exit 1
           fi
           rm -rf /tmp/minions-bootstrap-test
 
