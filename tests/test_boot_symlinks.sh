@@ -130,11 +130,107 @@ test_dev_mode_symlinks() {
     rm -rf "$REPO_ROOT" "$TEST_HOME" "$TEST_HOME2" "$TEST_HOME3"
 }
 
+# Test: hermes user-skills link (~/.hermes/skills/minions)
+# In dev mode Hermes must see the repo skills via ~/.hermes/skills/minions -> <repo>/skills
+# (the "hermes-codespace pattern" from the proposal). This was NOT wired by Phase 23 —
+# boot.sh only linked ~/.minions/{skills,wiki,mnemon,memories}. RED until fixed.
+test_hermes_skill_link() {
+    log_info "Test: hermes skill link (dev mode)"
+
+    # Source the real lib (already done at top of test_dev_mode_symlinks, but re-source for isolation)
+    # shellcheck disable=SC1091
+    . /workspaces/.minions/lib/knowledge-symlinks.sh
+
+    # Setup: fake repo root with skills
+    HERMES_REPO="/tmp/hermes_repo_$$"
+    mkdir -p "$HERMES_REPO/skills"
+    echo "test" > "$HERMES_REPO/skills/test_skill.md"
+
+    # Setup: fake HOME (isolated from real ~/.hermes)
+    HERMES_TEST_HOME="/tmp/hermes_home_$$"
+    mkdir -p "$HERMES_TEST_HOME"
+
+    # Call the NEW function with the fake HOME (pass the full .hermes path, as boot.sh does)
+    setup_hermes_skill_link "$HERMES_TEST_HOME/.hermes" "$HERMES_REPO/skills"
+
+    # Assertion: ~/.hermes/skills/minions is a symlink to the repo skills
+    local link="$HERMES_TEST_HOME/.hermes/skills/minions"
+    if [ -L "$link" ]; then
+        local actual
+        actual="$(readlink "$link")"
+        if [ "$actual" = "$HERMES_REPO/skills" ]; then
+            echo "  PASS: hermes skill link points to repo skills"
+            PASS=$((PASS + 1))
+        else
+            echo "  FAIL: hermes skill link points to $actual, expected $HERMES_REPO/skills"
+            FAIL=$((FAIL + 1))
+        fi
+    else
+        echo "  FAIL: no hermes skill link at $link"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # Cleanup
+    rm -rf "$HERMES_REPO" "$HERMES_TEST_HOME"
+}
+
+# Test: hermes memories link (~/.hermes/memories)
+# The proposal (§3.3) + test_dev_memories pin: ~/.hermes/memories -> repo memories (dev)
+# so Hermes' MEMORY.md/USER.md are git-tracked. NOT wired by Phase 23 (only ~/.minions/memories).
+test_hermes_memories_link() {
+    log_info "Test: hermes memories link (dev mode)"
+
+    # shellcheck disable=SC1091
+    . /workspaces/.minions/lib/knowledge-symlinks.sh
+
+    # Setup: fake repo root with memories + fake HERMES_HOME
+    HERMES_MEM_REPO="/tmp/hermes_mem_repo_$$"
+    mkdir -p "$HERMES_MEM_REPO/memories"
+    echo "test" > "$HERMES_MEM_REPO/memories/MEMORY.md"
+    HERMES_MEM_HOME="/tmp/hermes_mem_home_$$"
+    mkdir -p "$HERMES_MEM_HOME"
+
+    # Call the NEW function (mirrors boot.sh: pass full .hermes path)
+    setup_hermes_memories_link "$HERMES_MEM_HOME/.hermes" "$HERMES_MEM_REPO/memories"
+
+    # Assertion: ~/.hermes/memories is a symlink to the repo memories
+    local link="$HERMES_MEM_HOME/.hermes/memories"
+    if [ -L "$link" ]; then
+        local actual
+        actual="$(readlink "$link")"
+        if [ "$actual" = "$HERMES_MEM_REPO/memories" ]; then
+            echo "  PASS: hermes memories link points to repo memories"
+            PASS=$((PASS + 1))
+        else
+            echo "  FAIL: hermes memories link points to $actual, expected $HERMES_MEM_REPO/memories"
+            FAIL=$((FAIL + 1))
+        fi
+    else
+        echo "  FAIL: no hermes memories link at $link"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # Idempotency: re-run should keep the same link (no churn)
+    setup_hermes_memories_link "$HERMES_MEM_HOME/.hermes" "$HERMES_MEM_REPO/memories"
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "$HERMES_MEM_REPO/memories" ]; then
+        echo "  PASS: hermes memories link idempotent"
+        PASS=$((PASS + 1))
+    else
+        echo "  FAIL: hermes memories link not idempotent"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # Cleanup
+    rm -rf "$HERMES_MEM_REPO" "$HERMES_MEM_HOME"
+}
+
 # Run
 main() {
     log_info "=== Phase 23 Boot Symlink Unit Tests ==="
     echo ""
     test_dev_mode_symlinks
+    test_hermes_skill_link
+    test_hermes_memories_link
     echo ""
     log_info "=== Results: $PASS passed, $FAIL failed ==="
     [ "$FAIL" -eq 0 ]
