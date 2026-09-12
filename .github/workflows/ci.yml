@@ -165,11 +165,10 @@ jobs:
           # T7: real-install standalone test (Phase 22.5 proposal)
           # Fetch tarball, run install.sh with --no-* flags in temp HOME
           echo "Running standalone bootstrap test..."
-          # Fetch from the PR branch (minion-knowledge-base) — the bootstrap +
-          # knowledge-detection code lives there until the PR merges. Pointing at
-          # refs/heads/main here would fetch code WITHOUT Phase 22/22.5 and the
-          # grep assertions below would fail / the test would be a no-op.
-          TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/${GITHUB_HEAD_REF:-minion-knowledge-base}.tar.gz"
+          # Fetch from the PR branch (or main on push) — the bootstrap +
+          # knowledge-detection code lives there. Using the branch ref ensures
+          # the test runs against the code being validated.
+          TARBALL_URL="https://github.com/gitricko/.minions/archive/refs/heads/${GITHUB_HEAD_REF:-main}.tar.gz"
           STANDALONE_HOME="${HOME}/.minions-standalone-test"
           BOOTSTRAP_DIR="/tmp/minions-bootstrap-test"
           rm -rf "${STANDALONE_HOME}" "${BOOTSTRAP_DIR}"
@@ -215,7 +214,7 @@ jobs:
           # This tests the user-facing command: export INSTALL_URL=... && bash -c "$(curl ...)"
           echo "Running piped INSTALL_URL auto-derivation test..."
           # Use the branch name from the PR head ref or fallback
-          BRANCH_NAME="${GITHUB_HEAD_REF:-fix/dev-mode-hermes-wiring}"
+          BRANCH_NAME="${GITHUB_HEAD_REF:-main}"
           export INSTALL_URL="https://github.com/gitricko/.minions/raw/refs/heads/${BRANCH_NAME}/install.sh"
           STANDALONE_HOME2="${HOME}/.minions-standalone-test2"
           rm -rf "${STANDALONE_HOME2}"
