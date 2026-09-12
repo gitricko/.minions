@@ -1,61 +1,110 @@
-# Handoff Context Checklist
+# Context Handoff Checklist
 
-Every agent-to-agent handoff must include these sections. Use with `verify-handoff.sh validate`.
+This checklist defines what **must** be included in any agent-to-agent handoff briefing. Use with `verify-handoff.sh` to auto-validate.
 
-## Required Sections
+## Required Sections (All Mandatory)
 
-1. **Current State Summary**
-   - What's completed (with evidence: test counts, CI status, file paths)
-   - Known gaps (explicitly labeled as expected vs bugs)
-   - Branch/PR status
+| # | Section | Purpose |
+|---|---------|---------|
+| 1 | Current State Summary | What's done, verified, known gaps |
+| 2 | Required Skills | Skills to load, in order, with justification |
+| 3 | Verification Checklist | Exact commands + expected outputs |
+| 4 | Key Files | Priority-ordered reading list |
+| 5 | Artifacts Created | Deliverables per phase |
+| 6 | Remaining Implementation | Next phases with dependencies |
+| 7 | Critical Gotchas | Bugs fixed, patterns to avoid (WRONG/CORRECT) |
+| 8 | CI Pipeline | Jobs that must stay green |
+| 9 | Prompt Template | Copy-paste for fresh agent startup |
+| 10 | Quick Reference | Common commands |
+| 11 | Contact / Escalation | Repo, PRs, images |
 
-2. **Required Skills**
-   - Core workflow skills (TDD, coding guidelines) — Hermes built-in
-   - Repo-ported skills — authoritative copies in repo
-   - Task-relevant skills — load as needed
-   - Loading ORDER (workflow skills first)
+## Required Elements Within Sections
 
-3. **Verification Checklist**
-   - Numbered steps with exact commands
-   - Expected output for each step
-   - Failure diagnosis commands + trace path
+### Current State Summary
+- [ ] Table with Area/Status/Evidence columns
+- [ ] Separate table for Known Gaps with Phase/State
+- [ ] Clear ✅/⚠️ visual indicators
 
-4. **Key Files**
-   - Ordered reading list with purpose + critical sections
-   - File paths relative to repo root
+### Required Skills
+- [ ] Built-in skills listed with `skill_view(name='...')` calls
+- [ ] Repo-ported skills with paths
+- [ ] Task-relevant skills as needed
+- [ ] **Loading order** explicitly numbered (test-driven-development FIRST)
 
-5. **Remaining Implementation**
-   - Phases with dependencies and deliverables
-   - Priority ordering
-   - Blocking relationships
+### Verification Checklist
+- [ ] Exact bash commands to run
+- [ ] `EXPECT:` lines showing expected output
+- [ ] Failure diagnosis commands
+- [ ] Trace path from entry point through layers
 
-6. **Critical Gotchas**
-   - Each gotcha: WRONG code + CORRECT code + explanation
-   - Env scope bugs, precedence bugs, path bugs, test isolation
-   - "Do not re-introduce" warnings
+### Key Files
+- [ ] Table with File/Purpose/Critical Sections
+- [ ] Ordered by reading priority
 
-7. **CI Pipeline**
-   - Job names, durations, scopes
-   - Test commands that must stay green
-   - Hard-fail vs warn boundaries
+### Artifacts Created
+- [ ] Per-phase deliverables listed
+- [ ] File paths or descriptions
 
-8. **Prompt Template**
-   - Copy-paste ready prompt for fresh agent
-   - Includes all file paths, skill names, verification contract
+### Remaining Implementation
+- [ ] Phases numbered with titles
+- [ ] Priority indicators (HIGH/MEDIUM/LOW)
+- [ ] Dependencies between phases
+- [ ] Concrete deliverables
 
-9. **Quick Reference Commands**
-   - Common dev commands (test, DTS, lint, push)
-   - Mnemon/skill shortcuts
+### Critical Gotchas
+- [ ] Each gotcha has **WRONG** and **CORRECT** code blocks
+- [ ] Root cause explained
+- [ ] Pattern is generalizable (not one-off)
 
-10. **Contact/Escalation**
-    - Repo URL, PR numbers, prior PRs
-    - DTS image references
+### CI Pipeline
+- [ ] Job names, durations, purposes
+- [ ] List of tests per job
+- [ ] Explicit "Do not weaken hard-fail" warning
+
+### Prompt Template
+- [ ] Starts with "You are a fresh agent..."
+- [ ] REPO, GOAL clearly stated
+- [ ] READ FIRST list with 4+ docs in order
+- [ ] LOAD SKILLS with mandatory/optional distinction
+- [ ] KEY FILES table
+- [ ] VERIFICATION CONTRACT (commands)
+- [ ] NEXT WORK ordered list
+- [ ] KNOWN GAPS (don't chase)
+- [ ] CODING STYLE + WORKFLOW reminders
+
+### Quick Reference
+- [ ] Unit test command
+- [ ] Integration test command
+- [ ] Lint command
+- [ ] Auth + push command
+- [ ] Other project-specific commands
+
+### Contact / Escalation
+- [ ] Repo URL
+- [ ] Current PR with status
+- [ ] Previous relevant PR
+- [ ] Container images if applicable
 
 ## Quality Gates
 
-- [ ] All verification commands actually run and pass
-- [ ] No placeholder text ({{VARS}}) remains in final briefing
-- [ ] Gotchas have real code examples from the project
-- [ ] Skill names match actual skill_view() names
-- [ ] File paths are verified to exist
-- [ ] CI job names match .github/workflows/ci.yml
+A handoff is **complete** only if:
+- [ ] `verify-handoff.sh <briefing>` exits 0
+- [ ] Fresh agent can run verification checklist and all pass
+- [ ] Fresh agent can start Phase N+1 without asking clarifying questions
+- [ ] All gotchas have WRONG/CORRECT patterns
+- [ ] Prompt template is copy-paste ready
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It Breaks Handoff |
+|--------------|----------------------|
+| "Figure it out" / "See code" | Fresh agent has no context |
+| Missing expected outputs | Can't verify correctness |
+| No skill loading order | Wrong workflow applied first |
+| Gotchas without CORRECT code | Re-introduces fixed bugs |
+| Vague next steps ("continue work") | No actionable direction |
+| Missing known gaps | Fresh agent wastes time on expected state |
+
+---
+
+*This checklist is part of the `agent-context-transfer` skill. Update when handoff patterns evolve.*
