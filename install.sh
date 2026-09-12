@@ -49,6 +49,14 @@ if [ -z "${MINIONS_BOOTSTRAPPED:-}" ]; then
         log_info "Bootstrap: piped install detected, fetching repository..."
 
         # Resolve bootstrap URL (overrideable)
+        # Allow INSTALL_URL to be set (raw URL of install.sh) and auto-derive BOOTSTRAP_URL
+        # Example: INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/fix/dev-mode-hermes-wiring/install.sh
+        # Derives:  https://github.com/gitricko/.minions/archive/refs/heads/fix/dev-mode-hermes-wiring.tar.gz
+        if [ -n "${INSTALL_URL:-}" ] && [ -z "${BOOTSTRAP_URL:-}" ]; then
+            # Transform: /raw/ -> /archive/, /install.sh -> .tar.gz
+            BOOTSTRAP_URL=$(echo "$INSTALL_URL" | sed 's|/raw/|/archive/|; s|/install\.sh$|.tar.gz|')
+            log_info "Bootstrap: derived BOOTSTRAP_URL from INSTALL_URL -> $BOOTSTRAP_URL"
+        fi
         BOOTSTRAP_URL="${BOOTSTRAP_URL:-https://github.com/gitricko/.minions/archive/refs/heads/main.tar.gz}"
 
         # Create scratch dir
@@ -74,6 +82,10 @@ if [ -z "${MINIONS_BOOTSTRAPPED:-}" ]; then
         log_info "Bootstrap: re-executing from $EXTRACTED/install.sh"
 
         # Re-exec with flag to skip bootstrap + preserve all args + env
+        # Pass MINIONS_BOOTSTRAPPED so detect_knowledge_mode() skips the stale
+        # persisted knowledge.env fallback (the tarball has no .git — we must
+        # not read a dev-mode knowledge.env left by a prior install).
+        unset MINIONS_HOME
         MINIONS_BOOTSTRAPPED=1 exec "$EXTRACTED/install.sh" "$@"
     fi
 fi
@@ -291,6 +303,25 @@ log_info "Knowledge mode persisted to ${MINIONS_HOME}/etc/knowledge.env"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib/knowledge-symlinks.sh"
 setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
+
+# Hermes user-skills link: ~/.hermes/skills/minions -> repo skills (dev) or
+# ~/.minions/skills (standalone) — so Hermes discovers the .minions skills
+# immediately after install (before the first boot).
+if [ "${MODE}" = "dev" ]; then
+    _HERMES_SKILL_TARGET="${MINIONS_REPO_ROOT}/skills"
+else
+    _HERMES_SKILL_TARGET="${MINIONS_HOME}/skills"
+fi
+setup_hermes_skill_link "${HOME}/.hermes" "${_HERMES_SKILL_TARGET}"
+
+# Hermes memories link: ~/.hermes/memories -> repo memories (dev) or
+# ~/.minions/memories (standalone) — so MEMORY.md/USER.md are git-tracked.
+if [ "${MODE}" = "dev" ]; then
+    _HERMES_MEM_TARGET="${MINIONS_REPO_ROOT}/memories"
+else
+    _HERMES_MEM_TARGET="${MINIONS_HOME}/memories"
+fi
+setup_hermes_memories_link "${HOME}/.hermes" "${_HERMES_MEM_TARGET}"
 
 # Step 5: Copy and interpolate config templates
 log_info "Copying and configuring templates..."

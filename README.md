@@ -49,6 +49,38 @@ You'll see:
 
 ---
 
+## Installing from a Specific Branch (for testing PRs / dev branches)
+
+The standard one-liner installs from `main`. To install from a specific branch (e.g. to test a PR before merge), use the **`INSTALL_URL`** pattern:
+
+```bash
+# Export the raw install.sh URL from the branch you want to test
+export INSTALL_URL="https://github.com/gitricko/.minions/raw/refs/heads/fix/dev-mode-hermes-wiring/install.sh"
+
+# Run via bash -c "$(curl ...)" — this correctly propagates INSTALL_URL to the bootstrap
+bash -c "$(curl -fsSL "$INSTALL_URL")"
+
+# Or with a custom HOME (for isolated testing)
+HOME=/custom/path bash -c "$(curl -fsSL "$INSTALL_URL")"
+```
+
+**Why `bash -c "$(curl ...)"` instead of `curl ... | bash`?**
+
+| Pattern | Problem |
+|---------|---------|
+| `curl ... \| bash` | Env vars (`HOME`, `INSTALL_URL`) only apply to `curl`, not the piped `bash` — install goes to wrong location and branch detection fails |
+| `bash -c "$(curl ...)"` | Parent shell env propagates; `HOME` set once; clean stdin; branch tarball auto-derived |
+
+The bootstrap preamble detects `INSTALL_URL` and auto-derives the branch tarball URL:
+```
+/raw/ → /archive/     # GitHub raw → archive
+/install.sh → .tar.gz # install.sh → tarball
+```
+
+So you only set the **install.sh** URL — the correct **branch tarball** is fetched automatically.
+
+---
+
 ## Components
 
 | Component | Kind | Runs How | v1 Status |

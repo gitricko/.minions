@@ -76,6 +76,24 @@ detect_knowledge_mode
 # Dev-mode symlinks (from knowledge.env MODE + MINIONS_REPO_ROOT)
 setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
 
+# Hermes user-skills link: ~/.hermes/skills/minions -> repo skills (dev) or
+# ~/.minions/skills (standalone) — so Hermes discovers the .minions skills.
+if [ "${MODE}" = "dev" ]; then
+    _HERMES_SKILL_TARGET="${MINIONS_REPO_ROOT}/skills"
+else
+    _HERMES_SKILL_TARGET="${MINIONS_HOME}/skills"
+fi
+setup_hermes_skill_link "${HOME}/.hermes" "${_HERMES_SKILL_TARGET}"
+
+# Hermes memories link: ~/.hermes/memories -> repo memories (dev) or
+# ~/.minions/memories (standalone) — so MEMORY.md/USER.md are git-tracked.
+if [ "${MODE}" = "dev" ]; then
+    _HERMES_MEM_TARGET="${MINIONS_REPO_ROOT}/memories"
+else
+    _HERMES_MEM_TARGET="${MINIONS_HOME}/memories"
+fi
+setup_hermes_memories_link "${HOME}/.hermes" "${_HERMES_MEM_TARGET}"
+
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
 
