@@ -9,6 +9,23 @@ Standard `git push` fails in Codespaces because:
 
 ## Solution: Embed Token in Remote URL
 
+### Using the Reusable Script (Recommended)
+
+```bash
+source /home/codespace/.hermes/skills/minions/codespace-gh-auth/scripts/codespace-gh-auth.sh
+
+# Push current branch
+git_push_with_token
+
+# Or specify remote/branch
+git_push_with_token origin feature-branch
+
+# Full workflow: commit → push → PR
+codespace_create_pr "feat: description" "## Summary\n- Change 1\n- Change 2"
+```
+
+### Manual Method
+
 ```bash
 # 1. Extract token from VS Code server (from codespace-gh-auth)
 VSCODE_PID=$(pgrep -f "server-main.js" | head -1)
@@ -31,6 +48,20 @@ gh pr create --repo OWNER/REPO --head BRANCH --base main --title "Title" --body 
 
 ## Complete Workflow: Create Branch → Push → PR
 
+### Using Script (Recommended)
+```bash
+source /home/codespace/.hermes/skills/minions/codespace-gh-auth/scripts/codespace-gh-auth.sh
+
+# 1. Create branch, commit changes
+git checkout -b feature-branch
+git add .
+git commit -m "feat: description"
+
+# 2. Push and create PR in one call
+codespace_create_pr "feat: description" "## Summary\n- Change 1\n- Change 2"
+```
+
+### Manual Method
 ```bash
 # 1. Extract token
 VSCODE_PID=$(pgrep -f "server-main.js" | head -1)
@@ -60,3 +91,4 @@ gh pr create --repo OWNER/REPO --head feature-branch --base main --title "Title"
 - Works for both public and private repos
 - No need for `gh auth login` or SSH keys
 - Token has same permissions as the user who opened the Codespace
+- **Critical**: The script embeds token in the remote URL so `git push` never triggers VS Code credential helper
