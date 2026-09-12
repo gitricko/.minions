@@ -14,14 +14,13 @@ detect_knowledge_mode() {
     MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
     MINIONS_REPO_ROOT=""
 
-    # 1) Probe the live environment FIRST: script location / cwd — a git checkout
+    # 1) Probe the live environment FIRST: SCRIPT_DIR (set by install.sh/boot.sh)
     #    with skills/ + wiki/ is authoritative (dev). This also recovers from a
     #    STALE persisted root (checkout moved, re-run from the new location).
+    #    If SCRIPT_DIR not set, use cwd only — NEVER use $0 (it leaks when sourced).
     _SEARCH_DIR="$(pwd)"
     if [ -n "${SCRIPT_DIR:-}" ] && [ -d "${SCRIPT_DIR}/lib" ]; then
         _SEARCH_DIR="${SCRIPT_DIR}"
-    elif [ -n "${0:-}" ] && [ -f "$0" ]; then
-        _SEARCH_DIR="$(cd "$(dirname "$0")" && pwd)"
     fi
 
     if git -C "${_SEARCH_DIR}" rev-parse --show-toplevel >/dev/null 2>&1; then
