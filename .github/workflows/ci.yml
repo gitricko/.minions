@@ -246,6 +246,16 @@ jobs:
                   ls -la "${STANDALONE_HOME2}/.minions/" 2>/dev/null || echo "no .minions"
                   exit 1
               fi
+              # Phase 24: standalone Pi settings.json must point at the standalone skills dir
+              if [ -f "${STANDALONE_HOME2}/.pi/agent/settings.json" ] && \
+                 grep -q '"skills"' "${STANDALONE_HOME2}/.pi/agent/settings.json" && \
+                 grep -q "${STANDALONE_HOME2}/.minions/skills" "${STANDALONE_HOME2}/.pi/agent/settings.json"; then
+                  echo "✓ Pi settings.json wired with standalone skills path"
+              else
+                  echo "FAIL: Pi settings.json missing standalone skills path"
+                  cat "${STANDALONE_HOME2}/.pi/agent/settings.json" 2>/dev/null || echo "no settings.json"
+                  exit 1
+              fi
           else
               echo "FAIL: Piped INSTALL_URL test exited non-zero"
               cat /tmp/standalone_piped_test.log
