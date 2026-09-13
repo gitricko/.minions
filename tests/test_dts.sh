@@ -122,11 +122,13 @@ log_info "Binaries installed correctly"
 "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.pi/agent/pi.toml && test -f /home/ubuntu/.pi/agent/models.json && test -f /home/ubuntu/.hermes/config.yaml"
 log_info "Config templates copied to standard locations"
 
-# Phase 24: Pi shared-skills wiring — standalone mode must have the skills dir
-# in ~/.pi/agent/settings.json pointing at ~/.minions/skills (dev-mode repo
-# path is NOT used in standalone).
-"${DTS_SCRIPT}" exec "grep -q '\"skills\"' /home/ubuntu/.pi/agent/settings.json && grep -q '/home/ubuntu/.minions/skills' /home/ubuntu/.pi/agent/settings.json"
-log_info "Pi settings.json wired with standalone skills path (~/.minions/skills)"
+# Phase 24: Pi shared-skills wiring — settings.json must have a "skills" array
+# pointing at an existing skills dir (dev: /src/skills, standalone: ~/.minions/skills).
+# Detect mode to check the right path.
+"${DTS_SCRIPT}" exec 'if grep -q "\"skills\"" /home/ubuntu/.pi/agent/settings.json 2>/dev/null; then
+  if [ -d /src/.git ]; then grep -q /src/skills /home/ubuntu/.pi/agent/settings.json; else grep -q /home/ubuntu/.minions/skills /home/ubuntu/.pi/agent/settings.json; fi
+else exit 1; fi'
+log_info "Pi settings.json wired with skills path"
 
 # Test 2: boot.sh
 echo ""
