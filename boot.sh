@@ -94,6 +94,18 @@ else
 fi
 setup_hermes_memories_link "${HOME}/.hermes" "${_HERMES_MEM_TARGET}"
 
+# Phase 24: Pi shared-skills wiring — re-assert the SAME skills/ Path on every
+# boot (idempotent; survives reinstall/drift). dev -> repo skills; standalone
+# -> ~/.minions/skills.
+# shellcheck disable=SC1091
+. "${LIB_DIR}/pi-settings.sh"
+if [ "${MODE}" = "dev" ]; then
+    _PI_SKILLS_PATH="${MINIONS_REPO_ROOT}/skills"
+else
+    _PI_SKILLS_PATH="${MINIONS_HOME}/skills"
+fi
+wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
+
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
 
