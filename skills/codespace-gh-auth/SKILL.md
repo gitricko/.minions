@@ -10,6 +10,26 @@ In a GitHub Codespace, the GITHUB_TOKEN env var is set in the VS Code server pro
 
 ## Solution
 
+### Quick Usage (Source the script, then use functions)
+
+```bash
+source /home/codespace/.hermes/skills/minions/codespace-gh-auth/scripts/codespace-gh-auth.sh
+
+# Get token for API calls
+get_github_token
+curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/...
+
+# Push with token-embedded URL (no credential prompts)
+git_push_with_token
+
+# Set up gh CLI
+setup_gh_cli
+gh pr create ...
+
+# Full workflow: commit → push → PR
+codespace_create_pr "Title" "Body"
+```
+
 ### Step 1: Extract the real GITHUB_TOKEN from the VS Code server
 
 ```bash
@@ -51,6 +71,10 @@ gh auth status
 | **Unauthenticated API** | None | Public only | Public repos (read-only) |
 
 **When to use device flow instead**: Working on repos outside the Codespaces app installation (other users' repos, orgs without Codespaces app).
+
+## Scripts
+
+- `scripts/codespace-gh-auth.sh` — Reusable functions: `get_github_token`, `git_push_with_token`, `setup_gh_cli`, `codespace_create_pr`
 
 ## References
 
