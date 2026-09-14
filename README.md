@@ -2,9 +2,21 @@
 
 > **Portable, oh-my-zsh-style bootstrap for a complete AI coding stack in `~/.minions`.**
 
+<p align="center">
+    <picture>
+        <img height="300" alt="hermes-webtop-title-logo" src="./docs/ai-minions.jpg" />
+    </picture>
+</p>
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-1f425f.svg)](./install.sh)
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
+[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-v2026.8.31-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
+[![PI Agent](https://img.shields.io/badge/PI%20Agent-v0.85.1-brown?logo=github)](https://pi.dev)
+[![ModelRelay](https://img.shields.io/badge/ModelRelay-1.22.1-green?logo=npm)](https://www.npmjs.com/package/modelrelay)
+[![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.50-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
+[![Ollama](https://img.shields.io/badge/Ollama-0.33.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
+[![Mnemon](https://img.shields.io/badge/Mnemon-0.2.8-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
 
 `.minions` installs and wires a practical local AI toolchain so you can go from zero to productive with one command.
 
@@ -29,15 +41,7 @@
 - **Pi Agent** (CLI)
 - **Hermes** (CLI)
 - **Mnemon** (memory layer)
-
-```text
-firstmate ──dispatch──► boot.sh ──► Pi Agent (CLI)
-                              │
-                ┌─────────────┼──────────────┐
-                ▼             ▼              ▼
-          OmniRoute      ModelRelay      Hermes (CLI)
-           :20128/v1      :7352/v1       preinstalled
-```
+- **Skills/Wikis** (Useful skills and llm-wiki)
 
 ---
 
@@ -47,7 +51,7 @@ firstmate ──dispatch──► boot.sh ──► Pi Agent (CLI)
 
 ```bash
 # published installer
-curl -fsSL https://minions.sh/install.sh | bash
+curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh | bash
 
 # or from this repo
 ./install.sh
@@ -91,7 +95,6 @@ Use `bash -c "$(curl ...)"` so environment variables like `HOME` and `INSTALL_UR
 ```bash
 OMNIROUTE_PORT=20128
 MODELRELAY_PORT=7352
-MINIONS_LLM_BASE_URL=http://localhost:20128/v1
 ```
 
 Example custom ports:
