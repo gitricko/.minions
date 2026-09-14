@@ -297,7 +297,35 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         log_error "Chat completion via OmniRoute failed"
         exit 1
     fi
-    
+
+    # Phase 24: live skill discovery. hermes skills list is the authoritative
+    # check (deterministic, fast — NOT truncated: one known skill name asserts
+    # the whole minions dir is wired). pi -p is model-dependent but proves Pi
+    # also discovers skills via the settings.json skills array.
+    HERMES_BIN="${HOME}/.minions/bin/hermes"
+    PI_BIN="${HOME}/.minions/bin/pi"
+
+    HERMES_SKILLS_OUT=$("${HERMES_BIN}" skills list 2>&1) || true
+    if echo "$HERMES_SKILLS_OUT" | grep -q memory-automation; then
+        log_info "hermes skills list shows minions skills (memory-automation)"
+    else
+        log_error "hermes skills list did not show minions skills"
+        echo "$HERMES_SKILLS_OUT"
+        exit 1
+    fi
+
+    PI_SKILLS_OUT=$("${PI_BIN}" -p \
+      'List the name of every skill available to you. Read-only.' \
+      --provider omniroute --model omniroute/auto-fastest 2>&1) || true
+    if echo "$PI_SKILLS_OUT" | grep -qi docker-test-shell; then
+        log_info "pi -p sees minions skills (docker-test-shell)"
+    elif grep -q '"skills"' "${HOME}/.pi/agent/settings.json" 2>/dev/null; then
+        log_warn "pi -p may not have listed skills (model-dependent); settings.json skills array is present"
+    else
+        log_error "pi -p did not list skills AND settings.json skills missing"
+        exit 1
+    fi
+
     log_info "All CLI integration tests passed (Real install mode)"
 fi
 

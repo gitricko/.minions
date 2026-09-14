@@ -224,6 +224,8 @@ cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null 
 . "${MINIONS_HOME}/lib/omniroute.sh"
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/mnemon.sh"
+# shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/pi-settings.sh"
 
 # Step 2: Source versions
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
@@ -345,7 +347,16 @@ if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
     log_info "Created ~/.pi/agent/models.json"
 fi
 
-# Copy settings.json is not used; Pi-Agent reads pi.toml + models.json.
+# Phase 24: Pi shared-skills wiring — point Pi at the SAME skills/ Hermes loads.
+# dev -> repo skills; standalone -> ~/.minions/skills (copied by install).
+# settings.json is NOT unused anymore: it now carries the "skills" array plus
+# any user "packages" (e.g. pi-failover), merged and preserved by the helper.
+if [ "${MODE}" = "dev" ]; then
+    _PI_SKILLS_PATH="${MINIONS_REPO_ROOT}/skills"
+else
+    _PI_SKILLS_PATH="${MINIONS_HOME}/skills"
+fi
+wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 
 # Create Hermes config.yaml
 log_info "Creating ~/.hermes/config.yaml..."
