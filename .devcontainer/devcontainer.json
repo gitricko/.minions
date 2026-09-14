@@ -8,6 +8,6 @@
       ]
     }
   },
-  "postCreateCommand": "bash ./install.sh >> /tmp/.minions.log 2>&1",
-  "postStartCommand":  "bash ./.minions/boot.sh >> /tmp/.minions.log 2>&1"
+  "postCreateCommand": "export INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh; bash -c $(curl -fsSL $INSTALL_URL)",
+  "postStartCommand":  "bash $HOME/.minions/boot.sh >> /tmp/.minions.log 2>&1"
 }
