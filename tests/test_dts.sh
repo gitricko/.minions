@@ -316,6 +316,19 @@ else
     exit 1
 fi
 
+# 8d. hermes skills list discovers the minions skills (Phase 24).
+# `hermes skills list` prints a table of ALL skills (builtin + local).
+# The minions skills show as source=local, category=minions. We check for a
+# known skill name in the output. NOTE: may exit 1 when model not configured;
+# pipeline exit is grep's (not hermes), so the `if` tests content, not code.
+if "${DTS_SCRIPT}" exec "${HERMES_BIN} skills list 2>&1" | grep -q memory-automation; then
+    log_info "hermes skills list shows minions skills (memory-automation)"
+else
+    log_error "hermes skills list did not show minions skills"
+    cleanup
+    exit 1
+fi
+
 # Test 9: stop.sh
 echo ""
 echo "=== Test 9: stop.sh ==="
