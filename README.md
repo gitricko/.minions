@@ -8,6 +8,11 @@
     </picture>
 </p>
 
+<p align="center">
+<a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">
+    <img src="https://github.com/gitricko/.minions/actions/workflows/ci.yml/badge.svg" alt="Latest CI Status">
+</a>
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-1f425f.svg)](./install.sh)
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
@@ -17,6 +22,7 @@
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.50-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
 [![Ollama](https://img.shields.io/badge/Ollama-0.33.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.8-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
+</p>
 
 `.minions` installs and wires a practical local AI toolchain so you can go from zero to productive with one command.
 
