@@ -8,6 +8,6 @@
       ]
     }
   },
-  "postCreateCommand": "export INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh; bash -c $(curl -fsSL $INSTALL_URL)",
+  "postCreateCommand": "bash -c $(curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh)",
   "postStartCommand":  "bash $HOME/.minions/boot.sh >> /tmp/.minions.log 2>&1"
 }
