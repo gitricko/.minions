@@ -136,9 +136,9 @@ export MODELRELAY_PORT=7353
 
 ## Docs worth reading
 
-- `/home/runner/work/.minions/.minions/docs/scout-report-minions-v1.md` — full implementation narrative and decisions
-- `/home/runner/work/.minions/.minions/docs/IMPLEMENTATION-STATUS.md` — latest status and verification notes
-- `/home/runner/work/.minions/.minions/docs/requirements-research.md` — requirements and early research context
+- [`docs/scout-report-minions-v1.md`](docs/scout-report-minions-v1.md) — full implementation narrative and decisions
+- [`docs/IMPLEMENTATION-STATUS.md`](docs/IMPLEMENTATION-STATUS.md) — latest status and verification notes
+- [`docs/requirements-research.md`](docs/requirements-research.md) — requirements and early research context
 
 ---
 
