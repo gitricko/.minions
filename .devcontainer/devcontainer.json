@@ -1,0 +1,13 @@
+{
+  "name": ".minions",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "joverina.rina-hermes-acp",
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  "postCreateCommand": "bash ./install.sh >> /tmp/.minions.log 2>&1",
+  "postStartCommand":  "bash ./.minions/boot.sh >> /tmp/.minions.log 2>&1"
+}
