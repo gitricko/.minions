@@ -26,7 +26,7 @@
 
 </p>
 
-`.minions` installs and wires a practical local AI toolchain so you can go from zero to productive with one command.
+`.minions` installs and configures a complete local AI coding stack in one command. Add it to your Codespace's `.devcontainer` setup or run it from `devcontainer.json` lifecycle events to give any GitHub project its own ready-to-use coding agent.
 
 ---
 
