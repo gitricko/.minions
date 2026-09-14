@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-1f425f.svg)](./install.sh)
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
-[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-v2026.8.31-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
+[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-v2026.9.11-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
 [![PI Agent](https://img.shields.io/badge/PI%20Agent-v0.85.1-brown?logo=github)](https://pi.dev)
 [![ModelRelay](https://img.shields.io/badge/ModelRelay-1.22.1-green?logo=npm)](https://www.npmjs.com/package/modelrelay)
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.50-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
