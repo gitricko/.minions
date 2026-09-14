@@ -85,6 +85,26 @@ curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh |
 
 ---
 
+## DevContainer setup
+
+```
+{
+  "name": "<project-name>",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "joverina.rina-hermes-acp",
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  "postCreateCommand": "export INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh; bash -c $(curl -fsSL $INSTALL_URL)",
+  "postStartCommand":  "bash ./.minions/boot.sh"
+}
+
+```
+---
+
 ## Branch install (PR/dev testing)
 
 ```bash
