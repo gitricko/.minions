@@ -87,6 +87,7 @@ curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh |
 
 ## DevContainer setup
 
+file: `.devcontainer/devcontainer.json`
 ```
 {
   "name": "<project-name>",
