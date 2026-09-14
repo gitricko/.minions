@@ -98,10 +98,9 @@ curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh |
       ]
     }
   },
-  "postCreateCommand": "export INSTALL_URL=https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh; bash -c $(curl -fsSL $INSTALL_URL)",
-  "postStartCommand":  "bash ./.minions/boot.sh"
+  "postCreateCommand": "curl -fsSL https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh | bash",
+  "postStartCommand":  "bash $HOME/.minions/boot.sh >> /tmp/.minions.log 2>&1"
 }
-
 ```
 ---
 
