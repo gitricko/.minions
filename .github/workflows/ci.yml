@@ -33,7 +33,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.2'
+          node-version-file: .node-version
 
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -47,6 +47,11 @@ jobs:
         run: |
           set -e
           bash tests/test_boot.sh
+
+      - name: Run self-update tests
+        run: |
+          set -e
+          bash tests/test_self_update.sh
 
       - name: Knowledge layer global checks (F1 shell syntax, F3 JSON, F5 no .devcontainer refs)
         run: |
@@ -96,7 +101,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.2'
+          node-version-file: .node-version
 
       - name: Install uv (for Hermes)
         run: curl -LsSf https://astral.sh/uv/install.sh | sh

@@ -1,0 +1,66 @@
+# self-update.yml — scheduled dependency self-update (skeleton).
+# Wakes on cron, checks upstreams, bumps + opens a batch PR, merges when green,
+# and fixes red PRs by booting minion from stable main in the runner.
+#
+# This is the DRAFT shape. Merge/check/fix helpers land here incrementally.
+
+name: Self-Update
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"          # 03:00 UTC every Monday (tune cadence)
+  workflow_dispatch: {}          # manual kick for testing
+
+permissions:
+  contents: write                # merge + push
+  pull-requests: write           # open/update/close PRs
+  checks: read                   # poll check status
+
+env:
+  MINIONS_HOME: "${{ runner.home }}/.minions"
+
+concurrency:
+  group: self-update
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check for updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Detect outdated dependencies
+        id: check
+        run: |
+          scripts/check-updates.sh --json > /tmp/check.json
+          cat /tmp/check.json
+          # a) no updates -> exit early (no-op)
+
+      - name: Skip if an update PR already exists (D4)
+        run: |
+          echo "TODO: gh pr list --state open 'in:title self-update' -> if any, skip"
+
+      - name: Create batch bump PR (D3)
+        run: |
+          # TODO: parse /tmp/check.json -> args
+          # scripts/bump.sh --open-pr DEP=VERSION ...
+
+  merge-or-fix:
+    name: Merge green / fix red PRs
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Poll CI and merge green PRs (D7, D9)
+        run: |
+          echo "TODO: poll checks; green -> own merge; bump MINIONS_VERSION (D5)"
+
+      - name: Boot minion from stable main (D10) and fix red PR
+        run: |
+          echo "TODO: on red -> ./install.sh && boot.sh, invoke fix-agent with"
+          echo "(PR, failed check, dep->version), push, re-run CI, loop <=3 attempts"
+          echo "then leave PR open + label 'self-update: needs-review' for human (D9)"

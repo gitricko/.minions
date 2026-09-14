@@ -1,0 +1,55 @@
+# Self-update dependency catalog — schema v1
+# Source of truth for scripts/check-updates.sh and scripts/bump.sh.
+# One entry per <NAME>_VERSION in etc/versions.env.
+#
+# source_type:
+#   github_tag      latest version = latest tag matching selector (in repo)
+#   npm             latest version = dist-tag 'channel' on the npm registry
+#   release_tarball latest version = latest matching release tag on the repo
+#
+# sha_source: only deps whose tarballs download.sh hashes (NODE/UV) need one.
+#   shasums:        parse a SHASUMS256.txt/sha256 file at release_url
+#   release_assets: digests published as release assets
+#   none:           no integrity gate (npm verifies itself; hermes has none)
+
+dependencies:
+  - name: HERMES                       # github_tag
+    source_type: github_tag
+    repo: NousResearch/hermes-agent
+    selector: "v20*"
+    sha_source: none
+
+  - name: PI                           # npm
+    source_type: npm
+    package: "@earendil-works/pi-coding-agent"
+    channel: latest
+    sha_source: none                   # npm resolves + verifies integrity itself
+
+  - name: OMNIROUTE                    # npm
+    source_type: npm
+    package: omniroute
+    channel: latest
+    sha_source: none
+
+  - name: MODELRELAY                   # npm
+    source_type: npm
+    package: modelrelay
+    channel: latest
+    sha_source: none
+
+  - name: NODE                         # release_tarball
+    source_type: release_tarball
+    release_url: https://nodejs.org/dist/v{{VERSION}}/
+    sha_source: shasums                # SHASUMS256.txt (linux/macos × x64/arm64)
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+
+  - name: UV                           # release_tarball
+    source_type: release_tarball
+    release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
+    sha_source: release_assets
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+
+  - name: MINIONS                      # self-referential
+    source_type: git_tag
+    repo: gitricko/.minions            # bumps are authored in-repo (D5), not fetched
+    sha_source: none
