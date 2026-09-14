@@ -112,32 +112,9 @@ import_mnemon_seed() {
 
 # Setup Mnemon for all targets (hermes, pi, etc.)
 # Usage: setup_mnemon_all <minions_home>
+# Note: mnemon setup is disabled — user has their own mnemon plugin.
+# This function is a no-op (kept for compatibility with install.sh).
 setup_mnemon_all() {
-    minions_home=$1
-
-    echo "Setting up Mnemon for all targets..."
-
-    # Use local mnemon if available, otherwise fall back to system
-    if [ -x "${minions_home}/bin/mnemon" ]; then
-        MNEMON_BIN="${minions_home}/bin/mnemon"
-    elif command -v mnemon >/dev/null 2>&1; then
-        MNEMON_BIN="mnemon"
-    else
-        echo "Mnemon not available, skipping setup" >&2
-        return 0
-    fi
-
-    # Setup for Pi
-    # "${MNEMON_BIN}" setup --target pi --global --yes 2>/dev/null || echo "WARNING: Mnemon Pi setup failed" >&2  # disabled per user request
-
-    # Setup for Hermes
-    "${MNEMON_BIN}" setup --target hermes --global --yes 2>/dev/null || echo "WARNING: Mnemon Hermes setup failed" >&2
-
-    # Import seeds if they exist
-    for target in pi hermes; do
-        seed_file="${minions_home}/etc/mnemon-seed-${target}.json"
-        if [ -f "${seed_file}" ]; then
-            import_mnemon_seed "${target}" "${seed_file}" "default"
-        fi
-    done
+    echo "Mnemon setup disabled (user has their own mnemon plugin)."
+    return 0
 }
