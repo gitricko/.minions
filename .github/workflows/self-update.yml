@@ -28,7 +28,7 @@ permissions:
   checks: read                   # poll check status
 
 env:
-  MINIONS_HOME: "${{ github.run_home }}/.minions"
+  MINIONS_HOME: "/home/runner/.minions"
   GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
 concurrency:
