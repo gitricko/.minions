@@ -17,7 +17,7 @@ dependencies:
     sha_source: none
 
   - name: HERMES
-    version: "v2026.9.11"
+    version: "v2026.9.14"
     source_type: github_tag
     repo: NousResearch/hermes-agent
     selector: "v20*"
@@ -58,14 +58,14 @@ dependencies:
       macos_arm64: "f58e5044b938a3174184de4aaf1d2bbfcfff812e88220ff08e9221c09f5c8677"
 
   - name: UV
-    version: "0.6.14"
+    version: "0.12.15"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "0aaf451c391d3913823bfb8ed354b446dcfd0553a32ed8266611e4181c61fd51"
-      linux_arm64: "ea25597354af186bdd55aee0de431e16d45d82951a4f41f065a8e4dc27885265"
-      macos_x64: "1d8ecb2eb3b68fb50e4249dc96ac9d2458dc24068848f04f4c5b42af2fd26552"
-      macos_arm64: "4ea4731010fbd1bc8e790e07f199f55a5c7c2c732e9b77f85e302b0bee61b756"
+      linux_x64: "f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638"
+      linux_arm64: "0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
+      macos_x64: "e9ca61775532368fe518ab03e7a354c7ecab8ccb3c7d941c775fcc4a362b801b"
+      macos_arm64: "dc304b9ed1b24174572290fba60ac3f6fe63c73a671f0439e62a91375841964d"
