@@ -1,0 +1,69 @@
+# Self-update dependency catalog — schema v2
+# SINGLE SOURCE OF TRUTH for the dependency self-update system.
+# scripts/sync-versions.sh generates etc/versions.env from this file.
+# scripts/check-updates.sh and scripts/bump.sh read from this file.
+#
+# version: current pinned version (the pin). This is the source of truth.
+# source_type: github_tag | npm | release_tarball | git_tag
+# sha_source: shasums | release_assets | none  (where to fetch the digest)
+# sha256: per-platform digests, populated by bump.sh for tarball deps.
+#         Empty strings match the current placeholder state until fetched.
+
+dependencies:
+  - name: MINIONS
+    version: "1.0.0"
+    source_type: git_tag
+    repo: gitricko/.minions
+    sha_source: none
+
+  - name: HERMES
+    version: "v2026.9.11"
+    source_type: github_tag
+    repo: NousResearch/hermes-agent
+    selector: "v20*"
+    sha_source: none
+
+  - name: PI
+    version: "0.85.1"
+    source_type: npm
+    package: "@earendil-works/pi-coding-agent"
+    channel: latest
+    sha_source: none
+
+  - name: OMNIROUTE
+    version: "3.8.50"
+    source_type: npm
+    package: omniroute
+    channel: latest
+    sha_source: none
+
+  - name: MODELRELAY
+    version: "1.22.1"
+    source_type: npm
+    package: modelrelay
+    channel: latest
+    sha_source: none
+
+  - name: NODE
+    version: "22.22.2"
+    source_type: release_tarball
+    release_url: https://nodejs.org/dist/v{{VERSION}}/
+    sha_source: shasums
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+    sha256:
+      linux_x64: "PLACEHOLDER_NODE_LINUX_X64_SHA256"
+      linux_arm64: "PLACEHOLDER_NODE_LINUX_ARM64_SHA256"
+      macos_x64: "PLACEHOLDER_NODE_MACOS_X64_SHA256"
+      macos_arm64: "PLACEHOLDER_NODE_MACOS_ARM64_SHA256"
+
+  - name: UV
+    version: "0.6.14"
+    source_type: release_tarball
+    release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
+    sha_source: release_assets
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+    sha256:
+      linux_x64: "PLACEHOLDER_UV_LINUX_X64_SHA256"
+      linux_arm64: "PLACEHOLDER_UV_LINUX_ARM64_SHA256"
+      macos_x64: "PLACEHOLDER_UV_MACOS_X64_SHA256"
+      macos_arm64: "PLACEHOLDER_UV_MACOS_ARM64_SHA256"

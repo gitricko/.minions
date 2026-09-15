@@ -198,10 +198,29 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
 
-# Copy versions.env so lib scripts can source it from MINIONS_HOME
+# Ensure python3 + pyyaml for sync-versions.sh (single source of truth).
+# sync-versions.sh must generate etc/versions.env from deps.yaml.
+ensure_python_yaml() {
+    if python3 -c "import yaml" >/dev/null 2>&1; then
+        return 0
+    fi
+    if command -v apt-get >/dev/null 2>&1; then
+        log_info "Installing python3-yaml (required by sync-versions.sh)..."
+        (apt-get update -qq && apt-get install -y -qq python3-yaml) >/dev/null 2>&1 || true
+    fi
+    if ! python3 -c "import yaml" >/dev/null 2>&1; then
+        log_error "python3 + pyyaml required by sync-versions.sh but could not be installed."
+        return 1
+    fi
+    return 0
+}
+if [ -f "${SCRIPT_DIR}/scripts/sync-versions.sh" ]; then
+    ensure_python_yaml || log_warn "sync-versions.sh skipped (python3/pyyaml unavailable; using template versions.env)"
+    bash "${SCRIPT_DIR}/scripts/sync-versions.sh" >/dev/null 2>&1 || log_warn "sync-versions.sh failed"
+fi
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     cp -f "${SCRIPT_DIR}/etc/versions.env" "${MINIONS_HOME}/etc/versions.env"
-    log_info "Copied versions.env to ${MINIONS_HOME}/etc/"
+    log_info "Copied generated versions.env to ${MINIONS_HOME}/etc/"
 fi
 
 # Copy Mnemon seed templates to MINIONS_HOME/etc (available for user's own mnemon plugin; minions no longer imports them)
@@ -227,7 +246,7 @@ cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null 
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/pi-settings.sh"
 
-# Step 2: Source versions
+# Step 2: Source versions (generated from deps.yaml)
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     # shellcheck disable=SC1090,SC1091
     . "${SCRIPT_DIR}/etc/versions.env"
