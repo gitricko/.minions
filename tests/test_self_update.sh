@@ -229,6 +229,54 @@ test_sync_versions_generates() {
   rm -rf "$tmpdir"
 }
 
+# ─── SHA fetch (D8): hermetic fixture test for populate_shas ──
+# Fixtures under tests/fixtures/sha imitate the upstream manifests.
+# SHA_FETCH_BASE redirects populate_shas to those local files instead of
+# the network, so this runs offline.
+_fixture_sha_fetch() { # tmpenv tmpdeps tmpnode
+  local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
+  # NODE (sha_source: shasums -> SHASUMS256.txt)
+  if ! SHA_FETCH_BASE="${REPO_ROOT}/tests/fixtures/sha" \
+      VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
+      bash "${REPO_ROOT}/scripts/bump.sh" --open-pr NODE=22.22.2 >/dev/null 2>&1; then
+    bad "sha-fetch NODE" "non-zero exit"; return 1
+  fi
+  # NODE linux_x64 digest == dddd44... (fixture), macos_arm64 == aaaa11... (darwin-arm64)
+  grep -q 'linux_x64: "dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444"' "$tmpdeps" \
+    || { bad "sha-fetch NODE" "linux_x64 sha wrong"; return 1; }
+  grep -q 'macos_arm64: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"' "$tmpdeps" \
+    || { bad "sha-fetch NODE" "darwin-arm64 sha wrong"; return 1; }
+  # UV (sha_source: release_assets -> per-asset .sha256)
+  if ! SHA_FETCH_BASE="${REPO_ROOT}/tests/fixtures/sha" \
+      VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
+      bash "${REPO_ROOT}/scripts/bump.sh" --open-pr UV=0.6.14 >/dev/null 2>&1; then
+    bad "sha-fetch UV" "non-zero exit"; return 1
+  fi
+  grep -q 'linux_x64: "1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff"' "$tmpdeps" \
+    || { bad "sha-fetch UV" "linux_x64 sha wrong"; return 1; }
+  grep -q 'macos_arm64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"' "$tmpdeps" \
+    || { bad "sha-fetch UV" "darwin-arm64 sha wrong"; return 1; }
+  # sync-versions must have propagated one fetched digest into versions.env
+  grep -q 'NODE_SHA256_LINUX_X64="dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444"' "$tmpenv" \
+    || { bad "sha-fetch NODE" "versions.env not regenerated"; return 1; }
+  ok "bump.sh --open-pr fetches real SHAs for NODE/UV (fixture, D8)"
+}
+test_sha_fetch() { with_temp_env _fixture_sha_fetch; }
+
+# ─── SHA fetch: bare bumps (no --open-pr) must NOT touch sha256 ──
+_fixture_sha_untouched() { # tmpenv tmpdeps tmpnode
+  local tmpenv="$1" tmpdeps="$2" tmpnode="$3" source_sha256 after_sha256
+  source_sha256=$(python3 -c "import yaml; d=yaml.safe_load(open('$tmpdeps')); print(d['dependencies'][5]['sha256'].get('linux_x64',''))")
+  bash "${REPO_ROOT}/scripts/bump.sh" NODE=22.22.2 >/dev/null 2>&1 || {
+    bad "sha-untouched bump" "non-zero exit"; return 1
+  }
+  after_sha256=$(python3 -c "import yaml; d=yaml.safe_load(open('$tmpdeps')); print(d['dependencies'][5]['sha256'].get('linux_x64',''))")
+  [ "$source_sha256" = "$after_sha256" ] && [ -n "$source_sha256" ] \
+    && ok "bare bump leaves sha256 unchanged (no --open-pr)" \
+    || { bad "bare bump sha untouched" "sha256 changed or empty"; return 1; }
+}
+test_sha_untouched() { with_temp_env _fixture_sha_untouched; }
+
 # ─── Run all ─────────────────────────────────────────────
 test_deps_yaml_parses
 test_catalog_has_versions
@@ -244,6 +292,8 @@ test_bump_dry_run_no_mutation
 test_bump_real_write
 test_bump_only_touches_target
 test_sync_versions_generates
+test_sha_fetch
+test_sha_untouched
 
 echo ""
 echo "PASS=${PASS} FAIL=${FAIL}"

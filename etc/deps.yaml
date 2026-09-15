@@ -52,10 +52,10 @@ dependencies:
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "PLACEHOLDER_NODE_LINUX_X64_SHA256"
-      linux_arm64: "PLACEHOLDER_NODE_LINUX_ARM64_SHA256"
-      macos_x64: "PLACEHOLDER_NODE_MACOS_X64_SHA256"
-      macos_arm64: "PLACEHOLDER_NODE_MACOS_ARM64_SHA256"
+      linux_x64: "88fd1ce767091fd8d4a99fdb2356e98c819f93f3b1f8663853a2dee9b438068a"
+      linux_arm64: "e9e1930fd321a470e29bb68f30318bf58e3ecb4acb4f1533fb19c58328a091fe"
+      macos_x64: "b6a384bba1a7ec585e5a91a452b63f676b940584ff57b5c9cf0541c8db60023e"
+      macos_arm64: "f8655beb4b86ff6588ed7e02c37f8574b58557bd3e880012814b1a4956fd9d88"
 
   - name: UV
     version: "0.6.14"
@@ -65,7 +65,7 @@ dependencies:
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "PLACEHOLDER_UV_LINUX_X64_SHA256"
-      linux_arm64: "PLACEHOLDER_UV_LINUX_ARM64_SHA256"
-      macos_x64: "PLACEHOLDER_UV_MACOS_X64_SHA256"
-      macos_arm64: "PLACEHOLDER_UV_MACOS_ARM64_SHA256"
+      linux_x64: "0aaf451c391d3913823bfb8ed354b446dcfd0553a32ed8266611e4181c61fd51"
+      linux_arm64: "ea25597354af186bdd55aee0de431e16d45d82951a4f41f065a8e4dc27885265"
+      macos_x64: "1d8ecb2eb3b68fb50e4249dc96ac9d2458dc24068848f04f4c5b42af2fd26552"
+      macos_arm64: "4ea4731010fbd1bc8e790e07f199f55a5c7c2c732e9b77f85e302b0bee61b756"
