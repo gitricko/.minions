@@ -1,8 +1,8 @@
 # PROPOSAL — Self-Updating Dependencies
 
-**Status:** Design (iteration 1) — drafted from a grilling session, not yet implemented
+**Status:** Design (iteration 1) + implementation (adapters, orchestrator, fix-helper done)
 **Owner:** custody via pi/Hermes discussion
-**Related:** `etc/versions.env`, `etc/deps.yaml`, `scripts/check-updates.sh`, `scripts/bump.sh`, `.github/workflows/self-update.yml`, `skills/{tdd,grill-with-docs,domain-modeling}/`
+**Related:** `etc/versions.env`, `etc/deps.yaml`, `scripts/check-updates.sh`, `scripts/bump.sh`, `scripts/sync-versions.sh`, `scripts/self-update-fix.sh`, `.github/workflows/self-update.yml`, `skills/{tdd,grill-with-docs,domain-modeling,self-update-fix}/`
 
 ## tl;dr
 
@@ -33,18 +33,19 @@ generated `.node-version` file, not by editing CI.
 
 **Non-goals**
 - Not re-inventing a lockfile resolver — one version per component, as now.
-- No LLM involvement in a *clean* bump (deterministic code only).
-- No unattended agent in the cron happy path (no LLM to talk to in a fresh runner).
+- No LLM involved in a *clean* bump (deterministic code only).
+- No unattended agent in the cron happy path (LLM comes from booting minion in the runner).
 
 ## Skills in this repo (loaded during design)
 
-These were ported from mattpocock/skills for the design session and will govern implementation.
+These were ported from mattpocock/skills for the design session and govern implementation.
 
 | Skill | Status | Use |
 |-------|--------|-----|
 | `tdd` | **ported** (`skills/tdd/`) | RED→GREEN→REFACTOR; tests before code; test at seams |
 | `grill-with-docs` | **ported** (`skills/grill-with-docs/`) | Relentless interview to sharpen the plan (this doc) |
-| `domain-modeling` | **ported** (`skills/domain-modeling/`) | Actively build/sharpen the domain model; `CONTEXT.md`, ADRs, glossary |
+| `domain-modeling` | **ported** (`skills/domain-modeling/`) | Build/sharpen the domain model; `CONTEXT.md`, ADRs, glossary |
+| `self-update-fix` | **TODO** (`skills/self-update-fix/`) | Fix-agent skill: how to edit + D2 guardrails (see README) |
 | `karpathy-coding-guidelines` | existing | Minimal, surgical, verified changes |
 | `ci-lint-check` | existing | Pre-commit lint before push |
 | `codespace-gh-auth` | existing | GitHub token for PR push |
@@ -97,20 +98,26 @@ These were ported from mattpocock/skills for the design session and will govern 
 
 ## Architecture
 
-- `scripts/check-updates.sh` — read-only freshness detector (schema v2). Emits a machine-readable report. Per-source adapters (github_tag / npm / release_tarball) ship with the next iteration.
-- `scripts/bump.sh` — deterministic bump + `.node-version` regen + SHA256 for NODE/UV. Dry-run never mutates files. Tests validated (PASS=11 FAIL=0).
-- `scripts/sync-versions.sh` — generates `etc/versions.env` from `etc/deps.yaml`. Guard mode (`--check`) available.
-- `etc/deps.yaml` — schema v2: each dep has `version`, `source_type`, optional `selector`, `sha_source`, `sha256` per platform. **Single source of truth.** When you edit a `version` here and run `scripts/sync-versions.sh`, `etc/versions.env` updates automatically.
+- `scripts/check-updates.sh` — read-only freshness detector. Has three working source adapters:
+  - `github_tag` — queries GitHub API tags, filters by selector (glob), returns latest.
+  - `npm` — queries npm registry for `pkg@channel` latest version.
+  - `release_tarball` — queries GitHub tags for repo (handles non-v-prefixed tags).
+  Emits a machine-readable JSON report with `latest` and `outdated` per dep.
+- `scripts/bump.sh` — deterministic bump + `.node-version` regen. Edits `deps.yaml` (source of truth), calls `sync-versions.sh`. Dry-run never mutates files. Tests validated (PASS=14 FAIL=0).
+- `scripts/sync-versions.sh` — generates `etc/versions.env` from `etc/deps.yaml`. Guard mode (`--check`) available. Exits non-zero if python3/pyyaml unavailable.
+- `scripts/self-update-fix.sh` — fix-loop helper. Boots minion from stable main, invokes fix-agent, pushes fixes. Currently a documented placeholder (exits 1 until `skills/self-update-fix/` is authored).
+- `etc/deps.yaml` — schema v2: each dep has `version`, `source_type`, optional `selector`, `sha_source`, `sha256` per platform, `repo`. **Single source of truth.** When you edit a `version` here and run `scripts/sync-versions.sh`, `etc/versions.env` updates automatically.
 - `etc/versions.env` — generated lockfile; auto-generated (never hand-edited). Copied to `MINIONS_HOME` by `install.sh` during boot.
-- `scripts/self-update.yml` — cron orchestrator skeleton (check → bump → merge-green → fix-red).
+- `.github/workflows/self-update.yml` — cron orchestrator (check → bump → merge-green → fix-red). Uses `gh` CLI for merge/fix, polls CI via `gh api`.
 - `etc/self-update-skip.json` — **deleted**: D4 makes this redundant. A PR the agent can't fix stays open, labeled `self-update: needs-review`, for a human. D4 naturally blocks newer versions until the human acts.
-- `tests/test_self_update.sh` — 11 unit tests (catalog integrity, dry-run non-mutation, hermetic bump behavior), all green.
+- `tests/test_self_update.sh` — 14 unit tests (catalog integrity, JSON structure, offline mode, comparison logic, dry-run non-mutation, hermetic bump behavior, sync-versions), all green.
 
 ## Open items / next steps
 
-- [ ] Author source adapters in `check-updates.sh` (github_tag / npm / release_tarball).
-- [ ] Implement SHA fetch for NODE/UV in `bump.sh` (next iteration).
-- [ ] Author the fix-agent skill (`skills/self-update-fix/`) that tells the agent how to edit + the D2 guardrails (never touch `.github/workflows/`).
+- [ ] **Author the fix-agent skill** (`skills/self-update-fix/SKILL.md`) — tells the agent how to edit + D2 guardrails (never touch `.github/workflows/`). `scripts/self-update-fix.sh` delegates to this skill. See `skills/self-update-fix/README.md`.
+- [ ] Implement SHA fetch for NODE/UV in `bump.sh` (populate real SHAs from `SHASUMS256.txt` / release assets).
+- [ ] Author the `self-update-fix` skill so the fix loop actually works (currently exits 1).
 - [ ] Decide poll cadence + timeout budgets (esp. for `dts-integration` ~60min).
-- [ ] Validate CI integration: run `bash scripts/check-updates.sh --json` + poll checks + own merge script.
-- [ ] Add `node-version-file: .node-version` to `.github/workflows/ci.yml` (D6 already done in this repo; ensure both setup-node steps read it).
+- [ ] Add `node-version-file: .node-version` to `.github/workflows/ci.yml` (D6 already done; both setup-node steps read it).
+- [ ] Validate CI integration: run `bash scripts/check-updates.sh --json` + poll checks + own merge script in a real run.
+- [ ] Add `python3-yaml` as a documented prerequisite for install.sh (currently installed in DTS apt deps).
