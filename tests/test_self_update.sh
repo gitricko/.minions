@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # tests/test_self_update.sh — unit tests for the self-update scaffolding:
 #   - etc/deps.yaml catalog integrity vs etc/versions.env
-#   - scripts/check-updates.sh (read-only contract)
+#   - scripts/check-updates.sh (read-only contract, adapters, comparison)
 #   - scripts/bump.sh (hermetic, temp fixtures; dry-run never mutates)
+#   - scripts/sync-versions.sh (generates versions.env from deps.yaml)
 #
 # Usage:
 #   bash tests/test_self_update.sh
@@ -19,10 +20,7 @@ ok()  { PASS=$((PASS+1)); echo "PASS: $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL: $1 — $2"; }
 
 # ─── Guard fixture helper ──────────────────────────────────────────────
-# Copy real versions.env AND deps.yaml into a temp dir; run a fixture
-# function (given by NAME) with all env overrides set; clean up;
-# propagate exit code.
-with_temp_env() { # <fixture-fn-name>
+with_temp_env() {
   local fn="$1" tmpdir tmpenv tmpdeps tmpnode rc
   tmpdir="$(mktemp -d)"
   tmpenv="$tmpdir/versions.env"
@@ -30,8 +28,6 @@ with_temp_env() { # <fixture-fn-name>
   tmpnode="$tmpdir/.node-version"
   cp "${D}" "$tmpenv"
   cp "${Y}" "$tmpdeps"
-  # Do NOT pre-create .node-version — dry-run should not create it,
-  # and real-run should write it.
   VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
     "$fn" "$tmpenv" "$tmpdeps" "$tmpnode"
   rc=$?
@@ -86,7 +82,63 @@ test_check_updates_missing_catalog() {
   rm -rf "$tmpdir"
 }
 
-# ─── Test 5: bump.sh requires at least one DEP=VERSION ───────────
+# ─── Test 5: check-updates.sh --json produces valid structure ──
+test_check_updates_structure() {
+  local out
+  out="$(bash "${REPO_ROOT}/scripts/check-updates.sh" --json 2>/dev/null)" || {
+    bad "check-updates structure" "non-zero exit"; return 1
+  }
+  echo "$out" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+assert "catalog" in d, "missing catalog"
+assert "outdated" in d, "missing outdated"
+assert isinstance(d["outdated"], list), "outdated not a list"
+for r in d["outdated"]:
+    for k in ["name", "version", "source_type", "latest", "outdated"]:
+        assert k in r, f"missing {k} in {r}"
+' && ok "check-updates.sh --json produces valid structure" || bad "check-updates structure" "invalid JSON structure"
+}
+
+# ─── Test 6: check-updates.sh --offline returns null for all ──
+test_check_updates_offline() {
+  local out
+  out="$(bash "${REPO_ROOT}/scripts/check-updates.sh" --json --offline 2>/dev/null)" || {
+    bad "check-updates --offline" "non-zero exit"; return 1
+  }
+  echo "$out" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+for r in d["outdated"]:
+    assert r["latest"] is None
+' && ok "check-updates.sh --offline returns latest=null for all deps" || bad "check-updates --offline" "not all latest null"
+}
+
+# ─── Test 7: comparison logic (semver_tuple, is_outdated) ──────
+test_check_updates_comparison() {
+  python3 - <<'PY' && ok "check-updates comparison logic (semver_tuple, is_outdated)" || bad "check-updates comparison" "comparison logic failed"
+import re
+def semver_tuple(v):
+    s = str(v).lstrip('v').strip()
+    return tuple(int(x) for x in re.split(r'[.]', s)[:3])
+def is_outdated(current, latest):
+    if not latest or not current: return None
+    c, l = semver_tuple(current), semver_tuple(latest)
+    if c is None or l is None: return None
+    return l > c
+
+assert is_outdated('1.0.0', '1.0.1') == True
+assert is_outdated('1.0.1', '1.0.0') == False
+assert is_outdated('1.0.0', '1.0.0') == False
+assert is_outdated('v2026.9.11', 'v2026.9.14') == True
+assert is_outdated('22.22.2', 'v26.8.2') == True
+assert is_outdated('0.6.14', '0.12.15') == True
+assert is_outdated('1.0.0', None) == None
+print('all comparison tests passed')
+PY
+}
+
+# ─── Test 8: bump.sh requires at least one DEP=VERSION ───────────
 test_bump_requires_arg() {
   if bash "${REPO_ROOT}/scripts/bump.sh" >/dev/null 2>&1; then
     bad "bump.sh no-args" "expected usage error/non-zero exit"
@@ -95,7 +147,7 @@ test_bump_requires_arg() {
   fi
 }
 
-# ─── Test 6: bump.sh unknown arg exits non-zero ──────────────────
+# ─── Test 9: bump.sh unknown arg exits non-zero ──────────────────
 test_bump_unknown_arg() {
   if bash "${REPO_ROOT}/scripts/bump.sh" --bogus NODE=1 >/dev/null 2>&1; then
     bad "bump.sh unknown arg" "expected non-zero exit"
@@ -104,7 +156,7 @@ test_bump_unknown_arg() {
   fi
 }
 
-# ─── Test 7: bump.sh rejects bumping a non-existent component ────
+# ─── Test 10: bump.sh rejects bumping a non-existent component ────
 test_bump_unknown_component() {
   if bash "${REPO_ROOT}/scripts/bump.sh" NOPE_APP=9.9.9 >/dev/null 2>&1; then
     bad "bump.sh unknown component" "expected non-zero exit"
@@ -113,7 +165,7 @@ test_bump_unknown_component() {
   fi
 }
 
-# ─── Test 8: dry-run must NOT modify versions.env ────────────────
+# ─── Test 11: dry-run must NOT modify versions.env ────────────────
 _fixture_dry_run() { # tmpenv tmpdeps tmpnode
   local tmpenv="$1" tmpdeps="$2" tmpnode="$3" before after
   before=$(sha256sum "$tmpenv" | awk '{print $1}')
@@ -124,7 +176,6 @@ _fixture_dry_run() { # tmpenv tmpdeps tmpnode
   after=$(sha256sum "$tmpenv" | awk '{print $1}')
   [ "$before" = "$after" ] || { bad "dry-run no mutation" "versions.env checksum changed"; return 1; }
   [ ! -e "$tmpnode" ] || { bad "dry-run no mutation" ".node-version was created"; return 1; }
-  # Also verify deps.yaml was NOT modified
   local deps_before=$(sha256sum "${Y}" | awk '{print $1}')
   local deps_after=$(sha256sum "$tmpdeps" | awk '{print $1}')
   [ "$deps_before" = "$deps_after" ] || { bad "dry-run no mutation" "deps.yaml changed"; return 1; }
@@ -132,7 +183,7 @@ _fixture_dry_run() { # tmpenv tmpdeps tmpnode
 }
 test_bump_dry_run_no_mutation() { with_temp_env _fixture_dry_run; }
 
-# ─── Test 9: real run bumps the version line and regenerates .node-version
+# ─── Test 12: real run bumps the version line and regenerates .node-version
 _fixture_real_write() { # tmpenv tmpdeps tmpnode
   local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
   if ! VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
@@ -146,7 +197,7 @@ _fixture_real_write() { # tmpenv tmpdeps tmpnode
 }
 test_bump_real_write() { with_temp_env _fixture_real_write; }
 
-# ─── Test 10: bumping NODE_VERSION leaves OTHER pins unchanged ─
+# ─── Test 13: bumping NODE_VERSION leaves OTHER pins unchanged ─
 _fixture_only_target() { # tmpenv tmpdeps tmpnode
   local tmpenv="$1" tmpdeps="$2" tmpnode="$3" before after
   before=$(grep . "$tmpenv" | sed /^NODE_VERSION=/d | sha256sum | awk '{print $1}')
@@ -160,7 +211,7 @@ _fixture_only_target() { # tmpenv tmpdeps tmpnode
 }
 test_bump_only_touches_target() { with_temp_env _fixture_only_target; }
 
-# ─── Test 11: sync-versions.sh generates versions.env from deps.yaml
+# ─── Test 14: sync-versions.sh generates versions.env from deps.yaml
 test_sync_versions_generates() {
   local tmpdir tmpenv tmpdeps
   tmpdir="$(mktemp -d)"
@@ -168,7 +219,6 @@ test_sync_versions_generates() {
   tmpdeps="$tmpdir/deps.yaml"
   cp "${D}" "$tmpenv"
   cp "${Y}" "$tmpdeps"
-  # sync-versions.sh should produce versions.env with NODE_VERSION line
   VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" \
     bash "${REPO_ROOT}/scripts/sync-versions.sh" >/dev/null 2>&1 || {
     bad "sync-versions.sh" "non-zero exit"; rm -rf "$tmpdir"; return 1
@@ -179,11 +229,14 @@ test_sync_versions_generates() {
   rm -rf "$tmpdir"
 }
 
-# ─── Run all ─────────────────────────────────────────────────────
+# ─── Run all ─────────────────────────────────────────────
 test_deps_yaml_parses
 test_catalog_has_versions
 test_check_updates_json
 test_check_updates_missing_catalog
+test_check_updates_structure
+test_check_updates_offline
+test_check_updates_comparison
 test_bump_requires_arg
 test_bump_unknown_arg
 test_bump_unknown_component
