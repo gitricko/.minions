@@ -116,7 +116,7 @@ These were ported from mattpocock/skills for the design session and govern imple
 
 - [x] **Author the fix-agent skill** (`skills/self-update-fix/SKILL.md`) — tells the agent how to edit + D2 guardrails (never touch `.github/workflows/`). `scripts/self-update-fix.sh` delegates to this skill. See `skills/self-update-fix/README.md`.
 - [x] Implement SHA fetch for NODE/UV in `bump.sh` (populate real SHAs from `SHASUMS256.txt` / release assets). `bump.sh --open-pr` fetches real SHAs; `SHA_FETCH_BASE` env override enables hermetic fixture-based tests (PR #36).
-- [ ] Decide poll cadence + timeout budgets (esp. for `dts-integration` ~60min).
-- [ ] Add `python3-yaml` as a documented prerequisite for install.sh (`install.sh` already has `ensure_python_yaml()`; currently only in DTS apt deps).
-- [ ] Add `node-version-file: .node-version` to `.github/workflows/ci.yml` (D6 already done; both setup-node steps read it).
+- [x] Decide poll cadence + timeout budgets (esp. for `dts-integration` ~60min) — documented in `self-update.yml` header (30s poll via gh api, 20min CI budget, 48min worst-case with fix loop).
+- [x] Add `python3-yaml` as a documented prerequisite for install.sh — added to `install.sh` header; `ensure_python_yaml()` already handles install automatically.
+- [x] Add `node-version-file: .node-version` to `.github/workflows/ci.yml` (D6) — both setup-node steps read it; verified in ci.yml.
 - [x] Validate CI integration: run `bash scripts/check-updates.sh --json` + poll checks + own merge script in a real run (already validated via PR #36 CI).
