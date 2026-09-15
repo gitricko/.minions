@@ -198,10 +198,14 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
 
-# Copy versions.env so lib scripts can source it from MINIONS_HOME
+# Generate versions.env from deps.yaml (single source of truth),
+# then copy it to MINIONS_HOME so lib scripts can source it there.
+if [ -f "${SCRIPT_DIR}/scripts/sync-versions.sh" ]; then
+    bash "${SCRIPT_DIR}/scripts/sync-versions.sh" >/dev/null 2>&1 || log_warn "sync-versions.sh failed"
+fi
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     cp -f "${SCRIPT_DIR}/etc/versions.env" "${MINIONS_HOME}/etc/versions.env"
-    log_info "Copied versions.env to ${MINIONS_HOME}/etc/"
+    log_info "Copied generated versions.env to ${MINIONS_HOME}/etc/"
 fi
 
 # Copy Mnemon seed templates to MINIONS_HOME/etc (available for user's own mnemon plugin; minions no longer imports them)
@@ -227,7 +231,7 @@ cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null 
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/pi-settings.sh"
 
-# Step 2: Source versions
+# Step 2: Source versions (generated from deps.yaml)
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     # shellcheck disable=SC1090,SC1091
     . "${SCRIPT_DIR}/etc/versions.env"

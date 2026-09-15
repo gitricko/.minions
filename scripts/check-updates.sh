@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
 # check-updates.sh — read-only dependency freshness report.
-# Sources etc/versions.env (current pins) + etc/deps.yaml (how to check each)
-# and reports which are outdated. Never writes, never opens a PR.
-#
-# Only the SMALLEST guaranteed contract is implemented here (skeleton).
-# The per-source adapters (github_tag / npm / release_tarball) land in v2.
+# Reads the current pin from etc/deps.yaml (the single source of truth),
+# compares against upstream (adapters in v2), and reports outdated deps.
+# Never writes, never opens a PR.
 #
 # Usage: scripts/check-updates.sh [--json] [--offline]
 # Env overrides (for hermetic tests): VERSIONS_ENV, DEPS_YAML.
 
 set -u
-
-# Resolve paths, honoring env overrides so tests can point at temp fixtures.
-[ -z "${VERSIONS_ENV:-}" ] && VERSIONS_ENV="$(cd "$(dirname "$0")/../etc" && pwd)/versions.env"
 [ -z "${DEPS_YAML:-}" ] && DEPS_YAML="$(cd "$(dirname "$0")/../etc" && pwd)/deps.yaml"
 
 JSON=0
@@ -24,18 +19,27 @@ for arg in "$@"; do
   esac
 done
 
-[ -f "${VERSIONS_ENV}" ] || { echo "missing ${VERSIONS_ENV}" >&2; exit 1; }
 [ -f "${DEPS_YAML}" ] || { echo "missing ${DEPS_YAML}" >&2; exit 1; }
 
-# shellcheck source=/dev/null
-. "${VERSIONS_ENV}"
-
 if [ "${JSON}" -eq 1 ]; then
-  # Guaranteed machine-readable contract (skeleton: no live adapters yet).
-  printf '{"catalog":"%s","outdated":[],"note":"source adapters TODO"}\n' "${DEPS_YAML}"
+  # Machine-readable report: each dep with its current pin (from deps.yaml)
+  # and a note that live upstream adapters are pending (v2).
+  python3 - "${DEPS_YAML}" <<'PY'
+import sys, yaml, json
+data = yaml.safe_load(open(sys.argv[1]))
+report = []
+for d in data['dependencies']:
+    report.append({
+        'name': d['name'],
+        'version': d['version'],
+        'source_type': d['source_type'],
+        'outdated': None  # upstream adapters pending (v2)
+    })
+print(json.dumps({'catalog': sys.argv[1], 'outdated': report}, indent=2))
+PY
 else
-  echo "check-updates.sh (skeleton): catalog ${DEPS_YAML}"
-  echo "source adapters (npm/github_tag/release_tarball) not yet implemented."
+  echo "check-updates.sh: catalog ${DEPS_YAML}"
+  echo "Reading current pins from deps.yaml. Upstream adapters (v2) pending."
 fi
 
 exit 0
