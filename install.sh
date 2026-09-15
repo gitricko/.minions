@@ -198,9 +198,24 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
 fi
 
-# Generate versions.env from deps.yaml (single source of truth),
-# then copy it to MINIONS_HOME so lib scripts can source it there.
+# Ensure python3 + pyyaml for sync-versions.sh (single source of truth).
+# sync-versions.sh must generate etc/versions.env from deps.yaml.
+ensure_python_yaml() {
+    if python3 -c "import yaml" >/dev/null 2>&1; then
+        return 0
+    fi
+    if command -v apt-get >/dev/null 2>&1; then
+        log_info "Installing python3-yaml (required by sync-versions.sh)..."
+        (apt-get update -qq && apt-get install -y -qq python3-yaml) >/dev/null 2>&1 || true
+    fi
+    if ! python3 -c "import yaml" >/dev/null 2>&1; then
+        log_error "python3 + pyyaml required by sync-versions.sh but could not be installed."
+        return 1
+    fi
+    return 0
+}
 if [ -f "${SCRIPT_DIR}/scripts/sync-versions.sh" ]; then
+    ensure_python_yaml || log_warn "sync-versions.sh skipped (python3/pyyaml unavailable; using template versions.env)"
     bash "${SCRIPT_DIR}/scripts/sync-versions.sh" >/dev/null 2>&1 || log_warn "sync-versions.sh failed"
 fi
 if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
