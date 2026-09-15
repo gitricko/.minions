@@ -3,6 +3,10 @@
 # One-liner: curl -fsSL https://minions.sh/install.sh | bash
 # (minions.sh domain pending; GitHub raw URL works: https://github.com/gitricko/.minions/raw/refs/heads/main/install.sh)
 #
+# Prerequisites:
+#   - python3 + pyyaml (required by sync-versions.sh)
+#     — installed automatically via ensure_python_yaml()
+#
 # This script:
 #   1. Detects OS/arch
 #   2. Creates ~/.minions directory structure

@@ -31,6 +31,16 @@ env:
   MINIONS_HOME: "${{ runner.home }}/.minions"
   GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
+# Poll cadence + timeout budgets (D: operational):
+#   - GitHub Actions default: 6h per job.
+#   - Real Install ~4.5min, Test ~1min, DTS ~6min → ~12min total.
+#   - Poll interval: check gh pr checks every 30s (via gh api).
+#   - Overall timeout budget: 20min for CI completion.
+#   - Fix loop: ≤3 attempts per D9; each attempt includes
+#     minion boot (~1min) + fix + push + CI re-run (~12min).
+#     Worst case: 3 × 12min = 36min fix attempts + 12min CI
+#     = ~48min total before D9 labels for human.
+
 concurrency:
   group: self-update
   cancel-in-progress: true
