@@ -5,6 +5,10 @@
 #
 # Usage: scripts/sync-versions.sh [--check]
 #   --check: exit non-zero if versions.env would differ (CI guard).
+#
+# Gracefully skips generation when python3 + pyyaml are unavailable
+# (e.g., minimal bootstrap containers), leaving the existing versions.env
+# intact. install.sh tolerates this via the fallback on the previous template.
 
 set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,6 +16,12 @@ DEPS_YAML="${DEPS_YAML:-${REPO_ROOT}/etc/deps.yaml}"
 VERSIONS_ENV="${VERSIONS_ENV:-${REPO_ROOT}/etc/versions.env}"
 
 [ -f "${DEPS_YAML}" ] || { echo "missing ${DEPS_YAML}" >&2; exit 1; }
+
+# Check python3 + yaml availability before attempting generation.
+if ! python3 -c "import yaml" >/dev/null 2>&1; then
+  # python3 or pyyaml unavailable — leave versions.env as-is.
+  exit 0
+fi
 
 # Generate versions.env content via python3 (yaml module).
 generated="$(python3 - "${DEPS_YAML}" <<'PY'
