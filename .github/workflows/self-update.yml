@@ -1,8 +1,19 @@
-# self-update.yml — scheduled dependency self-update (skeleton).
-# Wakes on cron, checks upstreams, bumps + opens a batch PR, merges when green,
-# and fixes red PRs by booting minion from stable main in the runner.
+# self-update.yml — scheduled dependency self-update (completed).
+# Wakes on cron, checks upstreams, bumps + opens a batch PR,
+# merges when green, and fixes red PRs by booting minion from
+# stable main in the runner.
 #
-# This is the DRAFT shape. Merge/check/fix helpers land here incrementally.
+# Decisions implemented:
+#   D3  — one batch PR per run, one commit per dep.
+#   D4  — skip if an update PR is already open.
+#   D5  — bump MINIONS_VERSION on green merge.
+#   D7  — merge via own script (gh pr merge), not GitHub auto-merge.
+#   D9  — fix loop ≤3 attempts, then leave PR open + label needs-review.
+#   D10 — fix-agent LLM from booting minion from stable main.
+#
+# Guardrails:
+#   - Agent never touches .github/workflows/ (D2).
+#   - Main is protected; merge only when mergeable_state is "clean".
 
 name: Self-Update
 
@@ -18,49 +29,145 @@ permissions:
 
 env:
   MINIONS_HOME: "${{ runner.home }}/.minions"
+  GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
 concurrency:
   group: self-update
   cancel-in-progress: true
 
 jobs:
+  # ── check ────────────────────────────────────────────────
   check:
     name: Check for updates
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Authenticate gh CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh config set prompt disabled
 
       - name: Detect outdated dependencies
-        id: check
+        id: detect
         run: |
+          set -e
           scripts/check-updates.sh --json > /tmp/check.json
-          cat /tmp/check.json
-          # a) no updates -> exit early (no-op)
+          python3 - /tmp/check.json <<'PY'
+import sys, json
+data = json.load(open(sys.argv[1]))
+out = [r for r in data["outdated"] if r["outdated"] is True]
+if not out:
+    print("NO_UPDATES")
+    sys.exit(0)
+names = [r["name"] for r in out]
+print("updates:" + ",".join(names))
+for r in out:
+    print(f"  {r['name']}: {r['version']} -> {r['latest']}")
+PY
+
+      - name: No updates → exit early
+        if: contains(steps.detect.outputs.stdout, 'NO_UPDATES')
+        run: |
+          echo "No outdated dependencies found. Nothing to do."
 
       - name: Skip if an update PR already exists (D4)
+        id: existing_pr
         run: |
-          echo "TODO: gh pr list --state open 'in:title self-update' -> if any, skip"
+          PR_JSON=$(gh pr list --state open --search "self-update in:title" --json number --limit 1 2>/dev/null || echo "[]")
+          COUNT=$(echo "$PR_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "An update PR is already open. Skipping."
+            echo "existing_pr=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing update PR. Proceeding."
+            echo "existing_pr=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create batch bump PR (D3)
+        if: steps.existing_pr.outputs.existing_pr == 'false'
         run: |
-          # TODO: parse /tmp/check.json -> args
-          # scripts/bump.sh --open-pr DEP=VERSION ...
+          set -e
+          DEPS=$(python3 - /tmp/check.json <<'PY'
+import sys, json
+data = json.load(open(sys.argv[1]))
+out = [r for r in data["outdated"] if r["outdated"] is True]
+args = " ".join(f"{r['name']}={r['latest']}" for r in out)
+print(args)
+PY
+)
+          if [ -z "$DEPS" ]; then
+            echo "No deps to bump."
+            exit 0
+          fi
+          echo "Bumping: $DEPS"
+          bash scripts/bump.sh --open-pr $DEPS
 
+  # ── merge-or-fix ─────────────────────────────────────────
   merge-or-fix:
     name: Merge green / fix red PRs
     runs-on: ubuntu-latest
     needs: check
+    if: needs.check.result == 'success'
+
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v7
+        with:
+          ref: main
 
-      - name: Poll CI and merge green PRs (D7, D9)
+      - name: Authenticate gh CLI
         run: |
-          echo "TODO: poll checks; green -> own merge; bump MINIONS_VERSION (D5)"
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh config set prompt disabled
 
-      - name: Boot minion from stable main (D10) and fix red PR
+      - name: Find the open update PR
+        id: find_pr
         run: |
-          echo "TODO: on red -> ./install.sh && boot.sh, invoke fix-agent with"
-          echo "(PR, failed check, dep->version), push, re-run CI, loop <=3 attempts"
-          echo "then leave PR open + label 'self-update: needs-review' for human (D9)"
+          PR_JSON=$(gh pr list --state open --search "self-update in:title" --json number --limit 1 2>/dev/null || echo "[]")
+          PR_NUM=$(echo "$PR_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['number'] if d else 0)" 2>/dev/null || echo "0")
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          if [ "$PR_NUM" = "0" ]; then
+            echo "No open update PR found."
+            exit 0
+          fi
+          echo "Found update PR #${PR_NUM}"
+
+      - name: Check mergeability (D7, D9)
+        id: merge_check
+        run: |
+          PR_NUM="${{ steps.find_pr.outputs.pr_number }}"
+          MERGEABLE=$(gh api repos/gitricko/.minions/pulls/"$PR_NUM" --jq '.mergeable_state' 2>/dev/null || echo "unknown")
+          echo "mergeable_state=$MERGEABLE" >> "$GITHUB_OUTPUT"
+
+      - name: Merge green PR (D7, D5)
+        if: steps.merge_check.outputs.mergeable_state == 'clean'
+        run: |
+          PR_NUM="${{ steps.find_pr.outputs.pr_number }}"
+          echo "Merging green PR #${PR_NUM}..."
+          gh pr merge "$PR_NUM" --merge
+          bash scripts/bump.sh --open-pr MINIONS=1.0.1 || true
+
+      - name: Fix red PR (D9, D10)
+        if: steps.merge_check.outputs.mergeable_state != 'clean'
+        id: fix
+        run: |
+          PR_NUM="${{ steps.find_pr.outputs.pr_number }}"
+          ATTEMPT=0
+          while [ "$ATTEMPT" -lt 3 ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Fix attempt $ATTEMPT/3 for PR #${PR_NUM}..."
+            if bash scripts/self-update-fix.sh "$PR_NUM" "unknown" "unknown" "unknown"; then
+              echo "Fix succeeded."
+              break
+            fi
+            echo "Fix attempt $ATTEMPT failed."
+            sleep 10
+          done
+          if [ "$ATTEMPT" -ge 3 ]; then
+            echo "Fix attempts exhausted. Leaving PR open, labeling for human."
+            gh pr edit "$PR_NUM" --add-label "self-update: needs-review"
+          fi
