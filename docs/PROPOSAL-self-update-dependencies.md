@@ -42,7 +42,8 @@ These were loaded and/or ported from mattpocock/skills for the design session an
 | Skill | Status | Use |
 |-------|--------|-----|
 | `tdd` | **ported** (`skills/tdd/`) | RED→GREEN→REFACTOR; tests before code; test at seams |
-| `grill-with-docs` | **ported** (`skills/grill-with-docs/`) | Relentless interview to sharpen the plan (this doc) |
+| `grill-with-docs` | **ported** (`skills/grill-with-docs/`) | Relentless interview to sharpen the plan; sub-skills = *grilling* + *domain-modeling* |
+| `domain-modeling` | **ported** (`skills/domain-modeling/`) | Actively build/sharpen the domain model; `CONTEXT.md`, ADRs, glossary |
 | `karpathy-coding-guidelines` | existing | Minimal, surgical, verified changes |
 | `ci-lint-check` | existing | Pre-commit lint before push |
 | `codespace-gh-auth` | existing | GitHub token for PR push |
