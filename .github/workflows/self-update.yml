@@ -26,7 +26,6 @@ permissions:
   contents: write                # merge + push
   pull-requests: write           # open/update/close PRs
   checks: read                   # poll check status
-  workflows: write               # workflow_dispatch trigger
 
 env:
   MINIONS_HOME: "${{ runner.home }}/.minions"
