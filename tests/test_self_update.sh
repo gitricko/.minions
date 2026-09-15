@@ -223,8 +223,11 @@ test_sync_versions_generates() {
     bash "${REPO_ROOT}/scripts/sync-versions.sh" >/dev/null 2>&1 || {
     bad "sync-versions.sh" "non-zero exit"; rm -rf "$tmpdir"; return 1
   }
-  grep -q '^NODE_VERSION="22.22.2"' "$tmpenv" || { bad "sync-versions.sh" "NODE_VERSION missing"; rm -rf "$tmpdir"; return 1; }
-  grep -q '^UV_VERSION="0.6.14"' "$tmpenv" || { bad "sync-versions.sh" "UV_VERSION missing"; rm -rf "$tmpdir"; return 1; }
+  # Dynamically read NODE and UV versions from the updated deps.yaml
+  expected_node=$(python3 -c "import yaml; d=yaml.safe_load(open('${tmpdeps}')); print(next(d['dependencies'][i]['version'] for i,d in enumerate(d['dependencies']) if d['name']=='NODE') )")
+  expected_uv=$(python3 -c "import yaml; d=yaml.safe_load(open('${tmpdeps}')); print(next(d['dependencies'][i]['version'] for i,d in enumerate(d['dependencies']) if d['name']=='UV') )")
+  grep -q "^NODE_VERSION="${expected_node}"" "$tmpenv" || { bad "sync-versions.sh" "NODE_VERSION missing or wrong (expected ${expected_node})"; rm -rf "$tmpdir"; return 1; }
+  grep -q "^UV_VERSION="${expected_uv}"" "$tmpenv" || { bad "sync-versions.sh" "UV_VERSION missing or wrong (expected ${expected_uv})"; rm -rf "$tmpdir"; return 1; }
   ok "sync-versions.sh generates versions.env from deps.yaml"
   rm -rf "$tmpdir"
 }

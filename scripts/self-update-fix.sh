@@ -38,17 +38,17 @@ if [ ! -x "${REPO_ROOT}/install.sh" ]; then
     echo "self-update-fix: install.sh not found at ${REPO_ROOT}/install.sh" >&2
     exit 1
 fi
-bash "${REPO_ROOT}/install.sh" --no-hermes --no-omniroute --no-modelrelay >/tmp/install.log 2>&1 || {
+bash "${REPO_ROOT}/install.sh" --no-hermes >/tmp/install.log 2>&1 || {
     echo "self-update-fix: install.sh failed" >&2
-    cat /tmp/install.log >&2
+    cat /tmp/install.log 
     exit 1
 }
 
 echo "[2/3] Booting the stack..."
 export PATH="${REPO_ROOT}/bin:${PATH}"
-timeout 300s bash "${REPO_ROOT}/boot.sh" >/tmp/boot.log 2>&1 || {
+timeout 300s bash -lc "${REPO_ROOT}/boot.sh" >/tmp/boot.log 2>&1 || {
     echo "self-update-fix: boot.sh failed" >&2
-    cat /tmp/boot.log >&2
+    cat /tmp/boot.log
     exit 1
 }
 
