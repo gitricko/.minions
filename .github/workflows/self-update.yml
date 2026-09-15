@@ -15,7 +15,7 @@
 #   - Agent never touches .github/workflows/ (D2).
 #   - Main is protected; merge only when mergeable_state is "clean".
 
-name: Self-Update
+name: Self-Update Dependencies
 
 on:
   schedule:
@@ -56,21 +56,18 @@ jobs:
         run: |
           set -e
           scripts/check-updates.sh --json > /tmp/check.json
-          python3 - /tmp/check.json <<'PY'
-import sys, json
-data = json.load(open(sys.argv[1]))
-out = [r for r in data["outdated"] if r["outdated"] is True]
-if not out:
-    print("NO_UPDATES")
-    sys.exit(0)
-names = [r["name"] for r in out]
-print("updates:" + ",".join(names))
-for r in out:
-    print(f"  {r['name']}: {r['version']} -> {r['latest']}")
-PY
+          OUT=$(python3 -c "import sys,json; d=json.load(open(sys.argv[1])); o=[r for r in d['outdated'] if r['outdated']]; print('NO_UPDATES') if not o else (print('updates:'+','.join(r['name'] for r in o)), [print('  {}: {} -> {}'.format(r['name'], r['version'], r['latest'])) for r in o])" /tmp/check.json)
+          echo "$OUT"
+          # Extract the updates line for the step output
+          UPDATES_LINE=$(echo "$OUT" | grep '^updates:' || true)
+          if [ -z "$UPDATES_LINE" ]; then
+            echo "NO_UPDATES_FOUND=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "NO_UPDATES_FOUND=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: No updates → exit early
-        if: contains(steps.detect.outputs.stdout, 'NO_UPDATES')
+        if: steps.detect.outputs.NO_UPDATES_FOUND == 'true'
         run: |
           echo "No outdated dependencies found. Nothing to do."
 
@@ -91,14 +88,7 @@ PY
         if: steps.existing_pr.outputs.existing_pr == 'false'
         run: |
           set -e
-          DEPS=$(python3 - /tmp/check.json <<'PY'
-import sys, json
-data = json.load(open(sys.argv[1]))
-out = [r for r in data["outdated"] if r["outdated"] is True]
-args = " ".join(f"{r['name']}={r['latest']}" for r in out)
-print(args)
-PY
-)
+          DEPS=$(python3 -c "import sys,json; d=json.load(open(sys.argv[1])); o=[r for r in d['outdated'] if r['outdated']]; print(' '.join('{}={}'.format(r['name'], r['latest']) for r in o))" /tmp/check.json)
           if [ -z "$DEPS" ]; then
             echo "No deps to bump."
             exit 0
