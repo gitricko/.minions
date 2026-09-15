@@ -1,6 +1,6 @@
 # PROPOSAL — Self-Updating Dependencies
 
-**Status:** Design (iteration 1) + implementation (adapters, orchestrator, fix-helper done)
+**Status:** Design (iteration 1) + implementation (adapters, orchestrator, fix-agent skill done)
 **Owner:** custody via pi/Hermes discussion
 **Related:** `etc/versions.env`, `etc/deps.yaml`, `scripts/check-updates.sh`, `scripts/bump.sh`, `scripts/sync-versions.sh`, `scripts/self-update-fix.sh`, `.github/workflows/self-update.yml`, `skills/{tdd,grill-with-docs,domain-modeling,self-update-fix}/`
 
@@ -45,7 +45,7 @@ These were ported from mattpocock/skills for the design session and govern imple
 | `tdd` | **ported** (`skills/tdd/`) | RED→GREEN→REFACTOR; tests before code; test at seams |
 | `grill-with-docs` | **ported** (`skills/grill-with-docs/`) | Relentless interview to sharpen the plan (this doc) |
 | `domain-modeling` | **ported** (`skills/domain-modeling/`) | Build/sharpen the domain model; `CONTEXT.md`, ADRs, glossary |
-| `self-update-fix` | **TODO** (`skills/self-update-fix/`) | Fix-agent skill: how to edit + D2 guardrails (see README) |
+| `self-update-fix` | **authored** (`skills/self-update-fix/`) | Fix-agent skill: how to edit + D2 guardrails (never touch `.github/workflows/`) |
 | `karpathy-coding-guidelines` | existing | Minimal, surgical, verified changes |
 | `ci-lint-check` | existing | Pre-commit lint before push |
 | `codespace-gh-auth` | existing | GitHub token for PR push |
@@ -105,7 +105,7 @@ These were ported from mattpocock/skills for the design session and govern imple
   Emits a machine-readable JSON report with `latest` and `outdated` per dep.
 - `scripts/bump.sh` — deterministic bump + `.node-version` regen. Edits `deps.yaml` (source of truth), calls `sync-versions.sh`. Dry-run never mutates files. Tests validated (PASS=14 FAIL=0).
 - `scripts/sync-versions.sh` — generates `etc/versions.env` from `etc/deps.yaml`. Guard mode (`--check`) available. Exits non-zero if python3/pyyaml unavailable.
-- `scripts/self-update-fix.sh` — fix-loop helper. Boots minion from stable main, invokes fix-agent, pushes fixes. Currently a documented placeholder (exits 1 until `skills/self-update-fix/` is authored).
+- `scripts/self-update-fix.sh` — fix-loop helper. Boots minion from stable main, invokes fix-agent, pushes fixes. Delegates to `skills/self-update-fix/SKILL.md` (authored).
 - `etc/deps.yaml` — schema v2: each dep has `version`, `source_type`, optional `selector`, `sha_source`, `sha256` per platform, `repo`. **Single source of truth.** When you edit a `version` here and run `scripts/sync-versions.sh`, `etc/versions.env` updates automatically.
 - `etc/versions.env` — generated lockfile; auto-generated (never hand-edited). Copied to `MINIONS_HOME` by `install.sh` during boot.
 - `.github/workflows/self-update.yml` — cron orchestrator (check → bump → merge-green → fix-red). Uses `gh` CLI for merge/fix, polls CI via `gh api`.
@@ -114,9 +114,9 @@ These were ported from mattpocock/skills for the design session and govern imple
 
 ## Open items / next steps
 
-- [ ] **Author the fix-agent skill** (`skills/self-update-fix/SKILL.md`) — tells the agent how to edit + D2 guardrails (never touch `.github/workflows/`). `scripts/self-update-fix.sh` delegates to this skill. See `skills/self-update-fix/README.md`.
+- [x] **Author the fix-agent skill** (`skills/self-update-fix/SKILL.md`) — tells the agent how to edit + D2 guardrails (never touch `.github/workflows/`). `scripts/self-update-fix.sh` delegates to this skill. See `skills/self-update-fix/README.md`.
 - [ ] Implement SHA fetch for NODE/UV in `bump.sh` (populate real SHAs from `SHASUMS256.txt` / release assets).
-- [ ] Author the `self-update-fix` skill so the fix loop actually works (currently exits 1).
+- [x] Author the `self-update-fix` skill so the fix loop actually works (exits 1 until `skills/self-update-fix/SKILL.md` is authored, which is now done).
 - [ ] Decide poll cadence + timeout budgets (esp. for `dts-integration` ~60min).
 - [ ] Add `node-version-file: .node-version` to `.github/workflows/ci.yml` (D6 already done; both setup-node steps read it).
 - [ ] Validate CI integration: run `bash scripts/check-updates.sh --json` + poll checks + own merge script in a real run.
