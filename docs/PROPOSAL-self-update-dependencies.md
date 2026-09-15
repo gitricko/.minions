@@ -35,6 +35,19 @@ generated `.node-version` file, not by editing CI.
 - No LLM involvement in a *clean* bump (deterministic code only).
 - No unattended agent in the cron happy path (no LLM to talk to in a fresh runner).
 
+## Skills in this repo (loaded during design)
+
+These were loaded and/or ported from mattpocock/skills for the design session and will govern implementation.
+
+| Skill | Status | Use |
+|-------|--------|-----|
+| `tdd` | **ported** (`skills/tdd/`) | RED→GREEN→REFACTOR; tests before code; test at seams |
+| `grill-with-docs` | **ported** (`skills/grill-with-docs/`) | Relentless interview to sharpen the plan (this doc) |
+| `karpathy-coding-guidelines` | existing | Minimal, surgical, verified changes |
+| `ci-lint-check` | existing | Pre-commit lint before push |
+| `codespace-gh-auth` | existing | GitHub token for PR push |
+| `docker-test-shell` | existing | Clean-container integration tests |
+
 ## Decisions log (locked in iteration 1)
 
 | # | Decision | Rationale |
@@ -115,7 +128,7 @@ generated `.node-version` file, not by editing CI.
 
 ## Open items / next steps
 
-- [ ] Author/find the repo skill that tells the fix-agent *how* to edit (D2 guardrails).
+- [ ] **Author the fix-agent skill** (`skills/self-update-fix/`) that tells the agent how to edit + the D2 guardrails (never touch `.github/workflows/`). The `tdd` skill is already available; this one is not.
 - [ ] `check-updates.sh` — per-source adapters (github_tag / npm / release_tarball).
 - [ ] `bump.sh` — versions.env edit + `.node-version` regen + real SHA for NODE/UV.
 - [ ] `self-update.yml` — cron + merge + fix-loop orchestration (run on `workflow_dispatch` too).
