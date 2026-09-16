@@ -91,7 +91,7 @@ install_pi() {
 #!/usr/bin/env sh
 export PATH="${MINIONS_HOME}/lib/pi/npm/node_modules/.bin:${MINIONS_HOME}/lib/node/bin:\${PATH}"
 export NODE_PATH="${MINIONS_HOME}/lib/pi/npm/node_modules"
-cd "${MINIONS_HOME}/lib/pi/npm"
+cd "\${PI_CWD:-\$PWD}"
 exec "${MINIONS_HOME}/lib/pi/npm/node_modules/.bin/pi" "\$@"
 EOF
     make_executable "${install_dir}/pi"
