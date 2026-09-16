@@ -48,6 +48,16 @@ jobs:
           set -e
           bash tests/test_boot.sh
 
+      - name: Run pi wrapper CWD tests
+        run: |
+          set -e
+          bash tests/test_pi_wrapper_cwd.sh
+
+      - name: Run skill YAML validation
+        run: |
+          set -e
+          bash tests/test_skill_yaml.sh
+
       - name: Run self-update tests
         run: |
           set -e
