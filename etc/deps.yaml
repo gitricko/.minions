@@ -45,7 +45,7 @@ dependencies:
     sha_source: none
 
   - name: NODE
-    version: "26.9.0"
+    version: "26.8.2"
     source_type: release_tarball
     repo: nodejs/node
     release_url: https://nodejs.org/dist/v{{VERSION}}/
