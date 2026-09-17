@@ -38,14 +38,14 @@ dependencies:
     sha_source: none
 
   - name: MODELRELAY
-    version: "1.22.1"
+    version: "1.22.2"
     source_type: npm
     package: modelrelay
     channel: latest
     sha_source: none
 
   - name: NODE
-    version: "26.8.2"
+    version: "v26.8.2"
     source_type: release_tarball
     repo: nodejs/node
     release_url: https://nodejs.org/dist/v{{VERSION}}/
