@@ -312,17 +312,21 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         exit 1
     fi
     
-    # Test chat completion — OPTIONAL: skipped (OC provider bug)
+    # Test chat completion via OmniRoute — OPTIONAL (OC provider bug)
     # auto-fastest routes to oc/opencode-zen free-tier providers which reject
     # non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-    # Commented out so rest of suite runs; uncomment when OmniRoute OC is fixed.
-    # if curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >/dev/null; then
-    #     log_info "Chat completion via OmniRoute works"
-    # else
-    #     log_error "Chat completion via OmniRoute failed"
-    #     exit 1
-    # fi
-    log_warn "Chat completion via OmniRoute SKIPPED (OC provider bug; see comment above)"
+    if curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >/dev/null; then
+        log_info "Chat completion via OmniRoute works"
+    else
+        log_warn "Chat completion via OmniRoute SKIPPED (OC provider bug; see comment above)"
+    fi
+
+    # Test chat completion via 9Router (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
+    if curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >/dev/null; then
+        log_info "Chat completion via 9Router auto-fastest works"
+    else
+        log_warn "Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
+    fi
 
     # Phase 24: live skill discovery. hermes skills list is the authoritative
     # check (deterministic, fast — NOT truncated: one known skill name asserts
