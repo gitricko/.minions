@@ -319,25 +319,21 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
 
     # Phase 24: live skill discovery. hermes skills list is the authoritative
     # check (deterministic, fast — NOT truncated: one known skill name asserts
-    # the whole minions dir is wired). pi -p is model-dependent but proves Pi
-    # also discovers skills via the settings.json skills array.
-    # pi -p skills discovery — OPTIONAL: skipped (OC provider bug)
-    # auto-fastest routes to oc/opencode-zen free-tier providers which reject
-    # non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-    # Commented out so rest of suite runs; uncomment when OmniRoute OC is fixed.
-    # PI_SKILLS_OUT=$("${PI_BIN}" -p \
-    #   'List the name of every skill available to you. Read-only.' \
-    #   --provider omniroute --model omniroute/auto-fastest 2>&1) || true
-    # if echo "$PI_SKILLS_OUT" | grep -qi docker-test-shell; then
-    #     log_info "pi -p sees minions skills (docker-test-shell)"
-    # elif grep -q '"skills"' "${HOME}/.pi/agent/settings.json" 2>/dev/null; then
-    #     log_warn "pi -p may not have listed skills (model-dependent); settings.json skills array is present"
-    # else
-    #     log_error "pi -p did not list skills AND settings.json skills missing"
-    #     exit 1
-    # fi
-    log_warn "pi -p skills discovery SKIPPED (OC provider bug; see comment above)"
-    # Note: settings.json still verified by hermes skills list below
+    # the whole minions dir is wired). pi -p also discovers skills via the
+    # settings.json skills array. Uses default provider/model (pi-failover
+    # routes to 9Router); no hardcoded flags.
+    PI_BIN="${HOME}/.minions/bin/pi"
+    PI_SKILLS_OUT=$("${PI_BIN}" -p \
+      'List the name of every skill available to you. Read-only.' \
+      2>&1) || true
+    if echo "$PI_SKILLS_OUT" | grep -qi docker-test-shell; then
+        log_info "pi -p sees minions skills (docker-test-shell)"
+    elif grep -q '"skills"' "${HOME}/.pi/agent/settings.json" 2>/dev/null; then
+        log_warn "pi -p may not have listed skills (model-dependent); settings.json skills array is present"
+    else
+        log_error "pi -p did not list skills AND settings.json skills missing"
+        exit 1
+    fi
 
     # Phase 24: hermes skills list is the authoritative check (deterministic, fast)
     HERMES_BIN="${HOME}/.minions/bin/hermes"

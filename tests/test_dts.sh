@@ -312,24 +312,20 @@ log_warn "hermes chat -q SKIPPED (OC provider bug; see comment above)"
 # fi
 log_warn "pi -p chat SKIPPED (OC provider bug; see comment above)"
 
-# 8c. pi -p discovers the minions skills in standalone mode (Phase 24) — OPTIONAL: skipped (OC provider bug)
+# 8c. pi -p discovers the minions skills in standalone mode (Phase 24)
 # Ask the model to list the skills available to it; the system prompt includes the
 # <available_skills> block. A known minions skill name (docker-test-shell) must
 # appear. (The model may answer indirectly; grep for the skill name is the check.)
-# auto-fastest routes to oc/opencode-zen free-tier providers which reject
-# non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-# Commented out so rest of suite runs; uncomment when OmniRoute OC is fixed.
-# if "${DTS_SCRIPT}" exec "${PI_BIN} -p 'List the names of the skills available to you. Read-only.' --provider omniroute --model omniroute/auto-fastest 2>&1 | grep -qi docker-test-shell"; then
-#     log_info "pi -p sees the minions skills (docker-test-shell) in standalone mode"
-# elif "${DTS_SCRIPT}" exec "grep -q '\"skills\"' /home/ubuntu/.pi/agent/settings.json && grep -q '/home/ubuntu/.minions/skills' /home/ubuntu/.pi/agent/settings.json"; then
-#     log_warn "pi -p may not have listed skills (model-dependent); settings.json skills array is correct (standalone path)"
-# else
-#     log_error "pi -p did not list skills AND settings.json skills missing in standalone"
-#     cleanup
-#     exit 1
-# fi
-log_warn "pi -p skills discovery SKIPPED (OC provider bug; see comment above)"
-# Note: settings.json still verified by hermes skills list (8d)
+# Uses default provider/model (pi-failover routes to 9Router); no hardcoded flags.
+if "${DTS_SCRIPT}" exec "${PI_BIN} -p 'List the names of the skills available to you. Read-only.' 2>&1 | grep -qi docker-test-shell"; then
+    log_info "pi -p sees the minions skills (docker-test-shell) in standalone mode"
+elif "${DTS_SCRIPT}" exec "grep -q '\"skills\"' /home/ubuntu/.pi/agent/settings.json && grep -q '/home/ubuntu/.minions/skills' /home/ubuntu/.pi/agent/settings.json"; then
+    log_warn "pi -p may not have listed skills (model-dependent); settings.json skills array is correct (standalone path)"
+else
+    log_error "pi -p did not list skills AND settings.json skills missing in standalone"
+    cleanup
+    exit 1
+fi
 
 # 8d. hermes skills list discovers the minions skills (Phase 24).
 # `hermes skills list` prints a table of ALL skills (builtin + local).
