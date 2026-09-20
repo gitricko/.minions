@@ -41,7 +41,7 @@ color() { [ -t 1 ] && printf '\033[1;34m%s\033[0m\n' "$*" || echo "$*"; }
 log()  { color "[dts] $*"; }
 
 docker_env_flags() {
-    printf -- '--user %s:%s -e HOME=%s' "${CONTAINER_UID}" "${CONTAINER_GID}" "${home}"
+    printf -- '--user %s:%s -e HOME=%s -e CI_OMNIROUTE_CHAT_REQUIRED=%s' "${CONTAINER_UID}" "${CONTAINER_GID}" "${home}" "${CI_OMNIROUTE_CHAT_REQUIRED:-0}"
 }
 
 cmd_up() {
