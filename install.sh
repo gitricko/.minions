@@ -419,7 +419,7 @@ log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 
 
 # Step 6: Install pi-failover extension (CLI only, no proxy needed)
 log_info "Installing pi-failover extension..."
-if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>/dev/null; then
+if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@main 2>/dev/null; then
     log_info "pi-failover extension installed"
 else
     log_warn "pi-failover extension install failed (may not exist yet or needs retry at boot)"
