@@ -154,7 +154,17 @@ start_service "9router" \
 
 wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"
 
-# Step 3: Wait for OmniRoute health (needed for any post-boot checks)
+# Step 3: Configure 9Router (auto-fastest combo, disable login/API key)
+log_info "Preconfiguring 9Router..."
+# shellcheck disable=SC1091
+. "${LIB_DIR}/9router.sh"
+if ninerouter_preconfigure; then
+    log_info "9Router preconfig complete"
+else
+    log_warn "9Router preconfig had issues (non-fatal)"
+fi
+
+# Step 4: Wait for OmniRoute health (needed for any post-boot checks)
 log_info "Waiting for OmniRoute health..."
 wait_for_health "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/healthz" 120 "omniroute"
 
