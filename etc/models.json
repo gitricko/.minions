@@ -7,7 +7,7 @@
       "models": [
         {
           "id": "auto-fastest",
-          "name": "Auto Fastest",
+          "name": "auto-fastest",
           "api": "openai-completions",
           "provider": "omniroute",
           "baseUrl": "http://127.0.0.1:{{OMNIROUTE_PORT}}/v1",
@@ -37,7 +37,7 @@
       "models": [
         {
           "id": "auto-fastest",
-          "name": "Auto Fastest",
+          "name": "auto-fastest",
           "api": "openai-completions",
           "provider": "9router",
           "baseUrl": "http://127.0.0.1:{{NINEROUTER_PORT}}/v1",
