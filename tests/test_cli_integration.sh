@@ -152,15 +152,22 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         # Test chat completion through OmniRoute (OPTIONAL — see note in
         # Real-install mode: oc/opencode-zen free-tier providers reject
         # non-OpenCode requests; gate with CI_OMNIROUTE_CHAT_REQUIRED=1)
-        if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
-            log_info "DTS: Chat completion via OmniRoute works"
-        elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
-            log_error "DTS: Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
-            "${DTS_SCRIPT}" clean
-            exit 1
-        else
-            log_warn "DTS: Chat completion via OmniRoute skipped (known OC provider bug; set CI_OMNIROUTE_CHAT_REQUIRED=1 to enforce)"
-        fi
+                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+                    log_info "DTS: Chat completion via OmniRoute works"
+                elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
+                    log_error "DTS: Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
+                    "${DTS_SCRIPT}" clean
+                    exit 1
+                else
+                    log_warn "DTS: Chat completion via OmniRoute skipped (known OC provider bug; set CI_OMNIROUTE_CHAT_REQUIRED=1 to enforce)"
+                fi
+
+                # Test 9Router chat completion (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
+                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+                    log_info "DTS: Chat completion via 9Router auto-fastest works"
+                else
+                    log_warn "DTS: Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
+                fi
         
         # Test Pi-Agent extensions list
         if "${DTS_SCRIPT}" exec "/home/ubuntu/.minions/bin/pi extensions list 2>/dev/null | grep -q pi-failover"; then

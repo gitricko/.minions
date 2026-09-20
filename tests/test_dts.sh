@@ -213,14 +213,22 @@ fi
 # Known upstream OmniRoute OC bug — gate with CI_OMNIROUTE_CHAT_REQUIRED=1)
 echo ""
 echo "=== Test 5: End-to-end chat completion (optional) ==="
+# 5a. OmniRoute chat completion
 if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
-    log_info "Chat completion via auto-fastest works"
+    log_info "Chat completion via OmniRoute auto-fastest works"
 elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
-    log_error "Chat completion failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
+    log_error "Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
     cleanup
     exit 1
 else
-    log_warn "Chat completion skipped (known OC provider bug; set CI_OMNIROUTE_CHAT_REQUIRED=1 to enforce)"
+    log_warn "Chat completion via OmniRoute skipped (known OC provider bug; set CI_OMNIROUTE_CHAT_REQUIRED=1 to enforce)"
+fi
+
+# 5b. 9Router chat completion (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
+if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+    log_info "Chat completion via 9Router auto-fastest works"
+else
+    log_warn "Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
 fi
 
 # Test 6: Hermes CLI
