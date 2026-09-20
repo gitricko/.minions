@@ -286,31 +286,21 @@ echo "=== Test 8: CLI chat (hermes + pi, keyless via OmniRoute) ==="
 HERMES_BIN="/home/ubuntu/.minions/bin/hermes"
 PI_BIN="/home/ubuntu/.minions/bin/pi"
 
-# 8a. hermes chat -q — OPTIONAL: skipped (OC provider bug)
-# auto-fastest routes to oc/opencode-zen free-tier providers which reject
-# non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-# Commented out so rest of suite runs; uncomment when OmniRoute OC is fixed.
-# if "${DTS_SCRIPT}" exec "${HERMES_BIN} chat -q 'Reply with exactly: OK' 2>&1 | grep -q OK"; then
-#     log_info "hermes chat -q returns OK (keyless via OmniRoute)"
-# else
-#     log_error "hermes chat -q did not return OK"
-#     cleanup
-#     exit 1
-# fi
-log_warn "hermes chat -q SKIPPED (OC provider bug; see comment above)"
+# 8a. hermes chat -q — uses hermes default failover (omniroute → 9router)
+# If OmniRoute auto-fastest fails (OC provider bug), hermes wrapper should failover to 9router.
+if "${DTS_SCRIPT}" exec "${HERMES_BIN} chat -q 'Reply with exactly: OK' 2>&1 | grep -q OK"; then
+    log_info "hermes chat -q returns OK (failover: omniroute → 9router)"
+else
+    log_warn "hermes chat -q did not return OK (failover may not have triggered)"
+fi
 
-# 8b. pi -p chat — OPTIONAL: skipped (OC provider bug)
-# auto-fastest routes to oc/opencode-zen free-tier providers which reject
-# non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-# Commented out so rest of suite runs; uncomment when OmniRoute OC is fixed.
-# if "${DTS_SCRIPT}" exec "${PI_BIN} -p 'Reply with exactly: OK' --provider omniroute --model omniroute/auto-fastest 2>&1 | grep -q OK"; then
-#     log_info "pi -p returns OK (keyless via OmniRoute)"
-# else
-#     log_error "pi -p did not return OK"
-#     cleanup
-#     exit 1
-# fi
-log_warn "pi -p chat SKIPPED (OC provider bug; see comment above)"
+# 8b. pi -p chat — uses pi-failover default (no hardcoded flags)
+# pi-failover routes omniroute → 9router automatically; no --provider flags.
+if "${DTS_SCRIPT}" exec "${PI_BIN} -p 'Reply with exactly: OK' 2>&1 | grep -q OK"; then
+    log_info "pi -p chat returns OK (failover via pi-failover → 9router)"
+else
+    log_warn "pi -p chat did not return OK (failover may not have triggered)"
+fi
 
 # 8c. pi -p discovers the minions skills in standalone mode (Phase 24)
 # Ask the model to list the skills available to it; the system prompt includes the
