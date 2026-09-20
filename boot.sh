@@ -140,10 +140,16 @@ wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 300 "omniroute"
 
 # Step 2: 9Router
 log_info "Starting 9Router (${NINEROUTER_HOST}:${NINEROUTER_PORT})..."
+# 9Router 0.5.81 CLI: -H/--host, -p/--port, -n/--no-browser, --skip-update.
+# --no-browser + --skip-update are required in headless/CI environments —
+# otherwise it tries to open a browser and runs an auto-update check that can
+# stall startup. Default port is 20128, so --port is mandatory here.
 start_service "9router" \
     "${MINIONS_HOME}/bin/9router" \
     --host "${NINEROUTER_HOST}" \
     --port "${NINEROUTER_PORT}" \
+    --no-browser \
+    --skip-update \
     >> "${boot_log}" 2>&1 || log_error "Failed to start 9Router"
 
 wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"

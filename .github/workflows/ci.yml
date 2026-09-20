@@ -136,10 +136,8 @@ jobs:
           echo "Install complete"
 
           # Verify binaries. Hard-fail: a component installed but unusable is a real
-          # defect, not a warning. NOTE: 9router does NOT support --version (no such
-          # flag upstream; it would start the server and hang), so it is verified by
-          # booting + hitting its /v1/models endpoint in the CLI integration test below.
-          for bin in omniroute pi hermes; do
+          # defect, not a warning. 9router supports --version as of 0.5.81.
+          for bin in omniroute pi hermes 9router; do
               if [ -x "${HOME}/.minions/bin/${bin}" ]; then
                   if timeout 10s "${HOME}/.minions/bin/${bin}" --version >/dev/null 2>&1; then
                       echo "✓ ${bin} installed and --version works"
@@ -152,12 +150,6 @@ jobs:
                   exit 1
               fi
           done
-          if [ -x "${HOME}/.minions/bin/9router" ]; then
-              echo "✓ 9router binary present (no --version flag upstream; verified via /v1/models in CLI test)"
-          else
-              echo "FAIL: 9router not found"
-              exit 1
-          fi
           if [ -x "${HOME}/.minions/bin/mnemon" ]; then
               echo "✓ mnemon installed"
           else

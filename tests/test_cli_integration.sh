@@ -282,11 +282,22 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         exit 1
     fi
     
-    # Test 9Router endpoint
-    if curl -sf http://127.0.0.1:7352/v1/models >/dev/null; then
+    # Test 9Router endpoint (retry like OmniRoute — Next.js server needs a moment)
+    _9router_ok=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if curl -sf http://127.0.0.1:7352/v1/models >/dev/null; then
+            _9router_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "${_9router_ok}" -eq 1 ]; then
         log_info "9Router /v1/models endpoint responds"
     else
         log_error "9Router /v1/models endpoint failed"
+        echo "--- curl probe (127.0.0.1:7352) ---" >&2
+        curl -sS -w '\nHTTP_STATUS=%{http_code} EXIT=%{exitcode}\n' \
+            http://127.0.0.1:7352/v1/models 2>&1 || true
         exit 1
     fi
     
