@@ -32,7 +32,7 @@ echo "=== self-update-fix ==="
 echo "PR: ${PR_NUMBER} | dep: ${DEP}@${VERSION} | failed check: ${FAILED_CHECK}"
 
 # Step 1: Boot minion from stable main in the runner.
-# This gives the fix-agent access to OmniRoute/ModelRelay (LLM routing).
+# This gives the fix-agent access to OmniRoute/9Router (LLM routing).
 echo "[1/3] Installing minion from stable main..."
 if [ ! -x "${REPO_ROOT}/install.sh" ]; then
     echo "self-update-fix: install.sh not found at ${REPO_ROOT}/install.sh" >&2

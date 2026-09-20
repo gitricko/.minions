@@ -117,7 +117,7 @@ boot_log="${MINIONS_HOME}/var/log/boot.log"
     echo "DRY_RUN=${DRY_RUN:-0}"
     echo "DOCTOR=${DOCTOR:-0}"
     echo "OMNIROUTE_PORT=${OMNIROUTE_PORT}"
-    echo "MODELRELAY_PORT=${NINEROUTER_PORT}"
+    echo "NINEROUTER_PORT=${NINEROUTER_PORT}"
 } >> "${boot_log}" 2>&1
 
 echo ""

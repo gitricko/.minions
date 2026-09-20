@@ -11,7 +11,7 @@
 #   1. Detects OS/arch
 #   2. Creates ~/.minions directory structure
 #   3. Checks/installs prerequisites (Node, uv)
-#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, ModelRelay, Mnemon
+#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, 9Router, Mnemon
 #   4. Copies config templates to standard locations with port interpolation
 #   5. Fixes macOS quarantine where needed
 #
@@ -260,7 +260,7 @@ fi
 log_info "Installing prerequisites..."
 ensure_uv
 
-# Install vendored Node.js 22.22.2 for npm packages (OmniRoute, ModelRelay, Pi)
+# Install vendored Node.js 22.22.2 for npm packages (OmniRoute, 9Router, Pi)
 # These packages have compatibility issues with Node 24+
 log_info "Installing vendored Node.js ${NODE_VERSION} for npm packages..."
 ensure_node_v22

@@ -10,14 +10,14 @@ port = 8080
 
 # LLM Provider Configuration
 [llm]
-# Base URL for OpenAI-compatible API (OmniRoute or ModelRelay)
+# Base URL for OpenAI-compatible API (OmniRoute or 9Router)
 # Override via MINIONS_LLM_BASE_URL env var
 base_url = "http://localhost:{{OMNIROUTE_PORT}}/v1"
 # Model selection: "auto" lets the proxy choose, or specify a model ID
 model = "auto"
-# Default provider to use (both omniroute and modelrelay have auto-fastest)
+# Default provider to use (both omniroute and 9router have auto-fastest)
 provider = "omniroute"
-# Optional API key (not needed for free tiers via OmniRoute/ModelRelay)
+# Optional API key (not needed for free tiers via OmniRoute/9Router)
 api_key = ""
 
 # Agent behavior

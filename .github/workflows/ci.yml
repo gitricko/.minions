@@ -136,7 +136,7 @@ jobs:
           echo "Install complete"
 
           # Verify binaries. Hard-fail: a component installed but unusable is a real
-          # defect, not a warning. NOTE: modelrelay does NOT support --version (no such
+          # defect, not a warning. NOTE: 9router does NOT support --version (no such
           # flag upstream; it would start the server and hang), so it is verified by
           # booting + hitting its /v1/models endpoint in the CLI integration test below.
           for bin in omniroute pi hermes; do
@@ -152,10 +152,10 @@ jobs:
                   exit 1
               fi
           done
-          if [ -x "${HOME}/.minions/bin/modelrelay" ]; then
-              echo "✓ modelrelay binary present (no --version flag upstream; verified via /v1/models in CLI test)"
+          if [ -x "${HOME}/.minions/bin/9router" ]; then
+              echo "✓ 9router binary present (no --version flag upstream; verified via /v1/models in CLI test)"
           else
-              echo "FAIL: modelrelay not found"
+              echo "FAIL: 9router not found"
               exit 1
           fi
           if [ -x "${HOME}/.minions/bin/mnemon" ]; then
@@ -209,7 +209,7 @@ jobs:
           if curl -fsSL "${TARBALL_URL}" | tar xz -C "${BOOTSTRAP_DIR}" 2>/dev/null; then
               EXTRACTED=$(find /tmp/minions-bootstrap-test -maxdepth 1 -type d -name '.minions*' | head -1)
               if [ -n "${EXTRACTED}" ] && [ -f "${EXTRACTED}/install.sh" ]; then
-                  HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_real_install.log
+                  HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/standalone_real_install.log
                   if [ ${PIPESTATUS[0]} -eq 0 ]; then
                       echo "✓ Standalone real-install test exit 0"
                       if grep -q "Knowledge mode: standalone" /tmp/standalone_real_install.log; then
@@ -253,7 +253,7 @@ jobs:
           #   export INSTALL_URL="..."
           #   HOME=/custom/home bash -c "$(curl -fsSL "$INSTALL_URL")"
           # INSTALL_URL exported in parent shell; HOME set for bash -c
-          if HOME="${STANDALONE_HOME2}" bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/standalone_piped_test.log; then
+          if HOME="${STANDALONE_HOME2}" bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/standalone_piped_test.log; then
               echo "✓ Piped INSTALL_URL test exit 0"
               if grep -q "Knowledge mode: standalone" /tmp/standalone_piped_test.log; then
                   echo "✓ Standalone mode detected"

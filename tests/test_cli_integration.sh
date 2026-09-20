@@ -43,12 +43,12 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         
         # Run install.sh
         # Capture install.sh stderr to verify it doesn't attempt connections to
-        # OmniRoute/ModelRelay (services aren't up yet).
+        # OmniRoute/9Router (services aren't up yet).
         install_out=$("${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1")
         install_rc=$?
         if [ $install_rc -eq 0 ]; then
             if echo "$install_out" | grep -qE "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352"; then
-                log_error "DTS: install.sh attempted connections to OmniRoute/ModelRelay (services not up yet)"
+                log_error "DTS: install.sh attempted connections to OmniRoute/9Router (services not up yet)"
                 echo "$install_out" | grep -E "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352" | head -5
                 "${DTS_SCRIPT}" clean
                 exit 1
@@ -282,11 +282,11 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         exit 1
     fi
     
-    # Test ModelRelay endpoint
+    # Test 9Router endpoint
     if curl -sf http://127.0.0.1:7352/v1/models >/dev/null; then
-        log_info "ModelRelay /v1/models endpoint responds"
+        log_info "9Router /v1/models endpoint responds"
     else
-        log_error "ModelRelay /v1/models endpoint failed"
+        log_error "9Router /v1/models endpoint failed"
         exit 1
     fi
     

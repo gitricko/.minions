@@ -102,11 +102,11 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
             exit 1
         fi
         
-        # Verify ModelRelay API responds
+        # Verify 9Router API responds
         if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
-            log_info "DTS: ModelRelay models endpoint responds"
+            log_info "DTS: 9Router models endpoint responds"
         else
-            log_error "DTS: ModelRelay models endpoint failed"
+            log_error "DTS: 9Router models endpoint failed"
             "${DTS_SCRIPT}" clean
             exit 1
         fi

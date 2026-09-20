@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# lib/npm_packages.sh - npm package installation (OmniRoute, ModelRelay)
+# lib/npm_packages.sh - npm package installation (OmniRoute, 9Router)
 
 # Install npm package globally into our vendored location
 # Usage: install_npm_package <package_name> <version> <install_dir> <bin_name> [bin_path_in_package]
