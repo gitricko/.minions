@@ -116,7 +116,7 @@ else
 fi
 
 # Verify install outputs
-"${DTS_SCRIPT}" exec "test -d /home/ubuntu/.minions && test -f /home/ubuntu/.minions/bin/omniroute && test -f /home/ubuntu/.minions/bin/modelrelay && test -f /home/ubuntu/.minions/bin/pi"
+"${DTS_SCRIPT}" exec "test -d /home/ubuntu/.minions && test -f /home/ubuntu/.minions/bin/omniroute && test -f /home/ubuntu/.minions/bin/9router && test -f /home/ubuntu/.minions/bin/pi"
 log_info "Binaries installed correctly"
 
 "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.pi/agent/pi.toml && test -f /home/ubuntu/.pi/agent/models.json && test -f /home/ubuntu/.hermes/config.yaml"
@@ -341,7 +341,7 @@ else
 fi
 
 # Verify services stopped (PID files removed)
-for service in omniroute modelrelay; do
+for service in omniroute 9router; do
     if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
         log_info "${service} PID file removed"
     else
@@ -390,7 +390,7 @@ STANDALONE_HOME="/home/ubuntu/.minions-standalone"
 # Run the literal one-liner: cat install.sh | bash -s — $0=bash triggers the preamble,
 # which fetches BOOTSTRAP_URL (the file:// tarball) and re-execs the full installer.
 # RC captured via marker file because exec over ssh masks $?.
-"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-modelrelay > /tmp/standalone_install.log 2>&1; echo \$? > /tmp/standalone_install.rc)"
+"${DTS_SCRIPT}" exec "mkdir -p /tmp/empty && export BOOTSTRAP_URL=file://$TARBALL && export HOME=$STANDALONE_HOME && cd /tmp/empty && (bash -s < /tmp/repo/.minions-main/install.sh -- --no-hermes --no-omniroute --no-9router > /tmp/standalone_install.log 2>&1; echo \\$? > /tmp/standalone_install.rc)"
 STANDALONE_RC=$("${DTS_SCRIPT}" exec "cat /tmp/standalone_install.rc 2>/dev/null || echo 999")
 if [ "$STANDALONE_RC" -eq 0 ]; then
     log_info "Standalone piped install exit 0"
@@ -434,7 +434,7 @@ echo "=== Test 9.6: Dev mode in repo ==="
 DEV_HOME="/home/ubuntu/.minions-dev"
 "${DTS_SCRIPT}" exec "rm -rf $DEV_HOME"
 # Run install.sh from /src (the bind-mounted repo WITH .git)
-"${DTS_SCRIPT}" exec "HOME=$DEV_HOME bash /src/install.sh --no-hermes --no-omniroute --no-modelrelay 2>&1 | tee /tmp/dev_install.log"
+"${DTS_SCRIPT}" exec "HOME=$DEV_HOME bash /src/install.sh --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/dev_install.log"
 DEV_RC=$?
 if [ $DEV_RC -eq 0 ]; then
     log_info "Dev install exit 0"

@@ -16,11 +16,11 @@
 #   5. Fixes macOS quarantine where needed
 #
 # Usage:
-#   install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]
+#   install.sh [--no-hermes] [--no-omniroute] [--no-9router]
 #
 # Environment (set in ~/.bashrc BEFORE running):
 #   OMNIROUTE_PORT=20128   (default)
-#   MODELRELAY_PORT=7352   (default)
+#   NINEROUTER_PORT=7352   (default)
 #   BOOTSTRAP_URL=...       (override tarball source, default: main.tar.gz)
 
 # Phase 22.5: Bootstrap preamble for curl|bash one-liner
@@ -101,11 +101,11 @@ set -u
 MINIONS_HOME="${HOME}/.minions"
 INSTALL_HERMES=1
 INSTALL_OMNIROUTE=1
-INSTALL_MODELRELAY=1
+INSTALL_NINEROUTER=1
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
-MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
+NINEROUTER_PORT="${NINEROUTER_PORT:-7352}"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -118,16 +118,16 @@ while [ $# -gt 0 ]; do
             INSTALL_OMNIROUTE=0
             shift
             ;;
-        --no-modelrelay)
-            INSTALL_MODELRELAY=0
+        --no-9router)
+            INSTALL_NINEROUTER=0
             shift
             ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router]"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"
-            echo "  MODELRELAY_PORT=7352  (default)"
+            echo "  NINEROUTER_PORT=7352  (default)"
             exit 0
             ;;
         *)
@@ -181,7 +181,7 @@ fi
 
 log_info "Platform: ${PLATFORM}"
 log_info "Installing to: ${MINIONS_HOME}"
-log_info "Ports: omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
+log_info "Ports: omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
 # Step 1: Create directory structure
 log_info "Creating directory structure at ${MINIONS_HOME}"
@@ -279,9 +279,9 @@ if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
     ensure_omniroute
 fi
 
-log_info "Installing ModelRelay..."
-if [ "${INSTALL_MODELRELAY}" -eq 1 ]; then
-    ensure_modelrelay
+log_info "Installing 9Router..."
+if [ "${INSTALL_NINEROUTER}" -eq 1 ]; then
+    ensure_9router
 fi
 
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
@@ -357,7 +357,7 @@ mkdir -p "${HOME}/.pi/agent"
 # Copy pi.toml with port interpolation
 if [ -f "${SCRIPT_DIR}/etc/pi.toml" ]; then
     sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
         "${SCRIPT_DIR}/etc/pi.toml" > "${HOME}/.pi/agent/pi.toml"
     log_info "Created ~/.pi/agent/pi.toml"
 fi
@@ -365,7 +365,7 @@ fi
 # Copy models.json with port interpolation
 if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
     sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
         "${SCRIPT_DIR}/etc/models.json" > "${HOME}/.pi/agent/models.json"
     log_info "Created ~/.pi/agent/models.json"
 fi
@@ -392,11 +392,11 @@ providers:
   omniroute:
     base_url: http://127.0.0.1:${OMNIROUTE_PORT}/v1
     api_key: no-key-needed
-  modelrelay:
-    base_url: http://127.0.0.1:${MODELRELAY_PORT}/v1
+  9router:
+    base_url: http://127.0.0.1:${NINEROUTER_PORT}/v1
     api_key: no-key-needed
 fallback_providers:
-  - provider: modelrelay
+  - provider: 9router
     model: auto-fastest
 approvals:
   mode: "off"
@@ -413,7 +413,7 @@ display:
 terminal:
   cwd: ${HOME}
 YAMLEOF
-log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
+log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
 # (Mnemon seeds are not imported by minions — setup_mnemon_all is disabled per user request.)
 
@@ -473,7 +473,7 @@ echo ""
 echo "  Components installed to: ${MINIONS_HOME}"
 echo "    - Pi-Agent:    ${MINIONS_HOME}/bin/pi (version ${PI_VERSION:-unknown})"
 echo "    - OmniRoute:   ${MINIONS_HOME}/bin/omniroute (version ${OMNIROUTE_VERSION:-unknown})"
-echo "    - ModelRelay:  ${MINIONS_HOME}/bin/modelrelay (version ${MODELRELAY_VERSION:-unknown})"
+echo "    - 9Router:     ${MINIONS_HOME}/bin/9router (version ${NINEROUTER_VERSION:-unknown})"
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     echo "    - Hermes:      ${MINIONS_HOME}/bin/hermes (version ${HERMES_VERSION:-unknown})"
 fi
@@ -498,7 +498,7 @@ Stop the stack:
 Check status:
     ~/.minions/status.sh
 
-Switch LLM proxy to ModelRelay:
+Switch LLM proxy to 9Router:
     export MINIONS_LLM_BASE_URL=http://localhost:7352/v1
     ~/.minions/boot.sh
 EOF

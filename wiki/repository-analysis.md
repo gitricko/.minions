@@ -14,13 +14,13 @@
 |-----------|---------|------|
 | **Hermes Agent** | AI coding agent with memory, skills, multi-step tasks | 9119 (gateway+dashboard) |
 | **OmniRoute** | Primary LLM router — 8 free models, auto-routing | 20128 |
-| **ModelRelay** | Fallback LLM router | 7352 |
+| **9Router** | Fallback LLM router | 7352 |
 | **Ollama** | Local embeddings (nomic-embed-text) for Mnemon | 11434 |
 | **Mnemon** | Persistent graph memory (no token limits, cross-session) | — |
 | **Claude Code** | Anthropic CLI agent (preconfigured to use OmniRoute) | — |
 | **Cline** | VS Code coding agent (preconfigured to use OmniRoute) | — |
 
-The core idea: **free LLM models forever** via OmniRoute/ModelRelay, with **persistent memory** via Mnemon, all inside GitHub Codespaces (free tier: 60 hrs/month).
+The core idea: **free LLM models forever** via OmniRoute/9Router, with **persistent memory** via Mnemon, all inside GitHub Codespaces (free tier: 60 hrs/month).
 
 ---
 
@@ -37,11 +37,11 @@ The core idea: **free LLM models forever** via OmniRoute/ModelRelay, with **pers
 ├─────────────────────────────────────────────────────────────────┤
 │  Terminal Agents                                                │
 │  ├─ hermes (CLI + Gateway :9119 + Dashboard :9119)              │
-│  └─ claude (CLI via ModelRelay/OmniRoute)                       │
+│  └─ claude (CLI via 9Router/OmniRoute)                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  Model Routers (OpenAI-compatible)                              │
 │  ├─ OmniRoute  :20128  → 8 free models (auto-fastest combo)    │
-│  ├─ ModelRelay :7352   → fallback router                        │
+│  ├─ 9Router  :7352   → fallback router                        │
 │  └─ Ollama     :11434  → local embeddings (nomic-embed-text)   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Memory Layer                                                   │

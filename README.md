@@ -15,8 +15,8 @@
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
 [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-v2026.9.11-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
 [![PI Agent](https://img.shields.io/badge/PI%20Agent-v0.85.1-brown?logo=github)](https://pi.dev)
-[![ModelRelay](https://img.shields.io/badge/ModelRelay-1.22.1-green?logo=npm)](https://www.npmjs.com/package/modelrelay)
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.50-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
+[![9Router](https://img.shields.io/badge/9Router-0.5.81-green?logo=npm)](https://www.npmjs.com/package/9router)
 [![Ollama](https://img.shields.io/badge/Ollama-0.33.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.8-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
 
@@ -35,7 +35,7 @@
 | You want... | `.minions` gives you... |
 |---|---|
 | Fast setup, no yak-shaving | One installer (`install.sh`) + one runtime entrypoint (`boot.sh`) |
-| Free-model routing with OpenAI-compatible APIs | **OmniRoute** (`:20128/v1`) + **ModelRelay** (`:7352/v1`) |
+| Free-model routing with OpenAI-compatible APIs | **OmniRoute** (`:20128/v1`) + **9Router** (`:7352/v1`) |
 | Agent tooling ready out of the box | **Pi Agent** + **Hermes CLI** preconfigured |
 | Durable context across sessions | **Mnemon** installed and seeded |
 | Safe, reproducible behavior | Version pins, health checks, PID-based process control |
@@ -45,7 +45,7 @@
 ## What gets installed
 
 - **OmniRoute** (persistent proxy)
-- **ModelRelay** (persistent proxy)
+- **9Router** (persistent proxy)
 - **Pi Agent** (CLI)
 - **Hermes** (CLI)
 - **Mnemon** (memory layer)
@@ -122,14 +122,14 @@ Use `bash -c "$(curl ...)"` so environment variables like `HOME` and `INSTALL_UR
 
 ```bash
 OMNIROUTE_PORT=20128
-MODELRELAY_PORT=7352
+NINEROUTER_PORT=7352
 ```
 
 Example custom ports:
 
 ```bash
 export OMNIROUTE_PORT=20129
-export MODELRELAY_PORT=7353
+export NINEROUTER_PORT=7353
 ./install.sh
 ~/.minions/boot.sh
 ```

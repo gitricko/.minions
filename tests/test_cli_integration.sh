@@ -123,9 +123,9 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         if "${DTS_SCRIPT}" exec "grep -q '\"baseUrl\": \"http://127.0.0.1:7352/v1\"' /home/ubuntu/.pi/agent/models.json"; then
-            log_info "DTS: Pi models.json has correct modelrelay baseUrl (7352)"
+            log_info "DTS: Pi models.json has correct 9router baseUrl (7352)"
         else
-            log_error "DTS: Pi models.json missing correct modelrelay baseUrl"
+            log_error "DTS: Pi models.json missing correct 9router baseUrl"
             "${DTS_SCRIPT}" exec "cat /home/ubuntu/.pi/agent/models.json"
             "${DTS_SCRIPT}" clean
             exit 1
@@ -140,11 +140,11 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
             exit 1
         fi
         
-        # Test ModelRelay /v1/models endpoint responds
+        # Test 9Router /v1/models endpoint responds
         if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
-            log_info "DTS: ModelRelay /v1/models endpoint responds"
+            log_info "DTS: 9Router /v1/models endpoint responds"
         else
-            log_error "DTS: ModelRelay /v1/models endpoint failed"
+            log_error "DTS: 9Router /v1/models endpoint failed"
             "${DTS_SCRIPT}" clean
             exit 1
         fi
@@ -247,9 +247,9 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         fi
         
         if grep -q '"baseUrl": "http://127.0.0.1:7352/v1"' "${PI_MODELS}"; then
-            log_info "Pi models.json has correct modelrelay baseUrl (7352)"
+            log_info "Pi models.json has correct 9router baseUrl (7352)"
         else
-            log_error "Pi models.json missing correct modelrelay baseUrl"
+            log_error "Pi models.json missing correct 9router baseUrl"
             cat "${PI_MODELS}"
             exit 1
         fi

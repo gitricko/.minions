@@ -106,19 +106,19 @@ ensure_omniroute() {
     ln -sf "${MINIONS_HOME}/lib/omniroute/omniroute" "${MINIONS_HOME}/bin/omniroute"
 }
 
-# Ensure ModelRelay is available
-ensure_modelrelay() {
-    if [ -x "${MINIONS_HOME}/lib/modelrelay/modelrelay" ]; then
-        echo "ModelRelay found at ${MINIONS_HOME}/lib/modelrelay/modelrelay"
+# Ensure 9Router is available
+ensure_9router() {
+    if [ -x "${MINIONS_HOME}/lib/9router/9router" ]; then
+        echo "9Router found at ${MINIONS_HOME}/lib/9router/9router"
         return 0
     fi
 
-    echo "ModelRelay not found, installing..."
+    echo "9Router not found, installing..."
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/versions.env"
-    mkdir -p "${MINIONS_HOME}/lib/modelrelay"
-    install_npm_package "modelrelay" "${MODELRELAY_VERSION}" "${MINIONS_HOME}/lib/modelrelay" "modelrelay" "bin/modelrelay.js"
+    mkdir -p "${MINIONS_HOME}/lib/9router"
+    install_npm_package "9router" "${NINEROUTER_VERSION}" "${MINIONS_HOME}/lib/9router" "9router" "cli.js"
 
     # Create symlink in bin
-    ln -sf "${MINIONS_HOME}/lib/modelrelay/modelrelay" "${MINIONS_HOME}/bin/modelrelay"
+    ln -sf "${MINIONS_HOME}/lib/9router/9router" "${MINIONS_HOME}/bin/9router"
 }

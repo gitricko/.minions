@@ -37,10 +37,10 @@ dependencies:
     channel: latest
     sha_source: none
 
-  - name: MODELRELAY
-    version: "1.22.1"
+  - name: NINEROUTER
+    version: "0.5.81"
     source_type: npm
-    package: modelrelay
+    package: 9router
     channel: latest
     sha_source: none
 

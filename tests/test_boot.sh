@@ -87,7 +87,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify PID files created for persistent services
-        for service in omniroute modelrelay; do
+        for service in omniroute 9router; do
             if "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
                 log_info "DTS: PID file created for ${service}"
             else
@@ -167,7 +167,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify PID files removed
-        for service in omniroute modelrelay; do
+        for service in omniroute 9router; do
             if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
                 log_info "DTS: PID file removed for ${service}"
             else

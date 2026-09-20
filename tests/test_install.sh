@@ -149,7 +149,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     fi
 
     # Verify binaries exist in fixed install location
-    for bin in omniroute modelrelay pi; do
+    for bin in omniroute 9router pi; do
         if [ -x "${HOME}/.minions/bin/${bin}" ]; then
             log_info "${bin} installed"
         else

@@ -10,8 +10,8 @@ MINIONS_HOME="${MINIONS_HOME:-${HOME}/.minions}"
 # No runtime config file (etc/minions.env was removed) - ports come from env or defaults
 OMNIROUTE_HOST="${OMNIROUTE_HOST:-127.0.0.1}"
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
-MODELRELAY_HOST="${MODELRELAY_HOST:-127.0.0.1}"
-MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
+NINEROUTER_HOST="${NINEROUTER_HOST:-127.0.0.1}"
+NINEROUTER_PORT="${NINEROUTER_PORT:-7352}"
 
 check_port() {
     host=$1
@@ -48,10 +48,10 @@ echo "  omniroute   (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})"
 check_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" && echo "✅" || echo "❌"
 check_pid "omniroute"
 
-# Check ModelRelay
-echo "  modelrelay  (${MODELRELAY_HOST}:${MODELRELAY_PORT})"
-check_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" && echo "✅" || echo "❌"
-check_pid "modelrelay"
+# Check 9Router
+echo "  9router     (${NINEROUTER_HOST}:${NINEROUTER_PORT})"
+check_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" && echo "✅" || echo "❌"
+check_pid "9router"
 
 # Check Pi-Agent CLI
 echo "  pi-agent    CLI"
