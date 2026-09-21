@@ -158,30 +158,49 @@ wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"
 log_info "Preconfiguring 9Router..."
 # shellcheck disable=SC1091
 . "${LIB_DIR}/9router.sh"
-if ninerouter_preconfigure; then
+if ninerouter_preconfigure >> "${boot_log}" 2>&1; then
     log_info "9Router preconfig complete"
 else
-    log_warn "9Router preconfig had issues (non-fatal)"
+    log_warn "9Router preconfig had issues (see ${boot_log})"
 fi
 
 # Step 4: Wait for OmniRoute health (needed for any post-boot checks)
 log_info "Waiting for OmniRoute health..."
 wait_for_health "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/healthz" 120 "omniroute"
 
-# Step 4: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
+# Step 5: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
 log_info "Preconfiguring OmniRoute..."
 # shellcheck disable=SC1091
 . "${LIB_DIR}/omniroute.sh"
-if omniroute_preconfigure; then
+if omniroute_preconfigure >> "${boot_log}" 2>&1; then
     log_info "OmniRoute preconfig complete"
 else
-    log_warn "OmniRoute preconfig had issues (non-fatal)"
+    log_warn "OmniRoute preconfig had issues (see ${boot_log})"
 fi
 
-# Step 5: Readiness marker
+# Step 6: Configure Hermes CLI (model, providers, fallback) — matches hermes-codespace post-create
+log_info "Configuring Hermes..."
+HERMES_BIN="${MINIONS_HOME}/bin/hermes"
+if [ -x "${HERMES_BIN}" ]; then
+    {
+        "${HERMES_BIN}" config set model.default auto-fastest
+        "${HERMES_BIN}" config set model.provider omniroute
+        "${HERMES_BIN}" config set providers.omniroute.base_url "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
+        "${HERMES_BIN}" config set providers.omniroute.api_key "no-key-needed"
+        "${HERMES_BIN}" config set providers.9router.base_url "http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
+        "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
+    } >> "${boot_log}" 2>&1 || {
+        log_warn "Hermes config had issues (see ${boot_log})"
+    }
+    log_info "Hermes config complete"
+else
+    log_warn "Hermes binary not found at ${HERMES_BIN}, skipping config"
+fi
+
+# Step 7: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"
 
-# Step 6: Print READY message
+# Step 8: Print READY message
 echo ""
 echo "=============================================="
 echo "  .minions stack is UP"
