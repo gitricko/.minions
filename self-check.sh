@@ -24,7 +24,7 @@ SKIP_CHECKS="${MINIONS_SKIP_CHECKS:-}"
 DISK_WARN_PCT="${MINIONS_DISK_WARN_PCT:-85}"
 
 HERMES_CONFIG="${HERMES_CONFIG:-$HOME/.hermes/config.yaml}"
-REPORT_FILE="/tmp/health-report.json"
+REPORT_FILE="${CI_LOGS_DIR:-/tmp}/health-report.json"
 MINIONS_HOME="${MINIONS_HOME:-$HOME/.minions}"
 
 # Colours (disabled if stderr is not a terminal, e.g. CI)
