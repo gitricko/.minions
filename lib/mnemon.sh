@@ -25,7 +25,7 @@ install_mnemon() {
         aarch64|arm64) arch="aarch64" ;;
     esac
 
-    mnemon_version="0.2.5"
+    mnemon_version="0.2.9"
 
     # Try latest release download
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"

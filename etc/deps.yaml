@@ -44,6 +44,12 @@ dependencies:
     channel: latest
     sha_source: none
 
+  - name: MNEMON
+    version: "0.2.9"
+    source_type: github_tag
+    repo: mnemon-dev/mnemon
+    sha_source: none
+
   - name: NODE
     version: "26.8.2"
     source_type: release_tarball
