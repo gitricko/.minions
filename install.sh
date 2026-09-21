@@ -426,7 +426,10 @@ else
 fi
 
 # Step 7: Preconfigure OmniRoute default password and disable login (so boot is seamless)
-log_info "Preconfiguring OmniRoute defaults..."
+# Only run if OmniRoute is being installed (INSTALL_OMNIROUTE=1). Dev-mode installs
+# with --no-omniroute use a different HOME, so the DB path would be wrong.
+if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
+    log_info "Preconfiguring OmniRoute defaults..."
 export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
 export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
 # NOTE: login-off is a direct sqlite write (requireLogin=false) — the documented
@@ -448,6 +451,7 @@ if [ -f "${OR_DB}" ]; then
     fi
 else
     log_warn "OmniRoute storage DB not found at ${OR_DB}; login not disabled"
+fi
 fi
 
 # Step 8: Set up PATH snippet
