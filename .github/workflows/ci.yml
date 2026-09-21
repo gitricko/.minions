@@ -104,6 +104,8 @@ jobs:
     name: Real Install (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CI_LOGS_DIR: /tmp/real-install
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -130,7 +132,7 @@ jobs:
           CI_REAL_INSTALL: 1
         run: |
           set -e
-          mkdir -p /tmp/real-install
+          mkdir -p "${CI_LOGS_DIR}"
           # Install to fixed location ~/.minions (multi-instance support removed)
           echo "Running real install..."
           bash install.sh
@@ -168,21 +170,21 @@ jobs:
 
           # Now boot the stack
           export PATH="${HOME}/.minions/bin:${PATH}"
-          timeout 300s bash "${HOME}/.minions/boot.sh" >/tmp/real-install/boot.log 2>&1
+          timeout 300s bash "${HOME}/.minions/boot.sh" >"${CI_LOGS_DIR}/boot.log" 2>&1
           BOOT_EXIT=$?
           echo "boot.sh exit code: ${BOOT_EXIT}"
-          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" /tmp/real-install/boot.log; then
+          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" "${CI_LOGS_DIR}/boot.log"; then
               echo "FAIL: boot.sh did not reach completion marker"
-              cat /tmp/real-install/boot.log
+              cat "${CI_LOGS_DIR}/boot.log"
               exit 1
           fi
           echo "Stack booted successfully"
 
           # Run full self-check with services running
           echo "Running self-check..."
-          CI_LOGS_DIR=/tmp/real-install bash self-check.sh || {
+          bash self-check.sh || {
               echo "WARNING: self-check reported issues (exit $?)" 
-              cat /tmp/real-install/health-report.json
+              cat "${CI_LOGS_DIR}/health-report.json"
           }
 
           # T7: real-install standalone test (Phase 22.5 proposal)
@@ -202,14 +204,14 @@ jobs:
           if curl -fsSL "${TARBALL_URL}" | tar xz -C "${BOOTSTRAP_DIR}" 2>/dev/null; then
               EXTRACTED=$(find /tmp/minions-bootstrap-test -maxdepth 1 -type d -name '.minions*' | head -1)
               if [ -n "${EXTRACTED}" ] && [ -f "${EXTRACTED}/install.sh" ]; then
-                  HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/real-install/standalone_real_install.log
+                  HOME="${STANDALONE_HOME}" bash "${EXTRACTED}/install.sh" --no-hermes --no-omniroute --no-9router 2>&1 | tee "${CI_LOGS_DIR}/standalone_real_install.log"
                   if [ ${PIPESTATUS[0]} -eq 0 ]; then
                       echo "✓ Standalone real-install test exit 0"
-                      if grep -q "Knowledge mode: standalone" /tmp/real-install/standalone_real_install.log; then
+                      if grep -q "Knowledge mode: standalone" "${CI_LOGS_DIR}/standalone_real_install.log"; then
                           echo "✓ Standalone mode detected"
                       else
                           echo "FAIL: Standalone mode NOT detected"
-                          cat /tmp/real-install/standalone_real_install.log
+                          cat "${CI_LOGS_DIR}/standalone_real_install.log"
                           exit 1
                       fi
                       if [ -d "${STANDALONE_HOME}/.minions/skills" ] && [ -f "${STANDALONE_HOME}/.minions/etc/knowledge.env" ]; then
@@ -221,7 +223,7 @@ jobs:
                       fi
                   else
                       echo "FAIL: Standalone install exited non-zero"
-                      cat /tmp/real-install/standalone_real_install.log
+                      cat "${CI_LOGS_DIR}/standalone_real_install.log"
                       exit 1
                   fi
               else
@@ -246,20 +248,20 @@ jobs:
           #   export INSTALL_URL="..."
           #   HOME=/custom/home bash -c "$(curl -fsSL "$INSTALL_URL")"
           # INSTALL_URL exported in parent shell; HOME set for bash -c
-          if HOME="${STANDALONE_HOME2}" bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/real-install/standalone_piped_test.log; then
+          if HOME="${STANDALONE_HOME2}" bash -c "$(curl -fsSL "${INSTALL_URL}")" -- --no-hermes --no-omniroute --no-9router 2>&1 | tee "${CI_LOGS_DIR}/standalone_piped_test.log"; then
               echo "✓ Piped INSTALL_URL test exit 0"
-              if grep -q "Knowledge mode: standalone" /tmp/real-install/standalone_piped_test.log; then
+              if grep -q "Knowledge mode: standalone" "${CI_LOGS_DIR}/standalone_piped_test.log"; then
                   echo "✓ Standalone mode detected"
               else
                   echo "FAIL: Standalone mode NOT detected"
-                  cat /tmp/real-install/standalone_piped_test.log
+                  cat "${CI_LOGS_DIR}/standalone_piped_test.log"
                   exit 1
               fi
-              if grep -q "derived BOOTSTRAP_URL from INSTALL_URL" /tmp/real-install/standalone_piped_test.log; then
+              if grep -q "derived BOOTSTRAP_URL from INSTALL_URL" "${CI_LOGS_DIR}/standalone_piped_test.log"; then
                   echo "✓ BOOTSTRAP_URL auto-derivation worked"
               else
                   echo "FAIL: BOOTSTRAP_URL auto-derivation NOT triggered"
-                  cat /tmp/real-install/standalone_piped_test.log
+                  cat "${CI_LOGS_DIR}/standalone_piped_test.log"
                   exit 1
               fi
               if [ -d "${STANDALONE_HOME2}/.minions/skills" ] && [ -f "${STANDALONE_HOME2}/.minions/etc/knowledge.env" ]; then
@@ -281,7 +283,7 @@ jobs:
               fi
           else
               echo "FAIL: Piped INSTALL_URL test exited non-zero"
-              cat /tmp/real-install/standalone_piped_test.log
+              cat "${CI_LOGS_DIR}/standalone_piped_test.log"
               exit 1
           fi
           rm -rf "${STANDALONE_HOME2}"
@@ -292,27 +294,27 @@ jobs:
 
       # ── Collect logs on failure (hermes-codespace devcontainer-ci.yml pattern) ──
       - name: Collect diagnostic logs (Real Install)
-        if: failure()
+        if: always()
         run: |
-          mkdir -p /tmp/real-install
+          mkdir -p "${CI_LOGS_DIR}"
 
           # Boot/service logs (written by boot.sh to ~/.minions/var/log)
-          cp "${HOME}/.minions/var/log/boot.log"      /tmp/real-install/ 2>/dev/null || true
-          cp "${HOME}/.minions/var/log/omniroute.log" /tmp/real-install/ 2>/dev/null || true
-          cp "${HOME}/.minions/var/log/9router.log"   /tmp/real-install/ 2>/dev/null || true
+          cp "${HOME}/.minions/var/log/boot.log"      "${CI_LOGS_DIR}/" 2>/dev/null || true
+          cp "${HOME}/.minions/var/log/omniroute.log" "${CI_LOGS_DIR}/" 2>/dev/null || true
+          cp "${HOME}/.minions/var/log/9router.log"   "${CI_LOGS_DIR}/" 2>/dev/null || true
 
           # System diagnostics
-          ps aux > /tmp/real-install/ps-aux.txt 2>&1 || true
-          ss -tlnp > /tmp/real-install/ss-tlnp.txt 2>&1 || netstat -tlnp > /tmp/real-install/netstat-tlnp.txt 2>&1 || true
+          ps aux > "${CI_LOGS_DIR}/ps-aux.txt" 2>&1 || true
+          ss -tlnp > "${CI_LOGS_DIR}/ss-tlnp.txt" 2>&1 || netstat -tlnp > "${CI_LOGS_DIR}/netstat-tlnp.txt" 2>&1 || true
 
           echo "=== Collected logs ==="
-          ls -la /tmp/real-install/
+          ls -la "${CI_LOGS_DIR}/"
 
       - name: Upload Real Install logs on failure
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: real-install-ci-logs-${{ github.run_id }}
-          path: /tmp/real-install/
+          path: ${{ env.CI_LOGS_DIR }}/
           if-no-files-found: warn
           retention-days: 7
