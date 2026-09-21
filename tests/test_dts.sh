@@ -152,19 +152,21 @@ echo ""
 echo "=== Test 3: Service health checks ==="
 
 # OmniRoute
-if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/dev/null"; then
+if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/tmp/ci/omniroute-healthz.log 2>&1"; then
     log_info "OmniRoute health check passes"
 else
     log_error "OmniRoute health check failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/ci/omniroute-healthz.log" 2>/dev/null || true
     cleanup
     exit 1
 fi
 
 # 9Router
-if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
+if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/tmp/ci/ninerouter-models.log 2>&1"; then
     log_info "9Router models endpoint responds"
 else
     log_error "9Router models endpoint failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/ci/ninerouter-models.log" 2>/dev/null || true
     cleanup
     exit 1
 fi
@@ -208,10 +210,11 @@ else
 fi
 
 # Verify login disabled via REST API (sqlite fails when server has DB locked)
-if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings 2>/dev/null | grep -q 'requireLogin.*false'"; then
+if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings >/tmp/ci/omniroute-settings.log 2>&1; cat /tmp/ci/omniroute-settings.log | grep -q 'requireLogin.*false'"; then
     log_info "OmniRoute login disabled (REST API)"
 else
     log_warn "Could not verify login disabled via REST API"
+    "${DTS_SCRIPT}" exec "cat /tmp/ci/omniroute-settings.log" 2>/dev/null || true
 fi
 
 # Test 5: Chat completion end-to-end (OPTIONAL — auto-fastest routes to
@@ -220,10 +223,11 @@ fi
 echo ""
 echo "=== Test 5: End-to-end chat completion (optional) ==="
 # 5a. OmniRoute chat completion
-if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/tmp/ci/omniroute-chat.log 2>&1"; then
     log_info "Chat completion via OmniRoute auto-fastest works"
 elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
     log_error "Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
+    "${DTS_SCRIPT}" exec "cat /tmp/ci/omniroute-chat.log" 2>/dev/null || true
     cleanup
     exit 1
 else
@@ -231,10 +235,11 @@ else
 fi
 
 # 5b. 9Router chat completion (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
-if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/tmp/ci/ninerouter-chat.log 2>&1"; then
     log_info "Chat completion via 9Router auto-fastest works"
 else
     log_warn "Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
+    "${DTS_SCRIPT}" exec "cat /tmp/ci/ninerouter-chat.log" 2>/dev/null || true
 fi
 
 # Test 6: Hermes CLI
