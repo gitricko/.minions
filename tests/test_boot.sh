@@ -118,19 +118,21 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify OmniRoute health check passes
-        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/dev/null"; then
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/tmp/ci/omniroute-healthz.log 2>&1"; then
             log_info "DTS: OmniRoute health check passes"
         else
             log_error "DTS: OmniRoute health check failed"
+            "${DTS_SCRIPT}" exec "cat /tmp/ci/omniroute-healthz.log" 2>/dev/null || true
             "${DTS_SCRIPT}" clean
             exit 1
         fi
         
         # Verify 9Router responds
-        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/tmp/ci/ninerouter-models.log 2>&1"; then
             log_info "DTS: 9Router models endpoint responds"
         else
             log_error "DTS: 9Router models endpoint failed"
+            "${DTS_SCRIPT}" exec "cat /tmp/ci/ninerouter-models.log" 2>/dev/null || true
             "${DTS_SCRIPT}" clean
             exit 1
         fi
@@ -150,7 +152,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         else
             # REST API fallback check
             log_warn "DTS: Could not verify login via sqlite (DB locked), checking via REST API"
-            if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings 2>/dev/null | grep -q 'requireLogin.*false'"; then
+            if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings >/tmp/ci/omniroute-settings.log 2>&1; cat /tmp/ci/omniroute-settings.log | grep -q 'requireLogin.*false'"; then
                 log_info "DTS: OmniRoute login disabled (REST API)"
             else
                 log_warn "DTS: Could not verify login disabled"
