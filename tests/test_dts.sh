@@ -93,7 +93,7 @@ export LOGS_DIR="${LOGS_DIR:-/tmp/dts-logs}"
 log_info "DTS container started"
 
 # Install system prerequisites
-"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev python3-yaml build-essential git ca-certificates software-properties-common sqlite3"
+"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev python3-yaml build-essential git ca-certificates software-properties-common sqlite3"
 log_info "System prerequisites installed"
 
 # Test 1: install.sh

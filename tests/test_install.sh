@@ -73,7 +73,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         
         # Start container and install prerequisites
         "${DTS_SCRIPT}" up
-        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
+        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev build-essential git ca-certificates software-properties-common"
         
         # Run install.sh
         if "${DTS_SCRIPT}" exec "cd /src && bash install.sh --no-hermes"; then
