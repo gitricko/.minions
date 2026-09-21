@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-IMAGE="${IMAGE:-ubuntu:24.04}"
+IMAGE="${IMAGE:-ubuntu:26.04}"
 CONTAINER="${CONTAINER:-dts-test}"
 CONTAINER_UID="${CONTAINER_UID:-1000}"
 CONTAINER_GID="${CONTAINER_GID:-1000}"
@@ -50,12 +50,20 @@ cmd_up() {
         exit 1
     fi
     log "creating ${CONTAINER} from ${IMAGE} (mount ${REPO_PATH} -> ${MOUNT})"
-    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" "${IMAGE}" sleep infinity >/dev/null
+    # Bind-mount a host logs dir into the container at /tmp/ci so in-container
+    # CI logs (/tmp/ci/*.log) survive container cleanup and can be collected
+    # by the CI workflow for failure analysis.
+    LOGS_DIR="${LOGS_DIR:-/tmp/dts-logs}"
+    mkdir -p "${LOGS_DIR}"
+    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" "${IMAGE}" sleep infinity >/dev/null
     sleep 1
     # Ensure uid-1000 user exists and owns the mount (Ubuntu/Debian: ubuntu user)
     docker exec -u 0:0 "${CONTAINER}" bash -c "
         id ${CONTAINER_UID} >/dev/null 2>&1 || useradd -m -u ${CONTAINER_UID} ubuntu 2>/dev/null || true
         chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${MOUNT}
+        # Logs mount: uid-1000 writes /tmp/ci; without this chown the host dir
+        # stays owned by the runner uid and in-container writes silently fail.
+        mkdir -p /tmp/ci && chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/ci
         [ -d \"${home}\" ] || (mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home})
     " >/dev/null
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')

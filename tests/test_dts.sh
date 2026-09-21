@@ -34,6 +34,10 @@ PROJECT_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
 
 # Cleanup helper: with --no-clean, leaves the container up for manual testing.
 cleanup() {
+    # Preserve in-container logs to the host-mounted /tmp/ci (bind-mounted from
+    # $LOGS_DIR by dts.sh) so they survive container removal and CI can collect
+    # them: service/boot logs from ~/.minions/var/log, plus the self-check report.
+    "${DTS_SCRIPT}" exec "mkdir -p /tmp/ci && cp -a \$HOME/.minions/var/log/. /tmp/ci/ 2>/dev/null || true; cp /tmp/health-report.json /tmp/ci/ 2>/dev/null || true" >/dev/null 2>&1 || true
     if [ "${NO_CLEAN}" -eq 1 ]; then
         echo ""
         log_warn "--no-clean set: leaving container 'dts-test' running for manual testing"
@@ -78,6 +82,8 @@ if [ ! -x "${DTS_SCRIPT}" ]; then
     log_error "DTS script not found or not executable: ${DTS_SCRIPT}"
     exit 1
 fi
+# LOGS_DIR drives dts.sh bind-mount: host dir -> /tmp/ci in container
+export LOGS_DIR="${LOGS_DIR:-/tmp/dts-logs}"
 
 # Clean any existing container (always reset state at start, regardless of --non-clean)
 "${DTS_SCRIPT}" clean >/dev/null 2>&1 || true

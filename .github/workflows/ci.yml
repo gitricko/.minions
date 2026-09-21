@@ -83,6 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: test
+    env:
+      CI_LOGS_DIR: /tmp/dts-logs
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -90,8 +92,9 @@ jobs:
       - name: Run full-stack DTS integration test (up to 3 retries)
         run: |
           set -e
+          mkdir -p "${CI_LOGS_DIR}"
           for i in 1 2 3; do
-            if bash tests/test_dts.sh; then
+            if LOGS_DIR="${CI_LOGS_DIR}" bash tests/test_dts.sh; then
               echo "DTS passed on attempt $i"
               exit 0
             fi
@@ -99,6 +102,25 @@ jobs:
           done
           echo "DTS failed after 3 attempts"
           exit 1
+
+      # ── Collect logs on failure (hermes-codespace devcontainer-ci.yml pattern) ──
+      - name: Collect diagnostic logs (DTS)
+        if: always()
+        run: |
+          # Logs written inside the container land on host via bind-mount
+          # (dts.sh mounts $LOGS_DIR -> /tmp/ci). Container logs live under
+          # ~/.minions/var/log inside the container; they are copied out here.
+          echo "=== Collected DTS logs (host /tmp/dts-logs) ==="
+          ls -la "${CI_LOGS_DIR}/" 2>/dev/null || true
+
+      - name: Upload DTS logs on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dts-ci-logs-${{ github.run_id }}
+          path: ${{ env.CI_LOGS_DIR }}/
+          if-no-files-found: warn
+          retention-days: 7
 
   real-install:
     name: Real Install (Linux)
@@ -296,8 +318,6 @@ jobs:
       - name: Collect diagnostic logs (Real Install)
         if: always()
         run: |
-          mkdir -p "${CI_LOGS_DIR}"
-
           # Boot/service logs (written by boot.sh to ~/.minions/var/log)
           cp "${HOME}/.minions/var/log/boot.log"      "${CI_LOGS_DIR}/" 2>/dev/null || true
           cp "${HOME}/.minions/var/log/omniroute.log" "${CI_LOGS_DIR}/" 2>/dev/null || true
