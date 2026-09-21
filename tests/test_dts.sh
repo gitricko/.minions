@@ -223,7 +223,7 @@ fi
 echo ""
 echo "=== Test 5: End-to-end chat completion (optional) ==="
 # 5a. OmniRoute chat completion
-if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/tmp/ci/omniroute-chat.log 2>&1"; then
+if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":16}' >/tmp/ci/omniroute-chat.log 2>&1"; then
     log_info "Chat completion via OmniRoute auto-fastest works"
 elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
     log_error "Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
@@ -235,7 +235,7 @@ else
 fi
 
 # 5b. 9Router chat completion (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
-if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/tmp/ci/ninerouter-chat.log 2>&1"; then
+if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":16}' >/tmp/ci/ninerouter-chat.log 2>&1"; then
     log_info "Chat completion via 9Router auto-fastest works"
 else
     log_warn "Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"

@@ -155,7 +155,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         # Test chat completion through OmniRoute (OPTIONAL — see note in
         # Real-install mode: oc/opencode-zen free-tier providers reject
         # non-OpenCode requests; gate with CI_OMNIROUTE_CHAT_REQUIRED=1)
-                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":16}' >/dev/null"; then
                     log_info "DTS: Chat completion via OmniRoute works"
                 elif [ "${CI_OMNIROUTE_CHAT_REQUIRED:-0}" -eq 1 ]; then
                     log_error "DTS: Chat completion via OmniRoute failed (CI_OMNIROUTE_CHAT_REQUIRED=1)"
@@ -166,7 +166,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
                 fi
 
                 # Test 9Router chat completion (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
-                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":10}' >/dev/null"; then
+                if "${DTS_SCRIPT}" exec "curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"auto-fastest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":16}' >/dev/null"; then
                     log_info "DTS: Chat completion via 9Router auto-fastest works"
                 else
                     log_warn "DTS: Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
@@ -321,7 +321,7 @@ mkdir -p "${CLI_LOGS}"
     # Test chat completion via OmniRoute — OPTIONAL (OC provider bug)
     # auto-fastest routes to oc/opencode-zen free-tier providers which reject
     # non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-    if curl -sS -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >"${CLI_LOGS}/omniroute-chat.log" 2>&1; then
+    if curl -sS -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":16}' >"${CLI_LOGS}/omniroute-chat.log" 2>&1; then
         log_info "Chat completion via OmniRoute works"
     else
         cat "${CLI_LOGS}/omniroute-chat.log" >&2 2>/dev/null || true
@@ -329,7 +329,7 @@ mkdir -p "${CLI_LOGS}"
     fi
 
     # Test chat completion via 9Router (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
-    if curl -sS -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >"${CLI_LOGS}/ninerouter-chat.log" 2>&1; then
+    if curl -sS -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":16}' >"${CLI_LOGS}/ninerouter-chat.log" 2>&1; then
         log_info "Chat completion via 9Router auto-fastest works"
     else
         cat "${CLI_LOGS}/ninerouter-chat.log" >&2 2>/dev/null || true
