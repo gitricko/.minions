@@ -26,6 +26,9 @@ log_info() { echo "${GREEN}[PASS]${NC} $*"; }
 log_error() { echo "${RED}[FAIL]${NC} $*"; }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
+# Log capture dir (set by CI workflow, fallback to /tmp/cli-integration)
+export CLI_LOGS="${CI_LOGS_DIR:-/tmp/cli-integration}"
+
 # DTS-based integration test (primary)
 if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
     echo "=== CLI Integration Test (DTS mode) ==="
@@ -193,6 +196,7 @@ fi
 if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     echo ""
     echo "=== CLI Integration Test (Real install mode) ==="
+mkdir -p "${CLI_LOGS}"
     
     if [ ! -d "${HOME}/.minions" ]; then
         log_error "${HOME}/.minions not found"
@@ -270,7 +274,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     # health check by a moment on a busy runner; boot.sh only confirms /healthz first)
     _models_ok=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -sf http://127.0.0.1:20128/v1/models >/dev/null; then
+        if curl -sS http://127.0.0.1:20128/v1/models >"${CLI_LOGS}/omniroute-models.log" 2>&1; then
             _models_ok=1
             break
         fi
@@ -283,6 +287,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         # Distinguish "connection refused / server dead" (curl exit 7) from
         # "server alive but /v1/models returns non-2xx" (curl exit 22). -sS not -sf
         # so we see the real HTTP status/body instead of a silent failure.
+        cat "${CLI_LOGS}/omniroute-models.log" >&2 2>/dev/null || true
         echo "--- curl probe (127.0.0.1:20128) ---" >&2
         curl -sS -w '\nHTTP_STATUS=%{http_code} EXIT=%{exitcode}\n' \
             http://127.0.0.1:20128/v1/models 2>&1 || true
@@ -296,7 +301,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     # Test 9Router endpoint (retry like OmniRoute — Next.js server needs a moment)
     _9router_ok=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -sf http://127.0.0.1:7352/v1/models >/dev/null; then
+        if curl -sS http://127.0.0.1:7352/v1/models >"${CLI_LOGS}/ninerouter-models.log" 2>&1; then
             _9router_ok=1
             break
         fi
@@ -306,6 +311,7 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
         log_info "9Router /v1/models endpoint responds"
     else
         log_error "9Router /v1/models endpoint failed"
+        cat "${CLI_LOGS}/ninerouter-models.log" >&2 2>/dev/null || true
         echo "--- curl probe (127.0.0.1:7352) ---" >&2
         curl -sS -w '\nHTTP_STATUS=%{http_code} EXIT=%{exitcode}\n' \
             http://127.0.0.1:7352/v1/models 2>&1 || true
@@ -315,16 +321,18 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     # Test chat completion via OmniRoute — OPTIONAL (OC provider bug)
     # auto-fastest routes to oc/opencode-zen free-tier providers which reject
     # non-OpenCode requests (HTTP 400/403/401). Known upstream OmniRoute OC bug.
-    if curl -sf -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >/dev/null; then
+    if curl -sS -X POST http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >"${CLI_LOGS}/omniroute-chat.log" 2>&1; then
         log_info "Chat completion via OmniRoute works"
     else
+        cat "${CLI_LOGS}/omniroute-chat.log" >&2 2>/dev/null || true
         log_warn "Chat completion via OmniRoute SKIPPED (OC provider bug; see comment above)"
     fi
 
     # Test chat completion via 9Router (OpenAI-compatible /v1/chat/completions with model=auto-fastest)
-    if curl -sf -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >/dev/null; then
+    if curl -sS -X POST http://127.0.0.1:7352/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"auto-fastest","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":10}' >"${CLI_LOGS}/ninerouter-chat.log" 2>&1; then
         log_info "Chat completion via 9Router auto-fastest works"
     else
+        cat "${CLI_LOGS}/ninerouter-chat.log" >&2 2>/dev/null || true
         log_warn "Chat completion via 9Router skipped (may need OC credentials; same upstream OC bug)"
     fi
 
