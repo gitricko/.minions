@@ -22,10 +22,79 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Detect what changed — gates whether we run full suite or just lint
+  # ─────────────────────────────────────────────────────────────────
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+      content: ${{ steps.filter.outputs.content }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infrastructure:
+              - 'install.sh'
+              - 'boot.sh'
+              - 'stop.sh'
+              - 'status.sh'
+              - 'self-check.sh'
+              - 'lib/**'
+              - 'scripts/**'
+              - 'tests/**'
+              - 'etc/**'
+              - '.github/workflows/**'
+              - '.node-version'
+            content:
+              - 'skills/**'
+              - 'wiki/**'
+              - 'mnemon/**'
+              - 'memories/**'
+
+  # ── Run lint for content-only changes ──────────────────────────────
+  lint:
+    name: Lint (content changes)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.content == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+
+      - name: Skill YAML validation
+        run: bash tests/test_skill_yaml.sh
+
+      - name: Markdown lint (skills + wiki)
+        run: bash skills/ci-lint-check/scripts/ci_lint_check.sh --markdown-only
+
+      - name: Knowledge layer checks (F1 shell syntax, F3 JSON, F5 no refs)
+        run: |
+          bash scripts/verify-knowledge.sh F1
+          bash scripts/verify-knowledge.sh F3
+          bash scripts/verify-knowledge.sh F5
+
   test:
     name: Test (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -82,7 +151,8 @@ jobs:
     name: DTS Integration (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: test
+    needs: [detect-changes, test]
+    if: needs.detect-changes.outputs.infrastructure == 'true'
     env:
       CI_LOGS_DIR: /tmp/dts-logs
     steps:
@@ -126,6 +196,8 @@ jobs:
     name: Real Install (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
     env:
       CI_LOGS_DIR: /tmp/real-install
     steps:
