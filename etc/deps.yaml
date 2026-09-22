@@ -17,14 +17,14 @@ dependencies:
     sha_source: none
 
   - name: HERMES
-    version: "v2026.9.14"
+    version: "v2026.9.21"
     source_type: github_tag
     repo: NousResearch/hermes-agent
     selector: "v20*"
     sha_source: none
 
   - name: PI
-    version: "0.85.1"
+    version: "0.87.1"
     source_type: npm
     package: "@earendil-works/pi-coding-agent"
     channel: latest
@@ -38,7 +38,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.81"
+    version: "0.5.85"
     source_type: npm
     package: 9router
     channel: latest
