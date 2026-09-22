@@ -102,6 +102,7 @@ MINIONS_HOME="${HOME}/.minions"
 INSTALL_HERMES=1
 INSTALL_OMNIROUTE=1
 INSTALL_NINEROUTER=1
+INSTALL_PI=1
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
@@ -122,8 +123,12 @@ while [ $# -gt 0 ]; do
             INSTALL_NINEROUTER=0
             shift
             ;;
+        --no-pi)
+            INSTALL_PI=0
+            shift
+            ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi]"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"
@@ -272,8 +277,10 @@ log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
 setup_mnemon_all "${MINIONS_HOME}"
 
-log_info "Installing Pi-Agent..."
-ensure_pi
+if [ "${INSTALL_PI}" -eq 1 ]; then
+    log_info "Installing Pi-Agent..."
+    ensure_pi
+fi
 
 log_info "Installing OmniRoute..."
 if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
@@ -352,35 +359,37 @@ setup_hermes_memories_link "${HOME}/.hermes" "${_HERMES_MEM_TARGET}"
 # Step 5: Copy and interpolate config templates
 log_info "Copying and configuring templates..."
 
-# Create Pi agent config directory
-mkdir -p "${HOME}/.pi/agent"
+if [ "${INSTALL_PI}" -eq 1 ]; then
+    # Create Pi agent config directory
+    mkdir -p "${HOME}/.pi/agent"
 
-# Copy pi.toml with port interpolation
-if [ -f "${SCRIPT_DIR}/etc/pi.toml" ]; then
-    sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
-        "${SCRIPT_DIR}/etc/pi.toml" > "${HOME}/.pi/agent/pi.toml"
-    log_info "Created ~/.pi/agent/pi.toml"
-fi
+    # Copy pi.toml with port interpolation
+    if [ -f "${SCRIPT_DIR}/etc/pi.toml" ]; then
+        sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
+            -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
+            "${SCRIPT_DIR}/etc/pi.toml" > "${HOME}/.pi/agent/pi.toml"
+        log_info "Created ~/.pi/agent/pi.toml"
+    fi
 
-# Copy models.json with port interpolation
-if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
-    sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
-        "${SCRIPT_DIR}/etc/models.json" > "${HOME}/.pi/agent/models.json"
-    log_info "Created ~/.pi/agent/models.json"
-fi
+    # Copy models.json with port interpolation
+    if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
+        sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
+            -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
+            "${SCRIPT_DIR}/etc/models.json" > "${HOME}/.pi/agent/models.json"
+        log_info "Created ~/.pi/agent/models.json"
+    fi
 
-# Phase 24: Pi shared-skills wiring — point Pi at the SAME skills/ Hermes loads.
-# dev -> repo skills; standalone -> ~/.minions/skills (copied by install).
-# settings.json is NOT unused anymore: it now carries the "skills" array plus
-# any user "packages" (e.g. pi-failover), merged and preserved by the helper.
-if [ "${MODE}" = "dev" ]; then
-    _PI_SKILLS_PATH="${MINIONS_REPO_ROOT}/skills"
-else
-    _PI_SKILLS_PATH="${MINIONS_HOME}/skills"
+    # Phase 24: Pi shared-skills wiring — point Pi at the SAME skills/ Hermes loads.
+    # dev -> repo skills; standalone -> ~/.minions/skills (copied by install).
+    # settings.json is NOT unused anymore: it now carries the "skills" array plus
+    # any user "packages" (e.g. pi-failover), merged and preserved by the helper.
+    if [ "${MODE}" = "dev" ]; then
+        _PI_SKILLS_PATH="${MINIONS_REPO_ROOT}/skills"
+    else
+        _PI_SKILLS_PATH="${MINIONS_HOME}/skills"
+    fi
+    wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 fi
-wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 
 # Create Hermes config.yaml
 log_info "Creating ~/.hermes/config.yaml..."
@@ -476,7 +485,9 @@ echo ""
 log_info "Installation complete!"
 echo ""
 echo "  Components installed to: ${MINIONS_HOME}"
-echo "    - Pi-Agent:    ${MINIONS_HOME}/bin/pi (version ${PI_VERSION:-unknown})"
+if [ "${INSTALL_PI}" -eq 1 ]; then
+    echo "    - Pi-Agent:    ${MINIONS_HOME}/bin/pi (version ${PI_VERSION:-unknown})"
+fi
 echo "    - OmniRoute:   ${MINIONS_HOME}/bin/omniroute (version ${OMNIROUTE_VERSION:-unknown})"
 echo "    - 9Router:     ${MINIONS_HOME}/bin/9router (version ${NINEROUTER_VERSION:-unknown})"
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
