@@ -399,8 +399,8 @@ for cr in data['check_runs']:
 
 ### Key Files
 
-- `install.sh` — Main setup script (installs Hermes, OmniRoute, ModelRelay, etc.)
-- `boot.sh` — Starts OmniRoute, ModelRelay, and Hermes after setup
+- `install.sh` — Main setup script (installs Hermes, OmniRoute, 9Router, etc.)
+- `boot.sh` — Starts OmniRoute, 9Router, and Hermes after setup
 - `self-check.sh` — Smoke test that runs in CI
 - `.github/workflows/ci.yml` — CI workflow (build + smoke test)
 
@@ -417,8 +417,8 @@ The CI pipeline (`devcontainer-ci.yml`) runs on PRs and pushes to main:
 
 - Hermes Agent: `v2026.7.20`
 - OmniRoute: `3.8.49`
+- 9Router: `0.5.81`
 - Ollama: `0.32.5`
-- ModelRelay: `1.18.0`
 - Node: `24.18.0`
 - Mnemon: `0.1.17`
 

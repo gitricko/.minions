@@ -11,16 +11,16 @@
 #   1. Detects OS/arch
 #   2. Creates ~/.minions directory structure
 #   3. Checks/installs prerequisites (Node, uv)
-#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, ModelRelay, Mnemon
+#   4. Vendors/installs: Hermes, Pi-Agent, OmniRoute, 9Router, Mnemon
 #   4. Copies config templates to standard locations with port interpolation
 #   5. Fixes macOS quarantine where needed
 #
 # Usage:
-#   install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]
+#   install.sh [--no-hermes] [--no-omniroute] [--no-9router]
 #
 # Environment (set in ~/.bashrc BEFORE running):
 #   OMNIROUTE_PORT=20128   (default)
-#   MODELRELAY_PORT=7352   (default)
+#   NINEROUTER_PORT=7352   (default)
 #   BOOTSTRAP_URL=...       (override tarball source, default: main.tar.gz)
 
 # Phase 22.5: Bootstrap preamble for curl|bash one-liner
@@ -101,11 +101,11 @@ set -u
 MINIONS_HOME="${HOME}/.minions"
 INSTALL_HERMES=1
 INSTALL_OMNIROUTE=1
-INSTALL_MODELRELAY=1
+INSTALL_NINEROUTER=1
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
-MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
+NINEROUTER_PORT="${NINEROUTER_PORT:-7352}"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -118,16 +118,16 @@ while [ $# -gt 0 ]; do
             INSTALL_OMNIROUTE=0
             shift
             ;;
-        --no-modelrelay)
-            INSTALL_MODELRELAY=0
+        --no-9router)
+            INSTALL_NINEROUTER=0
             shift
             ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-modelrelay]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router]"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"
-            echo "  MODELRELAY_PORT=7352  (default)"
+            echo "  NINEROUTER_PORT=7352  (default)"
             exit 0
             ;;
         *)
@@ -181,7 +181,7 @@ fi
 
 log_info "Platform: ${PLATFORM}"
 log_info "Installing to: ${MINIONS_HOME}"
-log_info "Ports: omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
+log_info "Ports: omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
 # Step 1: Create directory structure
 log_info "Creating directory structure at ${MINIONS_HOME}"
@@ -200,6 +200,7 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/self-check.sh "${MINIONS_HOME}/self-check.sh" 2>/dev/null || true
 fi
 
 # Ensure python3 + pyyaml for sync-versions.sh (single source of truth).
@@ -260,7 +261,7 @@ fi
 log_info "Installing prerequisites..."
 ensure_uv
 
-# Install vendored Node.js 22.22.2 for npm packages (OmniRoute, ModelRelay, Pi)
+# Install vendored Node.js 22.22.2 for npm packages (OmniRoute, 9Router, Pi)
 # These packages have compatibility issues with Node 24+
 log_info "Installing vendored Node.js ${NODE_VERSION} for npm packages..."
 ensure_node_v22
@@ -279,9 +280,9 @@ if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
     ensure_omniroute
 fi
 
-log_info "Installing ModelRelay..."
-if [ "${INSTALL_MODELRELAY}" -eq 1 ]; then
-    ensure_modelrelay
+log_info "Installing 9Router..."
+if [ "${INSTALL_NINEROUTER}" -eq 1 ]; then
+    ensure_9router
 fi
 
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
@@ -357,7 +358,7 @@ mkdir -p "${HOME}/.pi/agent"
 # Copy pi.toml with port interpolation
 if [ -f "${SCRIPT_DIR}/etc/pi.toml" ]; then
     sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
         "${SCRIPT_DIR}/etc/pi.toml" > "${HOME}/.pi/agent/pi.toml"
     log_info "Created ~/.pi/agent/pi.toml"
 fi
@@ -365,7 +366,7 @@ fi
 # Copy models.json with port interpolation
 if [ -f "${SCRIPT_DIR}/etc/models.json" ]; then
     sed -e "s|{{OMNIROUTE_PORT}}|${OMNIROUTE_PORT}|g" \
-        -e "s|{{MODELRELAY_PORT}}|${MODELRELAY_PORT}|g" \
+        -e "s|{{NINEROUTER_PORT}}|${NINEROUTER_PORT}|g" \
         "${SCRIPT_DIR}/etc/models.json" > "${HOME}/.pi/agent/models.json"
     log_info "Created ~/.pi/agent/models.json"
 fi
@@ -392,11 +393,11 @@ providers:
   omniroute:
     base_url: http://127.0.0.1:${OMNIROUTE_PORT}/v1
     api_key: no-key-needed
-  modelrelay:
-    base_url: http://127.0.0.1:${MODELRELAY_PORT}/v1
+  9router:
+    base_url: http://127.0.0.1:${NINEROUTER_PORT}/v1
     api_key: no-key-needed
 fallback_providers:
-  - provider: modelrelay
+  - provider: 9router
     model: auto-fastest
 approvals:
   mode: "off"
@@ -413,20 +414,23 @@ display:
 terminal:
   cwd: ${HOME}
 YAMLEOF
-log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, modelrelay=${MODELRELAY_PORT}"
+log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
 # (Mnemon seeds are not imported by minions — setup_mnemon_all is disabled per user request.)
 
 # Step 6: Install pi-failover extension (CLI only, no proxy needed)
 log_info "Installing pi-failover extension..."
-if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@hermes-impl 2>/dev/null; then
+if "${MINIONS_HOME}/bin/pi" install git:github.com/gitricko/pi-failover@main 2>/dev/null; then
     log_info "pi-failover extension installed"
 else
     log_warn "pi-failover extension install failed (may not exist yet or needs retry at boot)"
 fi
 
 # Step 7: Preconfigure OmniRoute default password and disable login (so boot is seamless)
-log_info "Preconfiguring OmniRoute defaults..."
+# Only run if OmniRoute is being installed (INSTALL_OMNIROUTE=1). Dev-mode installs
+# with --no-omniroute use a different HOME, so the DB path would be wrong.
+if [ "${INSTALL_OMNIROUTE}" -eq 1 ]; then
+    log_info "Preconfiguring OmniRoute defaults..."
 export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
 export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
 # NOTE: login-off is a direct sqlite write (requireLogin=false) — the documented
@@ -449,6 +453,7 @@ if [ -f "${OR_DB}" ]; then
 else
     log_warn "OmniRoute storage DB not found at ${OR_DB}; login not disabled"
 fi
+fi
 
 # Step 8: Set up PATH snippet
 # shellcheck disable=SC2016
@@ -459,7 +464,7 @@ export PATH="${MINIONS_HOME}/bin:${PATH}"
 '
 
 # Add to shell rc files (only if not already present)
-for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+for rc in "${HOME}/.bashrc" "${HOME}/.zshrc" "${HOME}/.profile"; do
     if [ -f "${rc}" ] && ! grep -q "MINIONS_HOME" "${rc}"; then
         log_info "Adding MINIONS_HOME to ${rc}"
         printf '%s\n' "${PATH_SNIPPET}" >> "${rc}"
@@ -473,7 +478,7 @@ echo ""
 echo "  Components installed to: ${MINIONS_HOME}"
 echo "    - Pi-Agent:    ${MINIONS_HOME}/bin/pi (version ${PI_VERSION:-unknown})"
 echo "    - OmniRoute:   ${MINIONS_HOME}/bin/omniroute (version ${OMNIROUTE_VERSION:-unknown})"
-echo "    - ModelRelay:  ${MINIONS_HOME}/bin/modelrelay (version ${MODELRELAY_VERSION:-unknown})"
+echo "    - 9Router:     ${MINIONS_HOME}/bin/9router (version ${NINEROUTER_VERSION:-unknown})"
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     echo "    - Hermes:      ${MINIONS_HOME}/bin/hermes (version ${HERMES_VERSION:-unknown})"
 fi
@@ -498,7 +503,7 @@ Stop the stack:
 Check status:
     ~/.minions/status.sh
 
-Switch LLM proxy to ModelRelay:
+Switch LLM proxy to 9Router:
     export MINIONS_LLM_BASE_URL=http://localhost:7352/v1
     ~/.minions/boot.sh
 EOF

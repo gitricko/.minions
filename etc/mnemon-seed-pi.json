@@ -9,10 +9,10 @@
       "tags": ["coding-agent", "configuration"]
     },
     {
-      "text": "Pi-Agent uses pi-failover extension for model failover between OmniRoute and ModelRelay",
+      "text": "Pi-Agent uses pi-failover extension for model failover between OmniRoute and 9Router",
       "category": "fact",
       "importance": 4,
-      "entities": ["pi-agent", "pi-failover", "omniroute", "modelrelay"],
+      "entities": ["pi-agent", "pi-failover", "omniroute", "9router"],
       "tags": ["extension", "failover", "llm-proxy"]
     },
     {
@@ -23,10 +23,10 @@
       "tags": ["config", "symlink"]
     },
     {
-      "text": "Pi-Agent ports: OMNIROUTE_PORT=20128, MODELRELAY_PORT=7352, MINIONS_LLM_BASE_URL=http://localhost:20128/v1",
+      "text": "Pi-Agent ports: OMNIROUTE_PORT=20128, NINEROUTER_PORT=7352, MINIONS_LLM_BASE_URL=http://localhost:20128/v1",
       "category": "fact",
       "importance": 4,
-      "entities": ["pi-agent", "ports", "omniroute", "modelrelay"],
+      "entities": ["pi-agent", "ports", "omniroute", "9router"],
       "tags": ["ports", "configuration"]
     },
     {

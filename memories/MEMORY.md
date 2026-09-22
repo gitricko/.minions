@@ -3,11 +3,11 @@
 ## Stack layout
 
 - `.minions` installs a self-contained AI coding stack at `~/.minions`.
-- Components: OmniRoute (LLM proxy, :20128), ModelRelay (proxy alt, :7352),
+- Components: OmniRoute (LLM proxy, :20128), 9Router (proxy alt, :7352),
   Pi-Agent (CLI), Hermes (CLI), Mnemon (memory layer CLI).
 - `install.sh` one-time bootstrap (binaries + configs/templates).
   `boot.sh` starts services + asserts knowledge wiring. `stop.sh`/`status.sh` ops.
-- Ports env-overridable: `OMNIROUTE_PORT`, `MODELRELAY_PORT`, `MINIONS_LLM_BASE_URL`.
+- Ports env-overridable: `OMNIROUTE_PORT`, `NINEROUTER_PORT`, `MINIONS_LLM_BASE_URL`.
 
 ## Knowledge layer (two modes)
 

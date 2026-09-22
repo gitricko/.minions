@@ -197,7 +197,7 @@ WORKSPACE_ROOT="${WORKSPACE:-$(dirname "$SCRIPT_DIR")}"
 
 # ── Validate ALL critical dependencies ──────────────────────────────
 MISSING=()
-for bin in modelrelay omniroute ollama hermes mnemon; do
+for bin in 9router omniroute ollama hermes mnemon; do
   if ! command -v "$bin" &>/dev/null; then
     MISSING+=("binary: $bin")
   fi
@@ -215,10 +215,10 @@ if [ ${#MISSING[@]} -gt 0 ]; then
 fi
 
 # ── Start services (pgrep only — binaries guaranteed by validation) ──
-if pgrep -f modelrelay > /dev/null; then
-  echo "modelrelay already running, skipping"
+if pgrep -f 9router > /dev/null; then
+  echo "9router already running, skipping"
 else
-  setsid /usr/local/bin/modelrelay >> /tmp/modelrelay.log 2>&1 &
+  setsid /usr/local/bin/9router >> /tmp/9router.log 2>&1 &
 fi
 # ... (same pattern for omniroute, ollama, hermes-gateway, hermes-dashboard)
 
@@ -367,7 +367,7 @@ They are reference knowledge ("how system Y works"), not procedures.
    - Dry-run validation → real import → parse output
    - Mnemon deduplication handles duplicates automatically
 4. Add unified dependency validation:
-   - Checks 5 binaries (modelrelay, omniroute, ollama, hermes, mnemon)
+   - Checks 5 binaries (9router, omniroute, ollama, hermes, mnemon)
    - Checks skills directory and seed.json
    - Fails fast with clear FATAL message if any dependency missing
 5. Simplified service sections (pgrep only, no command-v fallbacks)

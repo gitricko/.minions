@@ -24,7 +24,7 @@ SKIP_CHECKS="${MINIONS_SKIP_CHECKS:-}"
 DISK_WARN_PCT="${MINIONS_DISK_WARN_PCT:-85}"
 
 HERMES_CONFIG="${HERMES_CONFIG:-$HOME/.hermes/config.yaml}"
-REPORT_FILE="/tmp/health-report.json"
+REPORT_FILE="${CI_LOGS_DIR:-/tmp}/health-report.json"
 MINIONS_HOME="${MINIONS_HOME:-$HOME/.minions}"
 
 # Colours (disabled if stderr is not a terminal, e.g. CI)
@@ -94,7 +94,7 @@ if ! should_skip "services" && [ "$CI_MODE" = "false" ]; then
   PORT_POLL_TIMEOUT=30
   POLL_STARTED_AT=$(date +%s)
 
-  for pair in "7352:ModelRelay" "20128:OmniRoute"; do
+  for pair in "7352:9Router" "20128:OmniRoute"; do
     PORT="${pair%%:*}"
     NAME="${pair##*:}"
     RESPONDED=false
@@ -129,12 +129,10 @@ section "Models"
 if ! should_skip "models" && [ "$CI_MODE" = "false" ]; then
   models_json=$(curl -s --max-time 5 "http://localhost:20128/v1/models" 2>/dev/null || echo '{}')
   model_count=$(echo "$models_json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "0")
-  default_model=$(grep -A1 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'default' | head -1 | sed 's/.*default: *//' || echo "unknown")
-  default_model="${default_model:-unknown}"
 
   if [ "$model_count" -gt 0 ] 2>/dev/null; then
-    _ok "OmniRoute" "${model_count} models (default: ${default_model})"
-    json_add "models" "ok" "${model_count} models" "{\"count\":${model_count},\"default\":\"${default_model}\"}"
+    _ok "OmniRoute" "${model_count} models available"
+    json_add "models" "ok" "${model_count} models" "{\"count\":${model_count}}"
   else
     _warn "OmniRoute" "no models from /v1/models"
     json_add "models" "warn" "no models" "{\"count\":0}"
@@ -143,6 +141,18 @@ elif [ "$CI_MODE" = "true" ]; then
   echo "   (skipped — CI mode)"
 else
   echo "   (skipped)"
+fi
+
+# 9Router model count
+models_json=$(curl -s --max-time 5 "http://localhost:7352/v1/models" 2>/dev/null || echo '{}')
+model_count=$(echo "$models_json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "0")
+
+if [ "$model_count" -gt 0 ] 2>/dev/null; then
+    _ok "9Router" "${model_count} models available"
+    json_add "models" "ok" "${model_count} models" "{\"count\":${model_count}}"
+else
+    _warn "9Router" "no models returned from /v1/models (may still be starting)"
+    json_add "models" "warn" "no models returned (may still be booting)" "{\"count\":0}"
 fi
 
 # ── 3. Mnemon ────────────────────────────────────────────────────────────────
@@ -176,8 +186,8 @@ section "Hermes"
 
 if ! should_skip "hermes"; then
   if [ -f "$HERMES_CONFIG" ]; then
-    cfg_model=$(grep -A1 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'default' | head -1 | sed 's/.*default: *//' || echo "")
-    cfg_provider=$(grep -A1 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'provider' | head -1 | sed 's/.*provider: *//' || echo "")
+    cfg_model=$(grep -A2 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'default' | head -1 | sed 's/.*default: *//' || echo "")
+    cfg_provider=$(grep -A2 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'provider' | head -1 | sed 's/.*provider: *//' || echo "")
 
     if [ -n "$cfg_model" ]; then
       _ok "Config" "model=${cfg_model}, provider=${cfg_provider:-unset}"

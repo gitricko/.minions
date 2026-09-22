@@ -190,7 +190,7 @@ ls ~/.hermes/skills/           # should include the .minions skills via plugin/w
 | Area | Change |
 |------|--------|
 | **Multi-instance** | `MINIONS_HOME` fixed to `~/.minions`; `--minions-home` and `--dry-run` removed |
-| **Ports** | `OMNIROUTE_PORT` (20128), `MODELRELAY_PORT` (7352) env-overridable in install.sh + boot.sh |
+| **Ports** | `OMNIROUTE_PORT` (20128), `NINEROUTER_PORT` (7352) env-overridable in install.sh + boot.sh |
 | **Config** | install.sh copies/interpolates `etc/pi.toml` → `~/.pi/agent/pi.toml`, `etc/models.json` → `~/.pi/agent/models.json`; Hermes config written to `~/.hermes/config.yaml` |
 | **`etc/minions.env`** | deleted — no runtime config file |
 | **Wrapper install** | `install_npm_package`, `install_pi` keep thin wrappers (npm needs vendored Node 22.22.2) |
@@ -216,8 +216,8 @@ These are DOCUMENTED intent changes, not bugs. The proposal text was reconciled 
    → `boot.sh` still calls `omniroute_preconfigure`.
 
 2. **npm packages use thin wrappers, not bare symlinks.** The proposal's "Direct Binaries,
-   No Wrappers" promise is impossible for OmniRoute/ModelRelay/Pi: they need vendored Node
-   22.22.2 + `NODE_PATH`. `~/.minions/bin/{omniroute,modelrelay,pi}` are wrappers; only
+   No Wrappers" promise is impossible for OmniRoute/9Router/Pi: they need vendored Node
+     22.22.2 + `NODE_PATH`. `~/.minions/bin/{omniroute,9router,pi}` are wrappers; only
    `hermes`/`mnemon` are plain symlinks. Documented in proposal §5.
 
 ---
@@ -263,7 +263,7 @@ follow-up should confirm seeds actually land in the mnemon store.
 
 ## Dead Code Removed
 
-- `--no-omniroute` / `--no-modelrelay` flags: were parsed but never used (SC2034). Now wired
+- `--no-omniroute` / `--no-9router` flags: were parsed but never used (SC2034). Now wired
   to actually skip those installs (`if [ "${INSTALL_*}" -eq 1 ]`).
 - `status.sh`: removed stale source of `etc/minions.env` (file no longer exists).
 - `install.sh`: removed dead `settings.json` copy block (no such template file exists).
@@ -290,13 +290,13 @@ follow-up should confirm seeds actually land in the mnemon store.
 
 ## Fixes Since Initial DTS Verification (2026-09-09)
 
-### 1. modelrelay `--version` warning → HARD FAIL on real-install
-**Problem:** CI real-install loop ran `--version` on all 4 binaries; modelrelay has **no `--version`
-flag** upstream (it starts the server and hangs). Every run printed `WARN: modelrelay installed but
+### 1. 9router `--version` warning → HARD FAIL on real-install
+**Problem:** CI real-install loop ran `--version` on all 4 binaries; 9router has **no `--version`
+flag** upstream (it starts the server and hangs). Every run printed `WARN: 9router installed but
 --version failed` and continued. A genuinely broken omniroute/pi/hermes would also only warn.
 
 **Fix (`.github/workflows/ci.yml`):** Split the loop. omniroute/pi/hermes: `--version` is a **hard
-fail** (exit 1). modelrelay: binary presence check + functional validation via `/v1/models` in
+fail** (exit 1). 9router: binary presence check + functional validation via `/v1/models` in
 `test_cli_integration.sh` (already hard-fail).
 
 ### 2. pi `--version` restored to hard-fail (was incorrectly weakened)
@@ -312,7 +312,7 @@ failure in both test files.
 
 ### 3. `pi extensions reload` removed from install.sh (source of "Connection error" spam)
 **Problem:** After installing pi-failover extension, `install.sh` ran `pi extensions reload`,
-which starts the Pi REPL and immediately tries to connect to OmniRoute (20128) and ModelRelay (7352)
+which starts the Pi REPL and immediately tries to connect to OmniRoute (20128) and 9Router (7352)
 — but those services aren't up until `boot.sh` runs. Users saw "Connection error" spam during install.
 
 **Fix (`install.sh`):** Removed the reload call. Extension is registered on disk; it loads
@@ -452,9 +452,9 @@ OmiRoute installs fine with 6GB+ RAM without the flags; on 2-4GB containers the 
 
 **Simplification era (superseded baseline) — was passing:**
 - [x] DTS Integration: fresh container → install → boot → health → chat → hermes/pi CLI → stop
-- [x] Real Install (Linux): install → boot → CLI integration (including `/v1/models` for modelrelay)
+- [x] Real Install (Linux): install → boot → CLI integration (including `/v1/models` for 9router)
 - [x] `pi --version` works in DTS container (0.85.1, rc=0)
-- [x] `modelrelay --version` correctly not checked (no upstream flag); verified via `/v1/models`
+- [x] 9router --version correctly not checked (no upstream flag); verified via `/v1/models`
 - [x] `install.sh` produces no "Connection error" or port connection attempts
 - [x] Hermes reads `~/.hermes/config.yaml` (single source of truth)
 

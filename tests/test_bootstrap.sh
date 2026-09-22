@@ -131,9 +131,9 @@ test_tarball_standalone() {
     mkdir -p "$TEST_HOME"
 
     log_info "  Running staged install.sh with HOME=$TEST_HOME"
-    # Use --no-hermes --no-omniroute --no-modelrelay to skip heavy deps
+    # Use --no-hermes --no-omniroute --no-9router to skip heavy deps
     # Capture output
-    OUTPUT=$(HOME="$TEST_HOME" bash "$STAGE_DIR/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1)
+    OUTPUT=$(HOME="$TEST_HOME" bash "$STAGE_DIR/install.sh" --no-hermes --no-omniroute --no-9router 2>&1)
     EC=$?
 
     # Assertions
@@ -183,7 +183,7 @@ test_git_dev_mode() {
     rm -rf "$TEST_HOME"
     mkdir -p "$TEST_HOME"
 
-    OUTPUT=$(HOME="$TEST_HOME" bash "$PROJECT_ROOT/install.sh" --no-hermes --no-omniroute --no-modelrelay 2>&1)
+    OUTPUT=$(HOME="$TEST_HOME" bash "$PROJECT_ROOT/install.sh" --no-hermes --no-omniroute --no-9router 2>&1)
     EC=$?
 
     assert_exit_code 0 "$EC" "install.sh exit 0"

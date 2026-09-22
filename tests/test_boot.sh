@@ -66,7 +66,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         
         # Start container and install prerequisites
         "${DTS_SCRIPT}" up
-        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3.12 python3.12-venv python3.12-dev build-essential git ca-certificates software-properties-common"
+        "${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev build-essential git ca-certificates software-properties-common"
         
         # Run install.sh first (needed for boot.sh to find binaries)
         if "${DTS_SCRIPT}" exec "cd /src && bash install.sh"; then
@@ -87,7 +87,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify PID files created for persistent services
-        for service in omniroute modelrelay; do
+        for service in omniroute 9router; do
             if "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
                 log_info "DTS: PID file created for ${service}"
             else
@@ -118,19 +118,21 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify OmniRoute health check passes
-        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/dev/null"; then
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/healthz >/tmp/ci/omniroute-healthz.log 2>&1"; then
             log_info "DTS: OmniRoute health check passes"
         else
             log_error "DTS: OmniRoute health check failed"
+            "${DTS_SCRIPT}" exec "cat /tmp/ci/omniroute-healthz.log" 2>/dev/null || true
             "${DTS_SCRIPT}" clean
             exit 1
         fi
         
-        # Verify ModelRelay responds
-        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/dev/null"; then
-            log_info "DTS: ModelRelay models endpoint responds"
+        # Verify 9Router responds
+        if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:7352/v1/models >/tmp/ci/ninerouter-models.log 2>&1"; then
+            log_info "DTS: 9Router models endpoint responds"
         else
-            log_error "DTS: ModelRelay models endpoint failed"
+            log_error "DTS: 9Router models endpoint failed"
+            "${DTS_SCRIPT}" exec "cat /tmp/ci/ninerouter-models.log" 2>/dev/null || true
             "${DTS_SCRIPT}" clean
             exit 1
         fi
@@ -150,7 +152,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         else
             # REST API fallback check
             log_warn "DTS: Could not verify login via sqlite (DB locked), checking via REST API"
-            if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings 2>/dev/null | grep -q 'requireLogin.*false'"; then
+            if "${DTS_SCRIPT}" exec "curl -sf http://127.0.0.1:20128/api/settings >/tmp/ci/omniroute-settings.log 2>&1; cat /tmp/ci/omniroute-settings.log | grep -q 'requireLogin.*false'"; then
                 log_info "DTS: OmniRoute login disabled (REST API)"
             else
                 log_warn "DTS: Could not verify login disabled"
@@ -167,7 +169,7 @@ if [ "${CI_DTS_TEST:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         fi
         
         # Verify PID files removed
-        for service in omniroute modelrelay; do
+        for service in omniroute 9router; do
             if ! "${DTS_SCRIPT}" exec "test -f /home/ubuntu/.minions/var/run/${service}.pid"; then
                 log_info "DTS: PID file removed for ${service}"
             else

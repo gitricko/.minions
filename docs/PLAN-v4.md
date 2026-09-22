@@ -22,7 +22,7 @@ v4 folds in all captain feedback: Linux-first scope, CLI-only components, precon
 | Component | Kind | Runs How | v1 Status |
 |-----------|------|----------|-----------|
 | OmniRoute | persistent service | `setsid omniroute --no-open &` + preconfig | ✅ npm OK |
-| ModelRelay | persistent service | `setsid modelrelay &` | ✅ npm OK |
+| 9Router | persistent service | `setsid 9router &` | ✅ npm OK |
 | Pi-Agent | CLI tool | invoked by **user or automation** (GitHub runner / firstmate) | ✅ npm OK |
 | Hermes | CLI tool | preinstalled; used as CLI | ✅ git install OK |
 | Mnemon | memory layer | binary + seed import + extensions (Hermes only) | ✅ available |
@@ -51,8 +51,8 @@ Mirroring `post-create-cmd.sh` + `start-hermes.sh`, **install + boot must precon
 | Component | Preconfiguration (from reference) | .minions Location |
 |-----------|-----------------------------------|-------------------|
 | **OmniRoute** | wait `/v1/models`→200; set `requireLogin=false` (sqlite); create combo `auto-fastest` (strategy auto); PUT models + retry config; enable MCP; `hermes mcp add omniroute` | `boot.sh` + `lib/omniroute.sh` |
-| **Hermes** | `hermes config set`: model.provider=custom:omniroute, model.default=auto-fastest, base_url `localhost:${OR_PORT}/v1`, modelrelay base_url `localhost:${MR_PORT}/v1`, fallback=modelrelay, approvals off, memory=mnemon, agent.max_turns=120, kanban.failure_limit=3 | `install.sh` (first-run only) |
-| **Pi** | install `pi-failover` ext; symlink tracked `etc/pi/{models,settings,pi.toml}` → `~/.pi/agent/` (`defaultProvider: omniroute`, `modelrelay` fallback); **mnemon Pi extension commented out** | `install.sh` + `boot.sh` (repair guard) |
+| **Hermes** | `hermes config set`: model.provider=custom:omniroute, model.default=auto-fastest, base_url `localhost:${OR_PORT}/v1`, 9router base_url `localhost:${NR_PORT}/v1`, fallback=9router, approvals off, memory=mnemon, agent.max_turns=120, kanban.failure_limit=3 | `install.sh` (first-run only) |
+| **Pi** | install `pi-failover` ext; symlink tracked `etc/pi/{models,settings,pi.toml}` → `~/.pi/agent/` (`defaultProvider: omniroute`, `9router` fallback); **mnemon Pi extension commented out** | `install.sh` + `boot.sh` (repair guard) |
 | **Mnemon (Hermes)** | install binary; seed import from `etc/mnemon-seed-hermes.json` (dry-run validate → import) | `install.sh` |
 
 > All preconfiguration must read ports from env (§5) so it targets the right instance.
@@ -61,21 +61,21 @@ Mirroring `post-create-cmd.sh` + `start-hermes.sh`, **install + boot must precon
 
 ## 5 · Port Configurability (CRITICAL dev-safety)
 
-> ⚠ **You are developing .minions INSIDE hermes-codespace where omniroute :20128 and modelrelay :7352 are ALREADY running.**
+> ⚠ **You are developing .minions INSIDE hermes-codespace where omniroute :20128 and 9router :7352 are ALREADY running.**
 
 Every port MUST be env-overridable so a parallel dev instance does not collide with the host:
 
 | Env var | Default | Dev Override (example) |
 |---------|---------|------------------------|
 | `OMNIROUTE_PORT` | 20128 | 20129 |
-| `MODELRELAY_PORT` | 7352 | 7353 |
+| `NINEROUTER_PORT` | 7352 | 7353 |
 | `MINIONS_HOME` | `~/.minions` | `/tmp/minions-dev` |
 
 **Dev command:**
 ```bash
 MINIONS_HOME=/tmp/minions-dev \
 OMNIROUTE_PORT=20129 \
-MODELRELAY_PORT=7353 \
+NINEROUTER_PORT=7353 \
 ./install.sh && ./boot.sh
 ```
 
@@ -102,7 +102,7 @@ Two full stacks coexist. Preconfiguration (§4) reads these vars.
 ```mermaid
 flowchart LR
     A[install.sh] --> B[detect node+npm+uv (B2)\ninstall if missing]
-    A --> C[omniroute + modelrelay\nnpm -g --prefix (ports via env)]
+    A --> C[omniroute + 9router\nnpm -g --prefix (ports via env)]
     A --> D[pi-agent (npm, B1)\n+ pi-failover ext]
     A --> E[preinstall hermes CLI\nD3: no gateway in v1]
     A --> F[hermes config set block\n§4 preconfig (ports via env)]
@@ -116,7 +116,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     A[boot.sh] --> B[bg omniroute\npreconfig: login off, combo\nMCP + hermes mcp add]
-    A --> C[bg modelrelay\nsetsid … &]
+    A --> C[bg 9router\nsetsid … &]
     A --> D[wait healthy + ready\nB5: var/run/ready]
     A --> E[status.sh + return\nno --daemon (B6 dropped)]
     A -.-> F[boot.sh --doctor (opt)\nrepair broken component]
@@ -131,7 +131,7 @@ flowchart LR
 | B1 | Pi URL 404 (Bun) | `lib/pi.sh` → `npm i -g @earendil-works/pi-coding-agent` (no `--ignore-scripts`) |
 | B2 | node/npm/uv prereq | `install.sh` detect + vendor/install if missing |
 | B3 | uv URL 404 | `lib/uv.sh` → Rust triple (uv-x86_64-unknown-linux-gnu.tar.gz) |
-| B4 | placeholder checksums | `etc/versions.env` pin: Hermes v2026.8.19, OmniRoute 3.8.49, ModelRelay 1.22.1, Pi 0.84.3 |
+| B4 | placeholder checksums | `etc/versions.env` pin: Hermes v2026.8.19, OmniRoute 3.8.50, 9Router 0.5.81, Pi 0.84.3 |
 | B5 | readiness marker | `boot.sh`: `touch $MINIONS_HOME/var/run/ready` after healthy |
 | B6 | --daemon | **DROPPED** — setsid + return |
 | B7 | get_sha256 case | `lib/detect.sh:96` uppercase before `eval` |

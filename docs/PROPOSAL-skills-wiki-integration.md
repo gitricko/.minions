@@ -8,7 +8,7 @@
 ## 1. What hermes-codespace Has That .minions Doesn't
 
 hermes-codespace builds a rich knowledge layer on top of the same components .minions
-installs (Hermes, OmniRoute, ModelRelay, Pi, Mnemon). .minions handles the infrastructure
+installs (Hermes, OmniRoute, 9Router, Pi, Mnemon). .minions handles the infrastructure
 (install, boot, config) but ships with no skills, no wiki, no persistent memory, and no
 knowledge persistence strategy. After install, Hermes and Pi-agent is a blank slate.
 
@@ -737,7 +737,7 @@ Probes and reports:
 
 | Check | What it verifies |
 |-------|-----------------|
-| Services | ModelRelay (:7352), OmniRoute (:20128) respond |
+| Services | 9Router (:7352), OmniRoute (:20128) respond |
 | Models | OmniRoute `/v1/models` returns model list |
 | Mnemon | Binary installed, database exists |
 | Hermes | Config valid, gateway responds |

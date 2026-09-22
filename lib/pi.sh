@@ -9,7 +9,7 @@ install_pi() {
 
     echo "Installing Pi-Agent ${version} via npm..."
 
-    # Use npm with custom prefix (like OmniRoute/ModelRelay)
+    # Use npm with custom prefix (like OmniRoute/9Router)
     npm_prefix="${install_dir}/npm"
     mkdir -p "${npm_prefix}/lib/node_modules"
 

@@ -71,7 +71,7 @@ ensure_node() {
     export PATH="${MINIONS_HOME}/lib/node/bin:${PATH}"
 }
 
-# Ensure Node.js 22.22.2 is available (vendored) for OmniRoute/ModelRelay/Pi
+# Ensure Node.js 22.22.2 is available (vendored) for OmniRoute/9Router/Pi
 # These packages have compatibility issues with Node 24+
 # Usage: ensure_node_v22
 ensure_node_v22() {

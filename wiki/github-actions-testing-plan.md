@@ -63,8 +63,8 @@ jobs:
 
 ```bash
 echo "=== Smoke testing service ports ==="
-# ModelRelay
-curl -sf http://localhost:7352/v1/models > /dev/null && echo "✓ ModelRelay (7352)" || echo "✗ ModelRelay"
+# 9Router
+curl -sf http://localhost:7352/v1/models > /dev/null && echo "✓ 9Router (7352)" || echo "✗ 9Router"
 
 # OmniRoute
 curl -sf http://localhost:20128/v1/models > /dev/null && echo "✓ OmniRoute (20128)" || echo "✗ OmniRoute"
@@ -219,7 +219,7 @@ Modify `self-check.sh` to support CI-friendly output:
 **Common pitfalls to avoid:**
 - Don't run `post-create-cmd.sh` on every CI run — it's slow. Consider a pre-built base image.
 - Services need 45-60s to fully start; `sleep 60` is conservative but reliable.
-- Free model endpoints (OmniRoute/ModelRelay) may return 5xx — health check should distinguish infra vs. model failures.
+- Free model endpoints (OmniRoute/9Router) may return 5xx — health check should distinguish infra vs. model failures.
 
 ---
 

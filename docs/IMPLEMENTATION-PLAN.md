@@ -34,22 +34,22 @@ Each phase had a clear test gate. Next phase only started after previous phase's
 
 ---
 
-### Phase 1: LLM Proxies (OmniRoute + ModelRelay) ✅ **DONE** (PR #4)
+### Phase 1: LLM Proxies (OmniRoute + 9Router) ✅ **DONE** (PR #57 phase)
 **Files:** `install.sh`, `boot.sh`, `lib/npm_packages.sh`, `lib/omniroute.sh`, `lib/process.sh`, `etc/minions.env`
 
 #### install.sh
 - [x] Detect Node.js ≥22.22.2 + npm (vendor if missing)
-- [x] `npm install -g --prefix $MINIONS_HOME/lib/omniroute omniroute@3.8.49`
-- [x] `npm install -g --prefix $MINIONS_HOME/lib/modelrelay modelrelay@1.18.0`
-- [x] Symlink `bin/omniroute` → `$MINIONS_HOME/lib/omniroute/bin/omniroute`
-- [x] Symlink `bin/modelrelay` → `$MINIONS_HOME/lib/modelrelay/bin/modelrelay`
+- [x] `npm install -g --prefix $MINIONS_HOME/lib/omniroute omniroute@3.8.50`
+- [x] `npm install -g --prefix $MINIONS_HOME/lib/9router 9router@0.5.81`
+- [x] Symlink `bin/omniroute` → `$MINIONS_HOME/lib/omniroute/omniroute`
+- [x] Symlink `bin/9router` → `$MINIONS_HOME/lib/9router/9router`
 - [x] Copy `etc/minions.env.template` → `etc/minions.env` with port defaults
 
 #### boot.sh
-- [x] Background OmniRoute: `setsid $MINIONS_HOME/bin/omniroute --no-open >> $MINIONS_HOME/var/log/omniroute.log 2>&1 &`
-- [x] Background ModelRelay: `setsid $MINIONS_HOME/bin/modelrelay >> $MINIONS_HOME/var/log/modelrelay.log 2>&1 &`
+- [x] Background OmniRoute: `setsid $MINIONS_HOME/bin/omniroute serve --no-open >> $MINIONS_HOME/var/log/omniroute.log 2>&1 &`
+- [x] Background 9Router: `setsid $MINIONS_HOME/bin/9router >> $MINIONS_HOME/var/log/9router.log 2>&1 &`
 - [x] Wait for health: `wait_for_port $OMNIROUTE_PORT` + `wait_for_health http://localhost:$OMNIROUTE_PORT/v1/models`
-- [x] Wait for health: `wait_for_port $MODELRELAY_PORT` + `wait_for_health http://localhost:$MODELRELAY_PORT/v1/models`
+- [x] Wait for health: `wait_for_port $NINEROUTER_PORT` + `wait_for_health http://localhost:$NINEROUTER_PORT/v1/models`
 - [x] **OmniRoute preconfig** (via `lib/omniroute.sh`):
   - [x] sqlite: `UPDATE key_value SET value='false' WHERE key='requireLogin'`
   - [x] `omniroute combo create auto-fastest --strategy auto`
@@ -76,7 +76,7 @@ Each phase had a clear test gate. Next phase only started after previous phase's
 - [x] Official git install script: `https://raw.githubusercontent.com/NousResearch/hermes-agent/v2026.8.19/scripts/install.sh`
 - [x] Runs with `bash` (not `sh`), HOME isolation (`HERMES_HOME_OVERRIDE`)
 - [x] Symlink `bin/hermes` → install location
-- [x] **Hermes config set block** (reads `$OMNIROUTE_PORT`, `$MODELRELAY_PORT`):
+- [x] **Hermes config set block** (reads `$OMNIROUTE_PORT`, `$NINEROUTER_PORT`):
   ```bash
   # Set in hermes_preconfigure() and hermes_update_config()
   hermes config set model.provider custom:omniroute
@@ -86,16 +86,16 @@ Each phase had a clear test gate. Next phase only started after previous phase's
   # custom_providers:
   #   - name: omniroute
   #     base_url: http://localhost:${OMNIROUTE_PORT}/v1
-  #   - name: modelrelay
-  #     base_url: http://localhost:${MODELRELAY_PORT}/v1
-  hermes config set fallback_providers.provider modelrelay
+  #   - name: 9router
+  #     base_url: http://localhost:${NINEROUTER_PORT}/v1
+  hermes config set fallback_providers.provider 9router
   hermes config set fallback_providers.model auto-fastest
   hermes config set auxiliary.title_generation.model auto-fastest
-  hermes config set auxiliary.title_generation.provider modelrelay
+  hermes config set auxiliary.title_generation.provider 9router
   hermes config set auxiliary.vision.model auto-fastest
-  hermes config set auxiliary.vision.provider modelrelay
+  hermes config set auxiliary.vision.provider 9router
   hermes config set auxiliary.compression.model auto-fastest
-  hermes config set auxiliary.compression.provider modelrelay
+  hermes config set auxiliary.compression.provider 9router
   hermes config set approvals.mode off
   hermes config set memory.memory_enabled true
   hermes config set memory.user_profile_enabled true
@@ -124,7 +124,7 @@ Each phase had a clear test gate. Next phase only started after previous phase's
 - [x] Symlink `bin/pi` → npm global bin (portable wrapper using `${MINIONS_HOME}`)
 - [x] `pi install git:github.com/gitricko/pi-failover@hermes-impl` (extension for model failover)
 - [x] **Config symlinks:** `etc/pi/{models,settings,pi.toml}` → `~/.pi/agent/` (NOT `~/.pi/`)
-  - `models.json`: `defaultProvider: omniroute`, `modelrelay` fallback, actual port URLs
+  - `models.json`: `defaultProvider: omniroute`, `9router` fallback, actual port URLs
   - `settings.json`: `defaultProvider: omniroute`, `defaultModel: auto-fastest`
   - `pi.toml`: `provider = "omniroute"`, `base_url = "http://127.0.0.1:20128/v1"`
 - [x] **Mnemon Pi extension:** COMMENTED OUT per user preference (user only wants mnemon for Hermes)
@@ -207,7 +207,7 @@ Every script reads:
 ```bash
 MINIONS_HOME=${MINIONS_HOME:-~/.minions}
 OMNIROUTE_PORT=${OMNIROUTE_PORT:-20128}
-MODELRELAY_PORT=${MODELRELAY_PORT:-7352}
+NINEROUTER_PORT=${NINEROUTER_PORT:-7352}
 MINIONS_LLM_BASE_URL=${MINIONS_LLM_BASE_URL:-http://localhost:${OMNIROUTE_PORT}/v1}
 ```
 
@@ -215,7 +215,7 @@ Dev command (parallel stack, no host collision):
 ```bash
 MINIONS_HOME=/tmp/minions-dev \
 OMNIROUTE_PORT=20129 \
-MODELRELAY_PORT=7353 \
+NINEROUTER_PORT=7353 \
 ./install.sh && ./boot.sh
 ```
 
@@ -236,8 +236,8 @@ MODELRELAY_PORT=7353 \
 |-----------|---------|--------|
 | Hermes | v2026.8.19 | Official git install |
 | Pi-Agent | 0.84.3 | npm `@earendil-works/pi-coding-agent` |
-| OmniRoute | 3.8.49 | npm |
-| ModelRelay | 1.22.1 | npm |
+| OmniRoute | 3.8.50 | npm |
+| 9Router | 0.5.81 | npm |
 | Node.js | 22.22.2 | Vendored if system < 22.22.2 |
 | uv | 0.6.14 | Vendored |
 

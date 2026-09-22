@@ -64,7 +64,7 @@ These were ported from mattpocock/skills for the design session and govern imple
 | D7 | **Merge via our own script**, not GitHub auto-merge. | Explicit control over merge timing + guardrails. |
 | D8 | **SHA256 populated only for NODE + UV** (the tarball deps `download.sh` already hashes). | npm deps get integrity from npm itself; Hermes has none. Minimal added complexity. |
 | D9 | **Fix loop capped at 3 attempts, then leave the PR open** + label `self-update: needs-review` for a human. | Bound cost/time; after the agent quits, a human decides. A stuck red PR also naturally blocks newer versions (D4) until a human closes it. |
-| D10 | **LLM for the agent comes from booting minion (from stable `main`) in the runner.** | OmniRoute/ModelRelay are localhost proxies; neither is reachable in a bare Actions container. |
+|| D10 | **LLM for the agent comes from booting minion (from stable `main`) in the runner.** | OmniRoute/9Router are localhost proxies; neither is reachable in a bare Actions container. |
 
 ## Flow diagram
 

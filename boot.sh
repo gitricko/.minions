@@ -3,7 +3,7 @@
 #
 # Boot sequence:
 #   1. OmniRoute (port OMNIROUTE_PORT) - LLM proxy
-#   2. ModelRelay (port MODELRELAY_PORT) - LLM proxy (alternative)
+#   2. 9Router (port NINEROUTER_PORT) - LLM proxy (alternative)
 #
 # Pi-Agent, Hermes, and Mnemon are CLI tools (invoked on demand), not servers.
 # No --daemon flag - services are backgrounded with setsid and boot returns.
@@ -19,8 +19,8 @@ MINIONS_HOME="${HOME}/.minions"
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_HOST="${OMNIROUTE_HOST:-127.0.0.1}"
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
-MODELRELAY_HOST="${MODELRELAY_HOST:-127.0.0.1}"
-MODELRELAY_PORT="${MODELRELAY_PORT:-7352}"
+NINEROUTER_HOST="${NINEROUTER_HOST:-127.0.0.1}"
+NINEROUTER_PORT="${NINEROUTER_PORT:-7352}"
 export MINIONS_LLM_BASE_URL="http://localhost:${OMNIROUTE_PORT}/v1"
 
 # Parse arguments
@@ -117,7 +117,7 @@ boot_log="${MINIONS_HOME}/var/log/boot.log"
     echo "DRY_RUN=${DRY_RUN:-0}"
     echo "DOCTOR=${DOCTOR:-0}"
     echo "OMNIROUTE_PORT=${OMNIROUTE_PORT}"
-    echo "MODELRELAY_PORT=${MODELRELAY_PORT}"
+    echo "NINEROUTER_PORT=${NINEROUTER_PORT}"
 } >> "${boot_log}" 2>&1
 
 echo ""
@@ -138,40 +138,75 @@ start_service "omniroute" \
 
 wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 300 "omniroute"
 
-# Step 2: ModelRelay
-log_info "Starting ModelRelay (${MODELRELAY_HOST}:${MODELRELAY_PORT})..."
-start_service "modelrelay" \
-    "${MINIONS_HOME}/bin/modelrelay" \
-    --host "${MODELRELAY_HOST}" \
-    --port "${MODELRELAY_PORT}" \
-    >> "${boot_log}" 2>&1 || log_error "Failed to start ModelRelay"
+# Step 2: 9Router
+log_info "Starting 9Router (${NINEROUTER_HOST}:${NINEROUTER_PORT})..."
+# 9Router 0.5.81 CLI: -H/--host, -p/--port, -n/--no-browser, --skip-update.
+# --no-browser + --skip-update are required in headless/CI environments —
+# otherwise it tries to open a browser and runs an auto-update check that can
+# stall startup. Default port is 20128, so --port is mandatory here.
+start_service "9router" \
+    "${MINIONS_HOME}/bin/9router" \
+    --host "${NINEROUTER_HOST}" \
+    --port "${NINEROUTER_PORT}" \
+    --no-browser \
+    --skip-update \
+    >> "${boot_log}" 2>&1 || log_error "Failed to start 9Router"
 
-wait_for_port "${MODELRELAY_HOST}" "${MODELRELAY_PORT}" 300 "modelrelay"
+wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"
 
-# Step 3: Wait for OmniRoute health (needed for any post-boot checks)
+# Step 3: Configure 9Router (auto-fastest combo, disable login/API key)
+log_info "Preconfiguring 9Router..."
+# shellcheck disable=SC1091
+. "${LIB_DIR}/9router.sh"
+if ninerouter_preconfigure >> "${boot_log}" 2>&1; then
+    log_info "9Router preconfig complete"
+else
+    log_warn "9Router preconfig had issues (see ${boot_log})"
+fi
+
+# Step 4: Wait for OmniRoute health (needed for any post-boot checks)
 log_info "Waiting for OmniRoute health..."
 wait_for_health "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/healthz" 120 "omniroute"
 
-# Step 4: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
+# Step 5: Preconfigure OmniRoute (auto-fastest combo; login-off done at install)
 log_info "Preconfiguring OmniRoute..."
 # shellcheck disable=SC1091
 . "${LIB_DIR}/omniroute.sh"
-if omniroute_preconfigure; then
+if omniroute_preconfigure >> "${boot_log}" 2>&1; then
     log_info "OmniRoute preconfig complete"
 else
-    log_warn "OmniRoute preconfig had issues (non-fatal)"
+    log_warn "OmniRoute preconfig had issues (see ${boot_log})"
 fi
 
-# Step 5: Readiness marker
+# Step 6: Configure Hermes CLI (model, providers, fallback) — matches hermes-codespace post-create
+log_info "Configuring Hermes..."
+HERMES_BIN="${MINIONS_HOME}/bin/hermes"
+if [ -x "${HERMES_BIN}" ]; then
+    {
+        "${HERMES_BIN}" config set model.default auto-fastest
+        "${HERMES_BIN}" config set model.provider omniroute
+        "${HERMES_BIN}" config set providers.omniroute.base_url "http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
+        "${HERMES_BIN}" config set providers.omniroute.api_key "no-key-needed"
+        "${HERMES_BIN}" config set providers.9router.base_url "http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
+        "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
+    } >> "${boot_log}" 2>&1 || {
+        log_warn "Hermes config had issues (see ${boot_log})"
+    }
+    log_info "Hermes config complete"
+else
+    log_warn "Hermes binary not found at ${HERMES_BIN}, skipping config"
+fi
+
+# Step 7: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"
 
-# Step 6: Print READY message
+# Step 8: Print READY message
 echo ""
 echo "=============================================="
 echo "  .minions stack is UP"
 echo ""
 echo "  ✅ omniroute    http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
-echo "  ✅ modelrelay   http://${MODELRELAY_HOST}:${MODELRELAY_PORT}/v1"
+echo "  ✅ 9router      http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
 echo "  ✅ pi-agent     CLI ready (invoked on demand)"
 echo "  ✅ hermes       CLI ready (preinstalled)"
 echo "  ✅ mnemon       memory layer ready"

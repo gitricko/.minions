@@ -14,7 +14,7 @@ log_info() { echo "[INFO] $*"; }
 log_warn() { echo "[WARN] $*"; }
 
 # Stop in reverse order
-for service in pi hermes modelrelay omniroute; do
+for service in pi hermes 9router omniroute; do
     if [ -f "${MINIONS_HOME}/var/run/${service}.pid" ]; then
         stop_service "${service}"
     fi
