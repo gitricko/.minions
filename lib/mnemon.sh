@@ -1,6 +1,13 @@
 #!/usr/bin/env sh
 # lib/mnemon.sh - Mnemon installation and seed import
 
+# Source versions.env for single source of truth (set by install.sh)
+# MINIONS_HOME must already be set; versions.env provides MNEMON_VERSION
+# shellcheck disable=SC1091,SC2153
+if [ -f "${MINIONS_HOME}/etc/versions.env" ]; then
+    . "${MINIONS_HOME}/etc/versions.env"
+fi
+
 # Install Mnemon binary (if not present)
 # Usage: install_mnemon <install_dir>
 install_mnemon() {
@@ -25,10 +32,6 @@ install_mnemon() {
         aarch64|arm64) arch="aarch64" ;;
     esac
 
-    # Source versions.env for version (single source of truth)
-    if [ -f "${MINIONS_HOME}/etc/versions.env" ]; then
-        . "${MINIONS_HOME}/etc/versions.env"
-    fi
     mnemon_version="${MNEMON_VERSION:-0.2.9}"
 
     # Try latest release download
