@@ -103,7 +103,7 @@ jobs:
           echo "DTS failed after 3 attempts"
           exit 1
 
-      # ── Collect logs on failure (hermes-codespace devcontainer-ci.yml pattern) ──
+      # ── Collect diagnostic logs (uploaded every run; if-no-files-found: warn) ──
       - name: Collect diagnostic logs (DTS)
         if: always()
         run: |
@@ -113,7 +113,7 @@ jobs:
           echo "=== Collected DTS logs (host /tmp/dts-logs) ==="
           ls -la "${CI_LOGS_DIR}/" 2>/dev/null || true
 
-      - name: Upload DTS logs on failure
+      - name: Upload DTS diagnostic logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -314,7 +314,7 @@ jobs:
           export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh
 
-      # ── Collect logs on failure (hermes-codespace devcontainer-ci.yml pattern) ──
+      # ── Collect diagnostic logs (uploaded every run; if-no-files-found: warn) ──
       - name: Collect diagnostic logs (Real Install)
         if: always()
         run: |
@@ -330,7 +330,7 @@ jobs:
           echo "=== Collected logs ==="
           ls -la "${CI_LOGS_DIR}/"
 
-      - name: Upload Real Install logs on failure
+      - name: Upload Real Install diagnostic logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
