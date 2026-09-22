@@ -190,8 +190,8 @@ section "Hermes"
 
 if ! should_skip "hermes"; then
   if [ -f "$HERMES_CONFIG" ]; then
-    cfg_model=$(grep -A1 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'default' | head -1 | sed 's/.*default: *//' || echo "")
-    cfg_provider=$(grep -A1 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'provider' | head -1 | sed 's/.*provider: *//' || echo "")
+    cfg_model=$(grep -A2 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'default' | head -1 | sed 's/.*default: *//' || echo "")
+    cfg_provider=$(grep -A2 '^model:' "$HERMES_CONFIG" 2>/dev/null | grep 'provider' | head -1 | sed 's/.*provider: *//' || echo "")
 
     if [ -n "$cfg_model" ]; then
       _ok "Config" "model=${cfg_model}, provider=${cfg_provider:-unset}"

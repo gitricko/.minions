@@ -200,6 +200,7 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/boot.sh "${MINIONS_HOME}/boot.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/self-check.sh "${MINIONS_HOME}/self-check.sh" 2>/dev/null || true
 fi
 
 # Ensure python3 + pyyaml for sync-versions.sh (single source of truth).
