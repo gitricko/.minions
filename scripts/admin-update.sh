@@ -87,11 +87,11 @@ fi
 echo "Bumping: $DEPS"
 scripts/bump.sh --open-pr $DEPS
 
-# Optionally sync versions
-if [ "${SYNC_VERSIONS:-0}" -eq 1 ]; then
-    echo "Syncing versions.env..."
-    scripts/sync-versions.sh
-fi
+# Regenerate versions.env from the updated deps.yaml (keep both in sync).
+# bump.sh already does this, but we do it here too so admin-update.sh is
+# self-contained and correct even if bump.sh's internals change.
+echo "Syncing versions.env..."
+scripts/sync-versions.sh
 
 echo "admin-update.sh complete."
 exit 0
