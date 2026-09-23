@@ -19,6 +19,26 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 [ -z "${VERSIONS_ENV:-}" ] && VERSIONS_ENV="${REPO_ROOT}/etc/versions.env"
 [ -z "${NODE_VERSION_FILE:-}" ] && NODE_VERSION_FILE="${REPO_ROOT}/.node-version"
 
+# normalize_version <dep> <version> — strip leading 'v' for release_tarball deps
+# (NODE, UV) whose URL templates and asset names already embed 'v'.
+# github_tag deps (HERMES, MINIONS) keep the 'v' as part of their pin.
+normalize_version() {
+  local dep="$1" ver="$2" source_type
+  source_type=$(python3 - "$DEPS_YAML" "$dep" <<'PY'
+import sys, yaml
+for d in yaml.safe_load(open(sys.argv[1]))['dependencies']:
+    if d['name'] == sys.argv[2]:
+        print(d.get('source_type', ''))
+        break
+PY
+)
+  if [ "$source_type" = "release_tarball" ] && [ -n "$ver" ] && [ "${ver#v}" != "$ver" ]; then
+    echo "${ver#v}"
+  else
+    echo "$ver"
+  fi
+}
+
 OPEN_PR=0
 DRY_RUN=0
 BUMPS=()
@@ -156,6 +176,10 @@ for b in "${BUMPS[@]}"; do
   dep="${b%%=*}"
   ver="${b##*=}"
   upper=$(echo "$dep" | tr '[:lower:]' '[:upper:]')
+
+  # Normalize: strip leading 'v' for release_tarball deps (NODE, UV) whose
+  # URL templates and asset names already embed 'v'.
+  ver=$(normalize_version "${dep}" "${ver}")
 
   # Validate dep exists in deps.yaml via targeted regex (preserves formatting).
   if ! python3 - "${DEPS_YAML}" "${dep}" <<'PY' >/dev/null 2>&1

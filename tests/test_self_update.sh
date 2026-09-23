@@ -280,6 +280,43 @@ _fixture_sha_untouched() { # tmpenv tmpdeps tmpnode
 }
 test_sha_untouched() { with_temp_env _fixture_sha_untouched; }
 
+# ─── Test 15: bump.sh strips leading v for release_tarball deps ──
+# Upstream GitHub tags carry a v prefix (nodejs/node: v26.10.0) but our
+# release_url templates and tarball names already include the v
+# (https://nodejs.org/dist/v{{VERSION}}/, node-v{{VERSION}}-...).
+# bump.sh must normalize at write time so both admin-update.sh and manual
+# bumps stay consistent (Routes: check-updates latest -> admin-update -> bump).
+_fixture_strip_v() { # tmpenv tmpdeps tmpnode
+  local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
+  if ! VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
+      bash "${REPO_ROOT}/scripts/bump.sh" NODE=v25.0.0 >/dev/null 2>&1; then
+    bad "strip-v bump" "non-zero exit"; return 1
+  fi
+  grep -q 'version: "25.0.0"' "$tmpdeps" \
+    || { bad "strip-v bump" "deps.yaml kept v prefix"; return 1; }
+  grep -q '^NODE_VERSION="25.0.0"' "$tmpenv" \
+    || { bad "strip-v bump" "versions.env kept v prefix"; return 1; }
+  [ "$(cat "$tmpnode")" = "25.0.0" ] \
+    || { bad "strip-v bump" ".node-version kept v prefix: $(cat "$tmpnode" 2>/dev/null)"; return 1; }
+  ok "bump.sh strips leading v for release_tarball deps (NODE=v25.0.0 -> 25.0.0)"
+}
+test_bump_strips_v() { with_temp_env _fixture_strip_v; }
+
+# ─── Test 16: bump.sh keeps v prefix for github_tag deps ──
+# HERMES pins carry the v (v2026.9.21, selector v20*) — the strip in Test 15
+# must be scoped to release_tarball only and must not touch these.
+_fixture_keep_v() { # tmpenv tmpdeps tmpnode
+  local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
+  if ! VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
+      bash "${REPO_ROOT}/scripts/bump.sh" HERMES=v2026.9.22 >/dev/null 2>&1; then
+    bad "keep-v bump" "non-zero exit"; return 1
+  fi
+  grep -q 'version: "v2026.9.22"' "$tmpdeps" \
+    || { bad "keep-v bump" "deps.yaml lost v prefix"; return 1; }
+  ok "bump.sh keeps v prefix for github_tag deps (HERMES=v2026.9.22)"
+}
+test_bump_keeps_v() { with_temp_env _fixture_keep_v; }
+
 # ─── Run all ─────────────────────────────────────────────
 test_deps_yaml_parses
 test_catalog_has_versions
@@ -297,6 +334,8 @@ test_bump_only_touches_target
 test_sync_versions_generates
 test_sha_fetch
 test_sha_untouched
+test_bump_strips_v
+test_bump_keeps_v
 
 echo ""
 echo "PASS=${PASS} FAIL=${FAIL}"
