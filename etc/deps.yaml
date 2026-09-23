@@ -38,7 +38,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.85"
+    version: "0.5.86"
     source_type: npm
     package: 9router
     channel: latest
@@ -59,17 +59,17 @@ dependencies:
       macos_arm64: "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af"
 
   - name: UV
-    version: "0.12.15"
+    version: "0.12.18"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638"
-      linux_arm64: "0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
-      macos_x64: "e9ca61775532368fe518ab03e7a354c7ecab8ccb3c7d941c775fcc4a362b801b"
-      macos_arm64: "dc304b9ed1b24174572290fba60ac3f6fe63c73a671f0439e62a91375841964d"
+      linux_x64: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
+      linux_arm64: "afb6291f3f0a6b4521fc67b947822506c41dde5b60d2189dd8f3695b2ac8c9e7"
+      macos_x64: "2e4108f5395397c8bc5d43bf83d3bdbb2d0e92b90d0efa607756be704905fa33"
+      macos_arm64: "cf40e0c6a202190ccd9e0406dcfdd5b2d6668a9a5c779b17948963df32aafe5b"
 
   - name: MNEMON
     version: "0.2.9"
