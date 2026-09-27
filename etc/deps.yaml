@@ -17,7 +17,7 @@ dependencies:
     sha_source: none
 
   - name: HERMES
-    version: "v2026.9.21"
+    version: "v2026.9.24"
     source_type: github_tag
     repo: NousResearch/hermes-agent
     selector: "v20*"
