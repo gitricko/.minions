@@ -245,6 +245,26 @@ if ! should_skip "ollama"; then
     _warn "Embedding" "failed to generate embedding (non-critical)"
     json_add "ollama:embedding" "warn" "failed to generate embedding" "{}"
   fi
+
+  # 5. Mnemon embedding integration
+  if command -v mnemon >/dev/null 2>&1; then
+    MNEMON_EMBED_STATUS=$(mnemon embed --status 2>/dev/null || echo "")
+    if [ -n "$MNEMON_EMBED_STATUS" ] && echo "$MNEMON_EMBED_STATUS" | grep -q '"embedding_available": true'; then
+      EMBED_COV=$(echo "$MNEMON_EMBED_STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('coverage','?'))" 2>/dev/null || echo "?")
+      EMBED_CNT=$(echo "$MNEMON_EMBED_STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('embedded',0))" 2>/dev/null || echo "0")
+      _ok "Mnemon Embed" "available (coverage=${EMBED_COV}, embedded=${EMBED_CNT})"
+      json_add "mnemon:embedding" "ok" "available (coverage=${EMBED_COV}, embedded=${EMBED_CNT})" "$MNEMON_EMBED_STATUS"
+    elif echo "$MNEMON_EMBED_STATUS" | grep -q '"embedding_available": false'; then
+      _warn "Mnemon Embed" "not available (Ollama not configured for mnemon)"
+      json_add "mnemon:embedding" "warn" "not available (Ollama not configured for mnemon)" "$MNEMON_EMBED_STATUS"
+    else
+      _warn "Mnemon Embed" "status check failed or unknown output"
+      json_add "mnemon:embedding" "warn" "status check failed" "$MNEMON_EMBED_STATUS"
+    fi
+  else
+    _warn "Mnemon Embed" "mnemon binary not found, skipping embed status"
+    json_add "mnemon:embedding" "warn" "mnemon binary not found" "{}"
+  fi
 else
   echo "   (skipped)"
 fi
