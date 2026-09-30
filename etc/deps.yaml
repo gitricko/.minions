@@ -77,3 +77,16 @@ dependencies:
     repo: mnemon-dev/mnemon
     sha_source: none
 
+  - name: OLLAMA
+    version: "0.35.0"
+    source_type: github_tag
+    repo: ollama/ollama
+    sha_source: shasums
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+    sha256:
+      linux_x64: "1c114a6b220c5efca2ef2b1e5f01d1e535e26f6cd6d1678c8489325d2835e525"
+      linux_arm64: "cb627d332b1fe5055bd5485ca10d595da8429e447648209e375390ec3bd09374"
+      macos_x64: "2608dbb0a0f0136a198db9d48b4f74ece55f452314a39452fca35b7cf20c2589"
+      macos_arm64: "2608dbb0a0f0136a198db9d48b4f74ece55f452314a39452fca35b7cf20c2589"
+
+

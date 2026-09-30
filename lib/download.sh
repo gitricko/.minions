@@ -55,6 +55,16 @@ extract_tarball() {
         *.tar.gz|*.tgz)
             tar -xzf "${tarball}" -C "${dest}"
             ;;
+        *.tar.zst)
+            if command -v zstd >/dev/null 2>&1; then
+                zstd -dc "${tarball}" | tar -xf - -C "${dest}"
+            elif tar --help 2>&1 | grep -q zstd; then
+                tar -xzf "${tarball}" -C "${dest}"
+            else
+                echo "zstd support required for .tar.zst files" >&2
+                return 1
+            fi
+            ;;
         *.tar.xz)
             tar -xJf "${tarball}" -C "${dest}"
             ;;

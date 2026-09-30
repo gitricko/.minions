@@ -16,7 +16,7 @@
 #   5. Fixes macOS quarantine where needed
 #
 # Usage:
-#   install.sh [--no-hermes] [--no-omniroute] [--no-9router]
+#   install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama]
 #
 # Environment (set in ~/.bashrc BEFORE running):
 #   OMNIROUTE_PORT=20128   (default)
@@ -103,6 +103,7 @@ INSTALL_HERMES=1
 INSTALL_OMNIROUTE=1
 INSTALL_NINEROUTER=1
 INSTALL_PI=1
+INSTALL_OLLAMA=1
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
@@ -127,8 +128,12 @@ while [ $# -gt 0 ]; do
             INSTALL_PI=0
             shift
             ;;
+        --no-ollama)
+            INSTALL_OLLAMA=0
+            shift
+            ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama]"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"
@@ -254,6 +259,8 @@ cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null 
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/mnemon.sh"
 # shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/ollama.sh"
+# shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/pi-settings.sh"
 
 # Step 2: Source versions (generated from deps.yaml)
@@ -295,6 +302,11 @@ fi
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes..."
     ensure_hermes
+fi
+
+if [ "${INSTALL_OLLAMA}" -eq 1 ]; then
+    log_info "Installing Ollama..."
+    ensure_ollama "${MINIONS_HOME}"
 fi
 
 # Phase 22: install mnemon plugin (idempotent)

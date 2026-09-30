@@ -181,7 +181,75 @@ else
   echo "   (skipped)"
 fi
 
-# ── 4. Hermes config ─────────────────────────────────────────────────────────
+# ── 4. Ollama (mnemon embeddings) ────────────────────────────────────────
+section "Ollama"
+
+if ! should_skip "ollama"; then
+  # 1. Binary
+  if command -v ollama >/dev/null 2>&1; then
+    _ok "Binary" "$(ollama --version 2>/dev/null || echo 'installed')"
+    json_add "ollama:binary" "ok" "$(ollama --version 2>/dev/null || echo 'installed')" "{}"
+  else
+    _fail "Binary" "ollama not in PATH"
+    json_add "ollama:binary" "fail" "ollama not in PATH" "{}"
+  fi
+
+  # 2. API responds
+  OLLAMA_API=$(curl -s --max-time 5 http://localhost:11434/api/tags 2>/dev/null || echo "")
+  if [ -n "$OLLAMA_API" ]; then
+    _ok "API" "responding on :11434"
+    json_add "ollama:api" "ok" "responding on :11434" "{}"
+  else
+    _fail "API" "no response from :11434"
+    json_add "ollama:api" "fail" "no response from :11434" "{}"
+  fi
+
+  # 3. Model listed — retry up to 15s (server may still be scanning models)
+  MODEL_LISTED=0
+  for _attempt in 1 2 3 4 5; do
+    MODEL_LISTED=$(ollama list 2>/dev/null | grep -c "nomic-embed-text" || true)
+    [ -z "$MODEL_LISTED" ] && MODEL_LISTED=0
+    [ "$MODEL_LISTED" -gt 0 ] && break
+    sleep 3
+  done
+  if [ "$MODEL_LISTED" -gt 0 ]; then
+    _ok "Model" "nomic-embed-text available"
+    json_add "ollama:model" "ok" "nomic-embed-text available" "{}"
+  else
+    # Filesystem fallback: check if model files exist on disk (server may be slow to load)
+    MODEL_MANIFEST="$HOME/.ollama/models/manifests/registry.ollama.ai/library/nomic-embed-text/latest"
+    if [ -f "$MODEL_MANIFEST" ]; then
+      _warn "Model" "nomic-embed-text on disk but not listed by server (loading slow)"
+      json_add "ollama:model" "warn" "nomic-embed-text on disk but not listed" "{}"
+    else
+      _warn "Model" "nomic-embed-text not found on disk"
+      json_add "ollama:model" "warn" "nomic-embed-text not found" "{}"
+    fi
+  fi
+
+  # 4. Embedding generation — retry after model check (model may have loaded during retries above)
+  EMBED_RESULT=""
+  for _attempt in 1 2 3; do
+    EMBED_RESULT=$(curl -s --max-time 30 -X POST http://localhost:11434/api/embed \
+      -d '{"model":"nomic-embed-text","input":"hello world"}' 2>/dev/null || echo "")
+    if echo "$EMBED_RESULT" | grep -q '"embeddings"'; then
+      break
+    fi
+    sleep 3
+  done
+  if echo "$EMBED_RESULT" | grep -q '"embeddings"'; then
+    EMBED_DIM=$(echo "$EMBED_RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['embeddings'][0]))" 2>/dev/null || echo "?")
+    _ok "Embedding" "generated (dim=${EMBED_DIM})"
+    json_add "ollama:embedding" "ok" "generated (dim=${EMBED_DIM})" "{}"
+  else
+    _warn "Embedding" "failed to generate embedding (non-critical)"
+    json_add "ollama:embedding" "warn" "failed to generate embedding" "{}"
+  fi
+else
+  echo "   (skipped)"
+fi
+
+# ── 5. Hermes config ─────────────────────────────────────────────────────────
 section "Hermes"
 
 if ! should_skip "hermes"; then
