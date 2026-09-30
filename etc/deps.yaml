@@ -76,6 +76,7 @@ dependencies:
     source_type: github_tag
     repo: mnemon-dev/mnemon
     sha_source: none
+    drift_check: false
 
   - name: OLLAMA
     version: "0.35.0"
