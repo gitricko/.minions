@@ -24,14 +24,14 @@ dependencies:
     sha_source: none
 
   - name: PI
-    version: "0.87.1"
+    version: "0.99.1"
     source_type: npm
     package: "@earendil-works/pi-coding-agent"
     channel: latest
     sha_source: none
 
   - name: OMNIROUTE
-    version: "3.8.50"
+    version: "3.8.51"
     source_type: npm
     package: omniroute
     channel: latest
@@ -59,17 +59,17 @@ dependencies:
       macos_arm64: "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af"
 
   - name: UV
-    version: "0.12.18"
+    version: "0.12.21"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
-      linux_arm64: "afb6291f3f0a6b4521fc67b947822506c41dde5b60d2189dd8f3695b2ac8c9e7"
-      macos_x64: "2e4108f5395397c8bc5d43bf83d3bdbb2d0e92b90d0efa607756be704905fa33"
-      macos_arm64: "cf40e0c6a202190ccd9e0406dcfdd5b2d6668a9a5c779b17948963df32aafe5b"
+      linux_x64: "23f02075b652bb1df64178cfae41b5caf160822e720e2663568f3f5d63bc52c0"
+      linux_arm64: "030b69227b40af8c1981b7301793dc66e71ed3c796ea8688209dd268bd91ec51"
+      macos_x64: "2b336763b396ec6afa20c5a8b083538ca7402445b868311979d740a4344c17d8"
+      macos_arm64: "b88bda573e566ef9bced66b155fe0408626fbbc053aee1c30ba686f0728c9447"
 
   - name: MNEMON
     version: "0.2.9"
