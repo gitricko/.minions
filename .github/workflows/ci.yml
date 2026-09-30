@@ -4,13 +4,11 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'README.md'
       - 'docs/**'
 
   pull_request:
     branches: [main]
     paths-ignore:
-      - 'README.md'
       - 'docs/**'
 
 permissions:
@@ -146,6 +144,85 @@ jobs:
           bash tests/test_knowledge_mode.sh
           # Phase 22.5: bootstrap unit tests (piped detection, tarball standalone, git dev)
           bash tests/test_bootstrap.sh
+
+  # ─────────────────────────────────────────────────────────────────
+  # Blocking: deps.yaml is the single source of truth. versions.env,
+  # .node-version (what setup-node reads) and the README version pills are
+  # all generated from it. Drift means a hand-edit landed where it should
+  # not have.
+  #
+  # Standalone (no detect-changes gate) on purpose: a PR touching only
+  # README.md must still be checked, or the badge can drift undetected --
+  # the exact failure from gitricko/pi-failover#8. Both checks are offline
+  # and take about a second, so there is nothing to gate.
+  # ─────────────────────────────────────────────────────────────────
+  version-sync:
+    name: Version sync (deps.yaml → versions.env + .node-version + README)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pyyaml
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+
+      - name: Check versions.env, .node-version and README badges match deps.yaml
+        run: |
+          set -e
+          bash scripts/sync-versions.sh --check
+          bash scripts/sync-readme-badges.sh --check
+
+  # ─────────────────────────────────────────────────────────────────
+  # Advisory: how far behind upstream are our pins? Never blocks a PR.
+  # Pattern borrowed from gitricko/pi-failover#8, where CI, code and the
+  # README badge each pinned a different host version and CI stayed green.
+  # ─────────────────────────────────────────────────────────────────
+  dependency-drift:
+    name: Dependency drift (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pyyaml
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+
+      - name: Report outdated dependencies
+        # check-updates.sh is read-only: it queries GitHub/npm and reports, it
+        # never writes and never opens a PR. Writes happen only via
+        # self-update.yml on its weekly cron.
+        #
+        # Renders the table AND sets the exit code in one pass — reporting and
+        # gating come from the same computation, so they cannot disagree.
+        run: |
+          set -e
+          scripts/check-updates.sh --json > /tmp/check.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('/tmp/check.json'))
+          rows = d['outdated']
+          width = max(len(r['name']) for r in rows)
+          print(f'{"DEP".ljust(width)}  {"PINNED".ljust(16)}  {"LATEST".ljust(16)}  STATE')
+          for r in rows:
+              if r['latest'] is None:
+                  state = 'UNKNOWN (upstream query failed)'
+              else:
+                  state = 'OUTDATED' if r['outdated'] else 'current'
+              print(f'{r["name"].ljust(width)}  {str(r["version"]).ljust(16)}  {str(r["latest"]).ljust(16)}  {state}')
+          stale = [r for r in rows if r['outdated']]
+          if stale:
+              print(f'\n{len(stale)} dependency/dependencies have upstream updates:')
+              for r in stale:
+                  print(f'  {r["name"]}: {r["version"]} -> {r["latest"]}')
+              print('\nThis job is advisory. To apply them: scripts/admin-update.sh')
+              sys.exit(1)
+          print('\nAll dependencies are current.')
+          PY
 
   dts-integration:
     name: DTS Integration (Linux)

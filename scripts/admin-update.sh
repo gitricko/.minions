@@ -93,5 +93,9 @@ scripts/bump.sh --open-pr $DEPS
 echo "Syncing versions.env..."
 scripts/sync-versions.sh
 
+# Refresh the README version pills so they match the pins we just bumped.
+echo "Syncing README badges..."
+scripts/sync-readme-badges.sh
+
 echo "admin-update.sh complete."
 exit 0
