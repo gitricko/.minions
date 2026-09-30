@@ -13,12 +13,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-1f425f.svg)](./install.sh)
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
-[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-v2026.9.11-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
-[![PI Agent](https://img.shields.io/badge/PI%20Agent-v0.85.1-brown?logo=github)](https://pi.dev)
-[![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.50-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
-[![9Router](https://img.shields.io/badge/9Router-0.5.81-green?logo=npm)](https://www.npmjs.com/package/9router)
+[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-2026.9.24-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
+[![PI Agent](https://img.shields.io/badge/PI%20Agent-0.99.2-brown?logo=github)](https://pi.dev)
+[![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.51-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
+[![9Router](https://img.shields.io/badge/9Router-0.5.91-green?logo=npm)](https://www.npmjs.com/package/9router)
 [![Ollama](https://img.shields.io/badge/Ollama-0.33.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
-[![Mnemon](https://img.shields.io/badge/Mnemon-0.2.8-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
+[![Mnemon](https://img.shields.io/badge/Mnemon-0.2.9-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
+[![Node.js](https://img.shields.io/badge/Node.js-26.10.0-brightgreen?logo=node.js)](https://nodejs.org)
+[![uv](https://img.shields.io/badge/uv-0.12.21-blue?logo=astral)](https://github.com/astral-sh/uv)
 
 <a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">
     <img src="https://github.com/gitricko/.minions/actions/workflows/ci.yml/badge.svg" alt="Latest CI Status">

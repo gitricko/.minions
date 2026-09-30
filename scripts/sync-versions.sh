@@ -17,6 +17,8 @@ set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEPS_YAML="${DEPS_YAML:-${REPO_ROOT}/etc/deps.yaml}"
 VERSIONS_ENV="${VERSIONS_ENV:-${REPO_ROOT}/etc/versions.env}"
+# CI reads .node-version (actions/setup-node), so it must track deps.yaml too.
+NODE_VERSION_FILE="${NODE_VERSION_FILE:-${REPO_ROOT}/.node-version}"
 
 [ -f "${DEPS_YAML}" ] || { echo "missing ${DEPS_YAML}" >&2; exit 1; }
 
@@ -50,14 +52,29 @@ print('\n'.join(lines))
 PY
 )"
 
+node_version="$(printf '%s\n' "${generated}" | grep '^NODE_VERSION=' | cut -d'"' -f2)"
+if [ -z "${node_version}" ]; then
+  echo "sync-versions.sh: no NODE dependency in ${DEPS_YAML} — cannot generate .node-version" >&2
+  exit 1
+fi
+
 if [ "${1:-}" = "--check" ]; then
+  rc=0
   if [ -f "${VERSIONS_ENV}" ] && [ "$(cat "${VERSIONS_ENV}")" = "${generated}" ]; then
-    exit 0
+    :
   else
     echo "versions.env is out of date — run sync-versions.sh to regenerate" >&2
-    exit 1
+    rc=1
   fi
+  if [ -f "${NODE_VERSION_FILE}" ] && [ "$(cat "${NODE_VERSION_FILE}")" = "${node_version}" ]; then
+    :
+  else
+    echo ".node-version is out of date — run sync-versions.sh to regenerate" >&2
+    rc=1
+  fi
+  exit $rc
 fi
 
 printf '%s\n' "${generated}" > "${VERSIONS_ENV}"
-echo "Generated ${VERSIONS_ENV} from ${DEPS_YAML}"
+printf '%s\n' "${node_version}" > "${NODE_VERSION_FILE}"
+echo "Generated ${VERSIONS_ENV} and ${NODE_VERSION_FILE} from ${DEPS_YAML}"
