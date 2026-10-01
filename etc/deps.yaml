@@ -15,6 +15,7 @@ dependencies:
     source_type: git_tag
     repo: gitricko/.minions
     sha_source: none
+    drift_check: false
 
   - name: HERMES
     version: "v2026.9.24"
@@ -38,7 +39,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.91"
+    version: "0.5.95"
     source_type: npm
     package: 9router
     channel: latest
@@ -76,7 +77,6 @@ dependencies:
     source_type: github_tag
     repo: mnemon-dev/mnemon
     sha_source: none
-    drift_check: false
 
   - name: OLLAMA
     version: "0.35.0"
