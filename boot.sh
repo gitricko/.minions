@@ -154,7 +154,22 @@ start_service "9router" \
 
 wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"
 
-# Step 3: Configure 9Router (auto-fastest combo, disable login/API key)
+# Step 3: Ollama (for mnemon embeddings)
+log_info "Starting Ollama (localhost:11434)..."
+start_service "ollama" \
+    "${MINIONS_HOME}/bin/ollama" \
+    serve \
+    >> "${boot_log}" 2>&1 || log_error "Failed to start Ollama"
+
+wait_for_health "http://localhost:11434/api/tags" 60 "ollama"
+
+# Pull embedding model for mnemon
+log_info "Pulling mnemon embedding model (nomic-embed-text)..."
+# shellcheck disable=SC1091
+. "${LIB_DIR}/ollama.sh"
+pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
+
+# Step 4: Configure 9Router (auto-fastest combo, disable login/API key)
 log_info "Preconfiguring 9Router..."
 # shellcheck disable=SC1091
 . "${LIB_DIR}/9router.sh"
