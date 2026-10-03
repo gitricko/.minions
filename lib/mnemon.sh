@@ -33,6 +33,8 @@ install_mnemon() {
     esac
 
     mnemon_version="${MNEMON_VERSION:-0.2.9}"
+    # Strip leading 'v' if present (versions.env stores v0.2.10)
+    mnemon_version="${mnemon_version#v}"
 
     # Try latest release download
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
@@ -44,7 +46,7 @@ install_mnemon() {
         return 0
     fi
 
-    # Fallback: try specific version from releases
+    # Fallback: try specific version from releases (without v prefix in URL)
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/v${mnemon_version}/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
