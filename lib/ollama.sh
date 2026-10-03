@@ -32,6 +32,8 @@ install_ollama() {
     esac
 
     ollama_version="${OLLAMA_VERSION:-0.35.0}"
+    # Strip leading 'v' if present (versions.env stores v0.35.1)
+    ollama_version="${ollama_version#v}"
 
     # Determine asset name and URL
     if [ "${platform}" = "darwin" ]; then
