@@ -51,9 +51,9 @@ _fail() { local label="$1" msg="$2"; printf "  ${RED}❌${NC} %-18s %s\n" "$labe
 
 json_add() {
   local name="$1" status="$2" message="$3" detail="${4:-null}"
-  # Write detail JSON to temp file to avoid shell quoting issues
+  # Write detail JSON to temp file using printf to avoid shell expansion of true/false/null
   local detail_file=$(mktemp)
-  echo "$detail" > "$detail_file"
+  printf '%s\n' "$detail" > "$detail_file"
   
   JSON_RESULTS=$(python3 -c "
 import json, sys
