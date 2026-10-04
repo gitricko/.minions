@@ -55,7 +55,15 @@ cmd_up() {
     # by the CI workflow for failure analysis.
     LOGS_DIR="${LOGS_DIR:-/tmp/dts-logs}"
     mkdir -p "${LOGS_DIR}"
-    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" "${IMAGE}" sleep infinity >/dev/null
+
+    # Ollama host cache: if OLLAMA_HOST_CACHE is set, mount it so install.sh
+    # finds the binary at ${MINIONS_HOME}/lib/ollama/ollama and skips the 1.4GB download.
+    OLLAMA_MOUNT=""
+    if [ -n "${OLLAMA_HOST_CACHE:-}" ] && [ -d "${OLLAMA_HOST_CACHE}" ]; then
+        OLLAMA_MOUNT="-v ${OLLAMA_HOST_CACHE}:/home/ubuntu/.minions/lib/ollama"
+    fi
+
+    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" ${OLLAMA_MOUNT} "${IMAGE}" sleep infinity >/dev/null
     sleep 1
     # Ensure uid-1000 user exists and owns the mount (Ubuntu/Debian: ubuntu user)
     docker exec -u 0:0 "${CONTAINER}" bash -c "
@@ -66,6 +74,14 @@ cmd_up() {
         mkdir -p /tmp/ci && chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/ci
         [ -d \"${home}\" ] || (mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home})
     " >/dev/null
+    # Ollama mount: Docker creates /home/ubuntu/.minions/lib/ollama with root ownership.
+    # Fix ownership so the uid-1000 user can write bin/ollama symlink and lib/ollama/*.
+    if [ -n "${OLLAMA_MOUNT}" ]; then
+        docker exec -u 0:0 "${CONTAINER}" bash -c "
+            mkdir -p /home/ubuntu/.minions/bin
+            chown -R ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions 2>/dev/null || true
+        " >/dev/null 2>&1 || true
+    fi
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')
     log "container ready. home=${home}. Install packages via: dts apt '<pkgs>' (root)"
     log "verify the mount: diff <(md5sum <file>) <(dts exec 'md5sum /src/<file>')"

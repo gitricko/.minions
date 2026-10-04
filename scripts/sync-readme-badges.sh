@@ -44,6 +44,7 @@ LABELS = {
     'MNEMON': 'Mnemon',
     'NODE': 'Node.js',
     'UV': 'uv',
+    'OLLAMA': 'Ollama',
 }
 
 for dep in deps['dependencies']:

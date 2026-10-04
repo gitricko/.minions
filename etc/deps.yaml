@@ -15,6 +15,7 @@ dependencies:
     source_type: git_tag
     repo: gitricko/.minions
     sha_source: none
+    drift_check: false
 
   - name: HERMES
     version: "v2026.9.24"
@@ -24,7 +25,7 @@ dependencies:
     sha_source: none
 
   - name: PI
-    version: "0.99.2"
+    version: "1.0.2"
     source_type: npm
     package: "@earendil-works/pi-coding-agent"
     channel: latest
@@ -38,7 +39,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.91"
+    version: "0.5.95"
     source_type: npm
     package: 9router
     channel: latest
@@ -59,21 +60,34 @@ dependencies:
       macos_arm64: "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af"
 
   - name: UV
-    version: "0.12.21"
+    version: "0.12.23"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "23f02075b652bb1df64178cfae41b5caf160822e720e2663568f3f5d63bc52c0"
-      linux_arm64: "030b69227b40af8c1981b7301793dc66e71ed3c796ea8688209dd268bd91ec51"
-      macos_x64: "2b336763b396ec6afa20c5a8b083538ca7402445b868311979d740a4344c17d8"
-      macos_arm64: "b88bda573e566ef9bced66b155fe0408626fbbc053aee1c30ba686f0728c9447"
+      linux_x64: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+      linux_arm64: "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
+      macos_x64: "960da44cb4b73685206ddd250b19e0a117fa41095710c1038f081f5cb613efb4"
+      macos_arm64: "50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544"
 
   - name: MNEMON
-    version: "0.2.9"
+    version: "v0.2.10"
     source_type: github_tag
     repo: mnemon-dev/mnemon
     sha_source: none
+
+  - name: OLLAMA
+    version: "v0.35.1"
+    source_type: github_tag
+    repo: ollama/ollama
+    sha_source: shasums
+    platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
+    sha256:
+      linux_x64: "9fcd79ac4575b2bd31b992eee18b1000c8ad126b451627c8f8cd091714cfbb10"
+      linux_arm64: "b1b1c85d25136b256d3740f6ecd2f7c0105e8ca71642fd6ff2fc199f3cefd69d"
+      macos_x64: "3137dbf28948ee844e0fb3e584d9b5de6879d73d9f0cb7eff3ad64930601d307"
+      macos_arm64: "3137dbf28948ee844e0fb3e584d9b5de6879d73d9f0cb7eff3ad64930601d307"
+
 

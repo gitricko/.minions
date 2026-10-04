@@ -87,6 +87,9 @@ def is_outdated(current, latest):
 
 report = []
 for dep in data['dependencies']:
+    # Skip drift check for dependencies we control (e.g., MNEMON)
+    if dep.get('drift_check') is False:
+        continue
     name = dep['name']
     version = dep['version']
     source_type = dep['source_type']

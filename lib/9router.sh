@@ -52,7 +52,6 @@ ninerouter_preconfigure() {
               "oc/union-alpha",
               "oc/big-pickle",
               "oc/mimo-v2.5-free",
-              "oc/ling-3.0-flash-fin-free",
               "oc/nemotron-3-ultra-free",
               "oc/nemotron-3.5-lightning-free"
             ]
@@ -61,21 +60,22 @@ ninerouter_preconfigure() {
         return 1
     fi
 
-    # Set auto-fastest combo strategy to round-robin
-    STRATEGIES=$(
-        curl -fsS -b "$COOKIE_FILE" "$BASE_URL/api/settings" 2>/dev/null | \
-        jq -c '
-            (.comboStrategies // {})
-            | .["auto-fastest"] = ((.["auto-fastest"] // {}) + {fallbackStrategy: "round-robin"})
-        ' 2>/dev/null
-    )
-    if ! curl -fsS -b "$COOKIE_FILE" \
-        -X PATCH "$BASE_URL/api/settings" \
-        -H "Content-Type: application/json" \
-        -d "{\"comboStrategies\":$STRATEGIES}" >/dev/null 2>&1; then
-        log_warn "ninerouter_preconfigure: failed to set combo strategy"
-        return 1
-    fi
+    # Set auto-fastest combo strategy to fallback
+
+    # STRATEGIES=$(
+    #     curl -fsS -b "$COOKIE_FILE" "$BASE_URL/api/settings" 2>/dev/null | \
+    #     jq -c '
+    #         (.comboStrategies // {})
+    #         | .["auto-fastest"] = ((.["auto-fastest"] // {}) + {fallbackStrategy: "round-robin"})
+    #     ' 2>/dev/null
+    # )
+    # if ! curl -fsS -b "$COOKIE_FILE" \
+    #     -X PATCH "$BASE_URL/api/settings" \
+    #     -H "Content-Type: application/json" \
+    #     -d "{\"comboStrategies\":$STRATEGIES}" >/dev/null 2>&1; then
+    #     log_warn "ninerouter_preconfigure: failed to set combo strategy"
+    #     return 1
+    # fi
 
     # Test the combo (9Router uses /v1/chat/completions with model=auto-fastest)
     if curl -fsS "$BASE_URL/v1/chat/completions" \
