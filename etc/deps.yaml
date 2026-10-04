@@ -25,7 +25,7 @@ dependencies:
     sha_source: none
 
   - name: PI
-    version: "1.0.1"
+    version: "1.0.2"
     source_type: npm
     package: "@earendil-works/pi-coding-agent"
     channel: latest
