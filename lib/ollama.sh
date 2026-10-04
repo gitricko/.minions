@@ -50,7 +50,11 @@ install_ollama() {
     if curl -fsSL "${url}" -o "${install_dir}/${asset}"; then
         # Extract
         if extract_tarball "${install_dir}/${asset}" "${install_dir}"; then
-            # The binary is at install_dir/ollama (extracted from archive)
+            # Archive layout: bin/ollama + lib/ollama/* (handle both)
+            if [ -f "${install_dir}/bin/ollama" ]; then
+                mv "${install_dir}/bin/ollama" "${install_dir}/ollama"
+                rmdir "${install_dir}/bin" 2>/dev/null || true
+            fi
             if [ -f "${install_dir}/ollama" ]; then
                 chmod +x "${install_dir}/ollama"
                 fix_macos_quarantine "${install_dir}/ollama"
@@ -86,6 +90,8 @@ ensure_ollama() {
 
     if [ -x "${minions_home}/lib/ollama/ollama" ]; then
         echo "Ollama found at ${minions_home}/lib/ollama/ollama"
+        mkdir -p "${minions_home}/bin"
+        ln -sf "${minions_home}/lib/ollama/ollama" "${minions_home}/bin/ollama"
         return 0
     fi
 
