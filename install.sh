@@ -505,6 +505,9 @@ echo "    - 9Router:     ${MINIONS_HOME}/bin/9router (version ${NINEROUTER_VERSI
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     echo "    - Hermes:      ${MINIONS_HOME}/bin/hermes (version ${HERMES_VERSION:-unknown})"
 fi
+if [ "${INSTALL_OLLAMA}" -eq 1 ]; then
+    echo "    - Ollama:      ${MINIONS_HOME}/bin/ollama (version ${OLLAMA_VERSION:-unknown})"
+fi
 echo "    - Mnemon:      ${MINIONS_HOME}/bin/mnemon (if available)"
 echo ""
 echo "  Next step: run '${MINIONS_HOME}/boot.sh' to start the stack"

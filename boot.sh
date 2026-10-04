@@ -225,5 +225,8 @@ echo "  ✅ 9router      http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
 echo "  ✅ pi-agent     CLI ready (invoked on demand)"
 echo "  ✅ hermes       CLI ready (preinstalled)"
 echo "  ✅ mnemon       memory layer ready"
+if [ -x "${MINIONS_HOME}/bin/ollama" ]; then
+    echo "  ✅ ollama       http://localhost:11434 (embeddings: nomic-embed-text)"
+fi
 echo "=============================================="
 echo ""
