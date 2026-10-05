@@ -365,26 +365,37 @@ section "Persistence"
 if ! should_skip "persistence"; then
   PERSIST_FAIL=0
 
-  # 7a. Skills symlink: ~/.minions/skills -> MINIONS_REPO_ROOT/skills
-  if [ -d "${MINIONS_HOME}/skills" ]; then
+  # 7a. Skills: ~/.minions/skills -> MINIONS_REPO_ROOT/skills (symlink in dev, copied in standalone)
+  if [ -d "${MINIONS_HOME}/skills" ] || [ -L "${MINIONS_HOME}/skills" ]; then
     if [ -L "${MINIONS_HOME}/skills" ]; then
-      _ok "Skills" "symlink -> $(readlink "${MINIONS_HOME}/skills")"
-      json_add "skills_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/skills")\"}"
+      if [ ! -e "${MINIONS_HOME}/skills" ]; then
+        _fail "Skills" "broken symlink at ${MINIONS_HOME}/skills -> $(readlink "${MINIONS_HOME}/skills")"
+        json_add "skills_symlink" "fail" "broken symlink" "{}"
+        PERSIST_FAIL=1
+      else
+        _ok "Skills" "symlink -> $(readlink "${MINIONS_HOME}/skills")"
+        json_add "skills_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/skills")\"}"
+      fi
     else
-      _fail "Skills" "knowledge exists but no symlink at ${MINIONS_HOME}/skills"
-      json_add "skills_symlink" "fail" "symlink missing" "{}"
-      PERSIST_FAIL=1
+      _ok "Skills" "${MINIONS_HOME}/skills exists (copied in standalone mode)"
+      json_add "skills_symlink" "ok" "skills dir exists (copied)" "{}"
     fi
   else
     _warn "Skills" "knowledge not installed (${MINIONS_HOME}/skills missing)"
     json_add "skills_symlink" "warn" "knowledge not installed" "{}"
   fi
 
-  # 7b. Wiki: ~/.minions/wiki -> MINIONS_REPO_ROOT/wiki (NOT symlinked in standalone, symlinked in dev)
-  if [ -d "${MINIONS_HOME}/wiki" ]; then
+  # 7b. Wiki: ~/.minions/wiki -> MINIONS_REPO_ROOT/wiki (symlink in dev, copied in standalone)
+  if [ -d "${MINIONS_HOME}/wiki" ] || [ -L "${MINIONS_HOME}/wiki" ]; then
     if [ -L "${MINIONS_HOME}/wiki" ]; then
-      _ok "Wiki" "symlink -> $(readlink "${MINIONS_HOME}/wiki")"
-      json_add "wiki_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/wiki")\"}"
+      if [ ! -e "${MINIONS_HOME}/wiki" ]; then
+        _fail "Wiki" "broken symlink at ${MINIONS_HOME}/wiki -> $(readlink "${MINIONS_HOME}/wiki")"
+        json_add "wiki_symlink" "fail" "broken symlink" "{}"
+        PERSIST_FAIL=1
+      else
+        _ok "Wiki" "symlink -> $(readlink "${MINIONS_HOME}/wiki")"
+        json_add "wiki_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/wiki")\"}"
+      fi
     else
       _ok "Wiki" "${MINIONS_HOME}/wiki exists (copied in standalone mode)"
       json_add "wiki_symlink" "ok" "wiki dir exists (copied)" "{}"
@@ -394,11 +405,17 @@ if ! should_skip "persistence"; then
     json_add "wiki_symlink" "warn" "knowledge not installed" "{}"
   fi
 
-  # 7c. Mnemon symlink: ~/.minions/mnemon -> MINIONS_REPO_ROOT/mnemon
-  if [ -d "${MINIONS_HOME}/mnemon" ]; then
+  # 7c. Mnemon: ~/.minions/mnemon -> MINIONS_REPO_ROOT/mnemon (symlink in dev, copied in standalone)
+  if [ -d "${MINIONS_HOME}/mnemon" ] || [ -L "${MINIONS_HOME}/mnemon" ]; then
     if [ -L "${MINIONS_HOME}/mnemon" ]; then
-      _ok "Mnemon" "symlink -> $(readlink "${MINIONS_HOME}/mnemon")"
-      json_add "mnemon_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/mnemon")\"}"
+      if [ ! -e "${MINIONS_HOME}/mnemon" ]; then
+        _fail "Mnemon" "broken symlink at ${MINIONS_HOME}/mnemon -> $(readlink "${MINIONS_HOME}/mnemon")"
+        json_add "mnemon_symlink" "fail" "broken symlink" "{}"
+        PERSIST_FAIL=1
+      else
+        _ok "Mnemon" "symlink -> $(readlink "${MINIONS_HOME}/mnemon")"
+        json_add "mnemon_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/mnemon")\"}"
+      fi
     else
       _ok "Mnemon" "${MINIONS_HOME}/mnemon exists (copied in standalone mode)"
       json_add "mnemon_symlink" "ok" "mnemon dir exists (copied)" "{}"
@@ -408,15 +425,20 @@ if ! should_skip "persistence"; then
     json_add "mnemon_symlink" "warn" "knowledge not installed" "{}"
   fi
 
-  # 7d. Memories symlink: ~/.minions/memories -> MINIONS_REPO_ROOT/memories
-  if [ -d "${MINIONS_HOME}/memories" ]; then
+  # 7d. Memories: ~/.minions/memories -> MINIONS_REPO_ROOT/memories (symlink in dev, copied in standalone)
+  if [ -d "${MINIONS_HOME}/memories" ] || [ -L "${MINIONS_HOME}/memories" ]; then
     if [ -L "${MINIONS_HOME}/memories" ]; then
-      _ok "Memories" "symlink -> $(readlink "${MINIONS_HOME}/memories")"
-      json_add "memories_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/memories")\"}"
+      if [ ! -e "${MINIONS_HOME}/memories" ]; then
+        _fail "Memories" "broken symlink at ${MINIONS_HOME}/memories -> $(readlink "${MINIONS_HOME}/memories")"
+        json_add "memories_symlink" "fail" "broken symlink" "{}"
+        PERSIST_FAIL=1
+      else
+        _ok "Memories" "symlink -> $(readlink "${MINIONS_HOME}/memories")"
+        json_add "memories_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/memories")\"}"
+      fi
     else
-      _fail "Memories" "knowledge exists but no symlink at ${MINIONS_HOME}/memories"
-      json_add "memories_symlink" "fail" "symlink missing" "{}"
-      PERSIST_FAIL=1
+      _ok "Memories" "${MINIONS_HOME}/memories exists (copied in standalone mode)"
+      json_add "memories_symlink" "ok" "memories dir exists (copied)" "{}"
     fi
   else
     _warn "Memories" "knowledge not installed (${MINIONS_HOME}/memories missing)"
