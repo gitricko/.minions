@@ -363,7 +363,6 @@ fi
 section "Persistence"
 
 if ! should_skip "persistence"; then
-  PERSIST_FAIL=0
 
   # 7a. Skills: ~/.minions/skills -> MINIONS_REPO_ROOT/skills (symlink in dev, copied in standalone)
   if [ -d "${MINIONS_HOME}/skills" ] || [ -L "${MINIONS_HOME}/skills" ]; then
@@ -371,7 +370,6 @@ if ! should_skip "persistence"; then
       if [ ! -e "${MINIONS_HOME}/skills" ]; then
         _fail "Skills" "broken symlink at ${MINIONS_HOME}/skills -> $(readlink "${MINIONS_HOME}/skills")"
         json_add "skills_symlink" "fail" "broken symlink" "{}"
-        PERSIST_FAIL=1
       else
         _ok "Skills" "symlink -> $(readlink "${MINIONS_HOME}/skills")"
         json_add "skills_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/skills")\"}"
@@ -391,7 +389,6 @@ if ! should_skip "persistence"; then
       if [ ! -e "${MINIONS_HOME}/wiki" ]; then
         _fail "Wiki" "broken symlink at ${MINIONS_HOME}/wiki -> $(readlink "${MINIONS_HOME}/wiki")"
         json_add "wiki_symlink" "fail" "broken symlink" "{}"
-        PERSIST_FAIL=1
       else
         _ok "Wiki" "symlink -> $(readlink "${MINIONS_HOME}/wiki")"
         json_add "wiki_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/wiki")\"}"
@@ -411,7 +408,6 @@ if ! should_skip "persistence"; then
       if [ ! -e "${MINIONS_HOME}/mnemon" ]; then
         _fail "Mnemon" "broken symlink at ${MINIONS_HOME}/mnemon -> $(readlink "${MINIONS_HOME}/mnemon")"
         json_add "mnemon_symlink" "fail" "broken symlink" "{}"
-        PERSIST_FAIL=1
       else
         _ok "Mnemon" "symlink -> $(readlink "${MINIONS_HOME}/mnemon")"
         json_add "mnemon_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/mnemon")\"}"
@@ -431,7 +427,6 @@ if ! should_skip "persistence"; then
       if [ ! -e "${MINIONS_HOME}/memories" ]; then
         _fail "Memories" "broken symlink at ${MINIONS_HOME}/memories -> $(readlink "${MINIONS_HOME}/memories")"
         json_add "memories_symlink" "fail" "broken symlink" "{}"
-        PERSIST_FAIL=1
       else
         _ok "Memories" "symlink -> $(readlink "${MINIONS_HOME}/memories")"
         json_add "memories_symlink" "ok" "symlink correct" "{\"target\":\"$(readlink "${MINIONS_HOME}/memories")\"}"
