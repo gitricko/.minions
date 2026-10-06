@@ -284,6 +284,9 @@ ensure_node_v22
 log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
 setup_mnemon_all "${MINIONS_HOME}"
+# Ensure HOME dot dirs exist so `uninstall.sh --keep-config` can preserve them
+# (mnemon setup is disabled; 9router/ollama dirs only appear after boot).
+mkdir -p "${HOME}/.mnemon" "${HOME}/.ollama" "${HOME}/.9router" 2>/dev/null || true
 
 if [ "${INSTALL_PI}" -eq 1 ]; then
     log_info "Installing Pi-Agent..."

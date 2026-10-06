@@ -284,21 +284,28 @@ if [ "$DO_DELETE" = "1" ]; then
       log_warn "skip unsafe rm: $MINIONS_HOME"
     else
       # Unmount any Docker volume mounts under MINIONS_HOME (DTS mounts host
-      # ollama cache at $MINIONS_HOME/lib/ollama - rm -rf fails on mountpoints)
+      # ollama cache at $MINIONS_HOME/lib/ollama - rm -rf fails on mountpoints).
+      # DTS runs as uid 1000 so umount needs sudo when available; try both.
+      _try_umount() {
+        for _u in "umount -l" "umount" "sudo umount -l" "sudo umount" "sudo -n umount -l"; do
+          $_u "$1" 2>/dev/null && return 0
+        done
+        return 1
+      }
       if command -v mountpoint >/dev/null 2>&1; then
         for mp in "$MINIONS_HOME/lib/ollama" "$MINIONS_HOME"; do
           if mountpoint -q "$mp" 2>/dev/null; then
-            umount -l "$mp" 2>/dev/null || umount "$mp" 2>/dev/null || true
+            _try_umount "$mp" || true
             log_info "unmounted $mp"
           fi
         done
       fi
       # Fallback: parse mount table for any mount under MINIONS_HOME
-      # (handles cases where mountpoint(1) not available)
       for mp in $(mount 2>/dev/null | grep " $MINIONS_HOME" | awk '{print $3}' | sort -r); do
-        umount -l "$mp" 2>/dev/null || umount "$mp" 2>/dev/null || true
+        _try_umount "$mp" || true
         log_info "unmounted $mp (via mount table)"
       done
+      unset -f _try_umount
       # Try removal with retries (handles transient file locks + mount release)
       for attempt in 1 2 3 4 5; do
         rm -rf "$MINIONS_HOME" 2>/dev/null && break
