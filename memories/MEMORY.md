@@ -37,3 +37,4 @@
 - Memory/seed in sync: seed is the checked-in snapshot; runtime edits live in
   `~/.hermes/memories`. Re-import seed at boot (fresh-spawn persistence).
 - Reinstall must preserve `USER.md`/`MEMORY.md` (copy only if absent).
+- NEVER push directly to `main` — always use feature branch + PR (`git checkout -b fix/... && git push -u origin fix/...`). Enforced by `.git/hooks/pre-push` (blocks `main` pushes) and ideally GitHub branch protection.
