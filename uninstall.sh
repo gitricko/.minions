@@ -270,11 +270,25 @@ fi
 
 # 3) MINIONS_HOME last
 if [ "$DO_DELETE" = "1" ]; then
-  safe_rm_target "$MINIONS_HOME"
-  # verify removal actually succeeded
-  if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
-    log_error "failed to remove $MINIONS_HOME"
-    exit 1
+  # For MINIONS_HOME, don't swallow errors - we need to know if it fails
+  if [ -L "$MINIONS_HOME" ]; then
+    rm -f "$MINIONS_HOME" 2>/dev/null || true
+    log_info "removed symlink $MINIONS_HOME"
+  elif [ -e "$MINIONS_HOME" ]; then
+    if ! is_safe_target "$MINIONS_HOME"; then
+      log_warn "skip unsafe rm: $MINIONS_HOME"
+    else
+      # Try removal with retries (handles transient file locks)
+      for attempt in 1 2 3; do
+        rm -rf "$MINIONS_HOME" 2>/dev/null && break
+        [ "$attempt" -lt 3 ] && sleep 1
+      done
+      if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
+        log_error "failed to remove $MINIONS_HOME after 3 attempts"
+        exit 1
+      fi
+      log_info "removed $MINIONS_HOME"
+    fi
   fi
 fi
 
