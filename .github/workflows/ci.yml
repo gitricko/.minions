@@ -507,9 +507,10 @@ jobs:
               fi
           done
 
-          # Reinstall after uninstall (clean cycle)
+          # Reinstall after uninstall (clean cycle) — full install so all dot
+          # folders (~/.hermes, ~/.omniroute, etc.) exist for the keep-config test
           echo "=== Real Install: reinstall after uninstall ==="
-          bash install.sh --no-hermes --no-omniroute --no-9router 2>&1 | tee "${CI_LOGS_DIR}/reinstall.log"
+          bash install.sh 2>&1 | tee "${CI_LOGS_DIR}/reinstall.log"
           if [ -d "${HOME}/.minions" ] && [ -f "${HOME}/.minions/bin/pi" ]; then
               echo "✓ Real Install: reinstall restored ~/.minions with binaries"
           else

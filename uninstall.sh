@@ -254,11 +254,16 @@ if [ "$DO_DELETE" = "1" ]; then
       fi
     done
   fi
+  # Aggressively kill any remaining processes using MINIONS_HOME (ollama, omniroute, 9router, etc.)
+  pkill -f "${MINIONS_HOME}" 2>/dev/null || true
+  pkill -f "ollama" 2>/dev/null || true
+  pkill -f "omniroute" 2>/dev/null || true
+  pkill -f "9router" 2>/dev/null || true
   # remove pidfiles/logs regardless
   rm -f "${MINIONS_HOME}/var/run/"*.pid "${MINIONS_HOME}/var/run/ready" 2>/dev/null || true
   rm -rf "${MINIONS_HOME}/var/log" 2>/dev/null || true
   # give processes time to fully exit and release file handles
-  sleep 1
+  sleep 2
 fi
 
 # 2) data folders (after services stopped)
@@ -278,13 +283,33 @@ if [ "$DO_DELETE" = "1" ]; then
     if ! is_safe_target "$MINIONS_HOME"; then
       log_warn "skip unsafe rm: $MINIONS_HOME"
     else
-      # Try removal with retries (handles transient file locks)
-      for attempt in 1 2 3; do
+      # Unmount any Docker volume mounts under MINIONS_HOME (DTS mounts host
+      # ollama cache at $MINIONS_HOME/lib/ollama - rm -rf fails on mountpoints)
+      if command -v mountpoint >/dev/null 2>&1; then
+        for mp in "$MINIONS_HOME/lib/ollama" "$MINIONS_HOME"; do
+          if mountpoint -q "$mp" 2>/dev/null; then
+            umount -l "$mp" 2>/dev/null || umount "$mp" 2>/dev/null || true
+            log_info "unmounted $mp"
+          fi
+        done
+      fi
+      # Fallback: parse mount table for any mount under MINIONS_HOME
+      # (handles cases where mountpoint(1) not available)
+      for mp in $(mount 2>/dev/null | grep " $MINIONS_HOME" | awk '{print $3}' | sort -r); do
+        umount -l "$mp" 2>/dev/null || umount "$mp" 2>/dev/null || true
+        log_info "unmounted $mp (via mount table)"
+      done
+      # Try removal with retries (handles transient file locks + mount release)
+      for attempt in 1 2 3 4 5; do
         rm -rf "$MINIONS_HOME" 2>/dev/null && break
-        [ "$attempt" -lt 3 ] && sleep 1
+        [ "$attempt" -lt 5 ] && sleep 2
       done
       if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
-        log_error "failed to remove $MINIONS_HOME after 3 attempts"
+        # Diagnostic: show what's left
+        log_error "failed to remove $MINIONS_HOME after 5 attempts"
+        ls -la "$MINIONS_HOME" 2>/dev/null | head -20 >&2 || true
+        find "$MINIONS_HOME" -type f 2>/dev/null | head -30 >&2 || true
+        mount 2>/dev/null | grep "$MINIONS_HOME" >&2 || true
         exit 1
       fi
       log_info "removed $MINIONS_HOME"

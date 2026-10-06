@@ -475,10 +475,11 @@ for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
     fi
 done
 
-# Test 9.7: reinstall after uninstall (install → uninstall → install cycle)
+# Test 9.7: reinstall after uninstall (install → uninstall → install cycle) — full
+# install so all dot folders (~/.hermes, ~/.omniroute, ...) exist for keep-config
 echo ""
 echo "=== Test 9.7: reinstall after uninstall (clean cycle) ==="
-if "${DTS_SCRIPT}" exec "cd /src && bash install.sh --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/reinstall.log"; then
+if "${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1 | tee /tmp/reinstall.log"; then
     log_info "Reinstall after uninstall exit 0"
 else
     log_error "Reinstall after uninstall failed"
