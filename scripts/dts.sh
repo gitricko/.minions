@@ -76,13 +76,14 @@ cmd_up() {
         mkdir -p /tmp/ci && chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/ci
         [ -d \"${home}\" ] || (mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home})
     " >/dev/null
-    # Ollama mount: outside ~/.minions — symlink into place so install.sh
+    # Ollama mount: outside ~/.minions — symlink binary so install.sh
     # finds ${MINIONS_HOME}/lib/ollama/ollama without a volume inside the tree.
     if [ -n "${OLLAMA_MOUNT}" ]; then
         docker exec -u 0:0 "${CONTAINER}" bash -c "
-            mkdir -p /home/ubuntu/.minions/bin /home/ubuntu/.minions/lib
-            ln -sfn /tmp/ollama-cache /home/ubuntu/.minions/lib/ollama
-            chown -h ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions/lib/ollama 2>/dev/null || true
+            mkdir -p /home/ubuntu/.minions/bin /home/ubuntu/.minions/lib/ollama
+            ln -sfn /tmp/ollama-cache/ollama /home/ubuntu/.minions/lib/ollama/ollama 2>/dev/null || true
+            ln -sfn /tmp/ollama-cache/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
+            chown -h ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions/lib/ollama/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
         " >/dev/null 2>&1 || true
     fi
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')
