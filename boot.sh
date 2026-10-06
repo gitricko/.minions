@@ -105,6 +105,7 @@ else
     _PI_SKILLS_PATH="${MINIONS_HOME}/skills"
 fi
 wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
+wire_pi_default_trust_always "${HOME}/.pi/agent/settings.json"
 
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"

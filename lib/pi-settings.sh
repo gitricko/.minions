@@ -28,18 +28,21 @@ wire_pi_skills_path() {
         return 0
     fi
 
+    command -v python3 >/dev/null 2>&1 || { log_warn "wire_pi_skills_path: python3 not found — skipping"; return 1; }
     mkdir -p "$(dirname "${_PI_SETTINGS_FILE}")"
 
-    python3 - "${_PI_SETTINGS_FILE}" "${_PI_SKILLS_PATH}" <<'PYEOF'
+    if ! python3 - "${_PI_SETTINGS_FILE}" "${_PI_SKILLS_PATH}" <<'PYEOF'
 import json
+import os
 import sys
+import tempfile
 
 settings_file, skills_path = sys.argv[1], sys.argv[2]
 
 try:
     with open(settings_file, "r", encoding="utf-8") as f:
         data = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
+except (FileNotFoundError, json.JSONDecodeError, IsADirectoryError, OSError):
     data = {}
 
 skills = data.get("skills", [])
@@ -47,10 +50,71 @@ if skills_path not in skills:
     skills.append(skills_path)
 data["skills"] = skills
 
-with open(settings_file, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
+# Atomic write: mkstemp + replace so a kill/disk-full cannot leave a half-written file.
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(settings_file) or ".")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, settings_file)
+except BaseException:
+    try:
+        os.unlink(tmp)
+    except Exception:
+        pass
+    raise
 PYEOF
+    then
+        log_warn "wire_pi_skills_path: failed to update ${_PI_SETTINGS_FILE}"
+        return 1
+    fi
 
     log_info "Wired Pi skills path: ${_PI_SKILLS_PATH} -> ${_PI_SETTINGS_FILE}"
+}
+
+# wire_pi_default_trust_always SETTINGS_FILE
+#   Ensures Pi auto-trusts projects (defaultProjectTrust: "always") so no
+#   interactive trust prompt appears on first pi in a new repo.
+#   Creates the file if missing, preserves all other keys. Idempotent.
+wire_pi_default_trust_always() {
+    _PI_TRUST_FILE="$1"
+    command -v python3 >/dev/null 2>&1 || { log_warn "wire_pi_default_trust_always: python3 not found — skipping"; return 1; }
+    mkdir -p "$(dirname "${_PI_TRUST_FILE}")"
+
+    if ! python3 - "${_PI_TRUST_FILE}" <<'PYEOF'
+import json
+import os
+import sys
+import tempfile
+
+settings_file = sys.argv[1]
+
+try:
+    with open(settings_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError, IsADirectoryError, OSError):
+    data = {}
+
+data["defaultProjectTrust"] = "always"
+
+# Atomic write: mkstemp + replace so a kill/disk-full cannot leave a half-written file.
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(settings_file) or ".")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, settings_file)
+except BaseException:
+    try:
+        os.unlink(tmp)
+    except Exception:
+        pass
+    raise
+PYEOF
+    then
+        log_warn "wire_pi_default_trust_always: failed to update ${_PI_TRUST_FILE}"
+        return 1
+    fi
+
+    log_info "Wired Pi defaultProjectTrust: always -> ${_PI_TRUST_FILE}"
 }

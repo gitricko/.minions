@@ -130,6 +130,11 @@ jobs:
           set -e
           bash tests/test_self_update.sh
 
+      - name: Run pi trust tests
+        run: |
+          set -e
+          bash tests/test_pi_trust.sh
+
       - name: Knowledge layer global checks (F1 shell syntax, F3 JSON, F5 no .devcontainer refs)
         run: |
           # These validate file integrity without needing services/install.
