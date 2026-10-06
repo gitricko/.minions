@@ -445,6 +445,92 @@ else
     exit 1
 fi
 
+# Test 9.6: uninstall.sh — default purge (verify CLEAN)
+echo ""
+echo "=== Test 9.6: uninstall.sh default purge ==="
+if "${DTS_SCRIPT}" exec "cd /src && bash uninstall.sh --force --verify 2>&1 | tee /tmp/uninstall_purge.log"; then
+    log_info "uninstall.sh --force --verify exit 0"
+else
+    log_error "uninstall.sh --force --verify failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_purge.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q '^CLEAN$' /tmp/uninstall_purge.log"; then
+    log_info "uninstall.sh verify CLEAN"
+else
+    log_error "uninstall.sh verify not CLEAN"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_purge.log"
+    cleanup
+    exit 1
+fi
+# Verify entire folders gone (default purge)
+for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
+    if ! "${DTS_SCRIPT}" exec "test -e /home/ubuntu/$d" 2>/dev/null; then
+        log_info "uninstall.sh removed ~/$d (default purge)"
+    else
+        log_error "uninstall.sh left ~/$d (default purge)"
+        cleanup
+        exit 1
+    fi
+done
+
+# Test 9.7: reinstall after uninstall (install → uninstall → install cycle)
+echo ""
+echo "=== Test 9.7: reinstall after uninstall (clean cycle) ==="
+if "${DTS_SCRIPT}" exec "cd /src && bash install.sh --no-hermes --no-omniroute --no-9router 2>&1 | tee /tmp/reinstall.log"; then
+    log_info "Reinstall after uninstall exit 0"
+else
+    log_error "Reinstall after uninstall failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "test -d /home/ubuntu/.minions && test -f /home/ubuntu/.minions/bin/pi"; then
+    log_info "Reinstall restored ~/.minions with binaries"
+else
+    log_error "Reinstall missing ~/.minions or binaries"
+    cleanup
+    exit 1
+fi
+
+# Test 9.8: uninstall.sh --keep-config (preserves dot folders)
+echo ""
+echo "=== Test 9.8: uninstall.sh --keep-config ==="
+if "${DTS_SCRIPT}" exec "cd /src && bash uninstall.sh --keep-config --force --verify 2>&1 | tee /tmp/uninstall_keep.log"; then
+    log_info "uninstall.sh --keep-config --force --verify exit 0"
+else
+    log_error "uninstall.sh --keep-config failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_keep.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q '^CLEAN$' /tmp/uninstall_keep.log"; then
+    log_info "uninstall.sh --keep-config verify CLEAN"
+else
+    log_error "uninstall.sh --keep-config verify not CLEAN"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_keep.log"
+    cleanup
+    exit 1
+fi
+# Verify MINIONS_HOME gone, dot folders preserved
+if ! "${DTS_SCRIPT}" exec "test -e /home/ubuntu/.minions" 2>/dev/null; then
+    log_info "uninstall.sh --keep-config removed ~/.minions"
+else
+    log_error "uninstall.sh --keep-config left ~/.minions"
+    cleanup
+    exit 1
+fi
+for d in .hermes .pi .omniroute .9router .mnemon .ollama; do
+    if "${DTS_SCRIPT}" exec "test -e /home/ubuntu/$d" 2>/dev/null; then
+        log_info "uninstall.sh --keep-config preserved ~/$d"
+    else
+        log_error "uninstall.sh --keep-config removed ~/$d (should preserve)"
+        cleanup
+        exit 1
+    fi
+done
+
 # Test 9.5: Standalone piped install (curl|bash) — Phase 22.5
 echo ""
 echo "=== Test 9.5: Standalone piped install (curl|bash) ==="

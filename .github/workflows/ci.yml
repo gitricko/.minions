@@ -487,6 +487,61 @@ jobs:
           export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh
 
+          # Test uninstall.sh default purge (verify CLEAN)
+          echo "=== Real Install: uninstall.sh default purge ==="
+          bash uninstall.sh --force --verify 2>&1 | tee "${CI_LOGS_DIR}/uninstall_purge.log"
+          if grep -q '^CLEAN$' "${CI_LOGS_DIR}/uninstall_purge.log"; then
+              echo "✓ Real Install: uninstall.sh verify CLEAN"
+          else
+              echo "FAIL: Real Install uninstall verify not CLEAN"
+              cat "${CI_LOGS_DIR}/uninstall_purge.log"
+              exit 1
+          fi
+          # Verify entire folders gone
+          for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
+              if [ ! -e "${HOME}/${d}" ]; then
+                  echo "✓ Real Install: uninstall.sh removed ~/${d} (default purge)"
+              else
+                  echo "FAIL: Real Install uninstall left ~/${d}"
+                  exit 1
+              fi
+          done
+
+          # Reinstall after uninstall (clean cycle)
+          echo "=== Real Install: reinstall after uninstall ==="
+          bash install.sh --no-hermes --no-omniroute --no-9router 2>&1 | tee "${CI_LOGS_DIR}/reinstall.log"
+          if [ -d "${HOME}/.minions" ] && [ -f "${HOME}/.minions/bin/pi" ]; then
+              echo "✓ Real Install: reinstall restored ~/.minions with binaries"
+          else
+              echo "FAIL: Real Install reinstall missing ~/.minions or binaries"
+              exit 1
+          fi
+
+          # uninstall.sh --keep-config (preserves dot folders)
+          echo "=== Real Install: uninstall.sh --keep-config ==="
+          bash uninstall.sh --keep-config --force --verify 2>&1 | tee "${CI_LOGS_DIR}/uninstall_keep.log"
+          if grep -q '^CLEAN$' "${CI_LOGS_DIR}/uninstall_keep.log"; then
+              echo "✓ Real Install: uninstall.sh --keep-config verify CLEAN"
+          else
+              echo "FAIL: Real Install uninstall --keep-config verify not CLEAN"
+              cat "${CI_LOGS_DIR}/uninstall_keep.log"
+              exit 1
+          fi
+          if [ ! -e "${HOME}/.minions" ]; then
+              echo "✓ Real Install: uninstall.sh --keep-config removed ~/.minions"
+          else
+              echo "FAIL: Real Install uninstall --keep-config left ~/.minions"
+              exit 1
+          fi
+          for d in .hermes .pi .omniroute .9router .mnemon .ollama; do
+              if [ -e "${HOME}/${d}" ]; then
+                  echo "✓ Real Install: uninstall.sh --keep-config preserved ~/${d}"
+              else
+                  echo "FAIL: Real Install uninstall --keep-config removed ~/${d} (should preserve)"
+                  exit 1
+              fi
+          done
+
       # ── Collect diagnostic logs (uploaded every run; if-no-files-found: warn) ──
       - name: Collect diagnostic logs (Real Install)
         if: always()
