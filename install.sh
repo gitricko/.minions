@@ -434,6 +434,10 @@ display:
   busy_input_mode: steer
 terminal:
   cwd: .
+telemetry:
+  shared_metrics:
+    enabled: false
+    send: false
 YAMLEOF
 log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 

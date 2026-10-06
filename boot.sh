@@ -204,6 +204,8 @@ if [ -x "${HERMES_BIN}" ]; then
         "${HERMES_BIN}" config set providers.omniroute.api_key "no-key-needed"
         "${HERMES_BIN}" config set providers.9router.base_url "http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
         "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
+        "${HERMES_BIN}" config set telemetry.shared_metrics.enabled false
+        "${HERMES_BIN}" config set telemetry.shared_metrics.send false
     } >> "${boot_log}" 2>&1 || {
         log_warn "Hermes config had issues (see ${boot_log})"
     }
