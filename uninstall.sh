@@ -257,6 +257,8 @@ if [ "$DO_DELETE" = "1" ]; then
   # remove pidfiles/logs regardless
   rm -f "${MINIONS_HOME}/var/run/"*.pid "${MINIONS_HOME}/var/run/ready" 2>/dev/null || true
   rm -rf "${MINIONS_HOME}/var/log" 2>/dev/null || true
+  # give processes time to fully exit and release file handles
+  sleep 1
 fi
 
 # 2) data folders (after services stopped)
@@ -269,6 +271,11 @@ fi
 # 3) MINIONS_HOME last
 if [ "$DO_DELETE" = "1" ]; then
   safe_rm_target "$MINIONS_HOME"
+  # verify removal actually succeeded
+  if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
+    log_error "failed to remove $MINIONS_HOME"
+    exit 1
+  fi
 fi
 
 # rc blocks (after MINIONS_HOME)
