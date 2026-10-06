@@ -54,3 +54,33 @@ PYEOF
 
     log_info "Wired Pi skills path: ${_PI_SKILLS_PATH} -> ${_PI_SETTINGS_FILE}"
 }
+
+# wire_pi_default_trust_always SETTINGS_FILE
+#   Ensures Pi auto-trusts projects (defaultProjectTrust: "always") so no
+#   interactive trust prompt appears on first pi in a new repo.
+#   Creates the file if missing, preserves all other keys. Idempotent.
+wire_pi_default_trust_always() {
+    _PI_TRUST_FILE="$1"
+    mkdir -p "$(dirname "${_PI_TRUST_FILE}")"
+
+    python3 - "${_PI_TRUST_FILE}" <<'PYEOF'
+import json
+import sys
+
+settings_file = sys.argv[1]
+
+try:
+    with open(settings_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    data = {}
+
+data["defaultProjectTrust"] = "always"
+
+with open(settings_file, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PYEOF
+
+    log_info "Wired Pi defaultProjectTrust: always -> ${_PI_TRUST_FILE}"
+}
