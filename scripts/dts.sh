@@ -56,11 +56,13 @@ cmd_up() {
     LOGS_DIR="${LOGS_DIR:-/tmp/dts-logs}"
     mkdir -p "${LOGS_DIR}"
 
-    # Ollama host cache: if OLLAMA_HOST_CACHE is set, mount it so install.sh
-    # finds the binary at ${MINIONS_HOME}/lib/ollama/ollama and skips the 1.4GB download.
+    # Ollama host cache: mount at /tmp/ollama-cache (NOT inside MINIONS_HOME)
+    # so uninstall.sh `rm -rf ~/.minions` does not hit a Docker volume mountpoint.
+    # dts up then symlinks /home/ubuntu/.minions/lib/ollama -> /tmp/ollama-cache
+    # so install.sh finds the binary at ${MINIONS_HOME}/lib/ollama/ollama.
     OLLAMA_MOUNT=""
     if [ -n "${OLLAMA_HOST_CACHE:-}" ] && [ -d "${OLLAMA_HOST_CACHE}" ]; then
-        OLLAMA_MOUNT="-v ${OLLAMA_HOST_CACHE}:/home/ubuntu/.minions/lib/ollama"
+        OLLAMA_MOUNT="-v ${OLLAMA_HOST_CACHE}:/tmp/ollama-cache:ro"
     fi
 
     docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" ${OLLAMA_MOUNT} "${IMAGE}" sleep infinity >/dev/null
@@ -74,12 +76,13 @@ cmd_up() {
         mkdir -p /tmp/ci && chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/ci
         [ -d \"${home}\" ] || (mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home})
     " >/dev/null
-    # Ollama mount: Docker creates /home/ubuntu/.minions/lib/ollama with root ownership.
-    # Fix ownership so the uid-1000 user can write bin/ollama symlink and lib/ollama/*.
+    # Ollama mount: outside ~/.minions — symlink into place so install.sh
+    # finds ${MINIONS_HOME}/lib/ollama/ollama without a volume inside the tree.
     if [ -n "${OLLAMA_MOUNT}" ]; then
         docker exec -u 0:0 "${CONTAINER}" bash -c "
-            mkdir -p /home/ubuntu/.minions/bin
-            chown -R ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions 2>/dev/null || true
+            mkdir -p /home/ubuntu/.minions/bin /home/ubuntu/.minions/lib
+            ln -sfn /tmp/ollama-cache /home/ubuntu/.minions/lib/ollama
+            chown -h ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions/lib/ollama 2>/dev/null || true
         " >/dev/null 2>&1 || true
     fi
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')
