@@ -51,7 +51,7 @@ ninerouter_preconfigure() {
               "oc/muse-spark-1.3-contributor-free",
               "oc/union-alpha",
               "oc/big-pickle",
-              "oc/mimo-v2.5-free",
+              "oc/mimo-v2.6-flash-free",
               "oc/nemotron-3-ultra-free",
               "oc/nemotron-3.5-lightning-free"
             ]
