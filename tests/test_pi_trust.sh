@@ -14,14 +14,9 @@ bad() { echo "  FAIL: $1${2:+ — $2}"; FAIL=$((FAIL+1)); }
 log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
 
 # Source helper under test
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
-. /workspaces/.minions/lib/pi-settings.sh
-
-assert_json_eq() {
-  _name="$1"; _file="$2"; _expr="$3"; _want="$4"
-  _got="$(python3 -c "import json; print(json.dumps(json.load(open('$_file')).get($_expr)))" 2>&1)"
-  if [ "$_got" = "$_want" ]; then ok "$_name"; else bad "$_name" "want $_want got $_got raw=$_got file=$(cat "$_file" 2>&1)"; fi
-}
+. "${REPO_ROOT}/lib/pi-settings.sh"
 
 # 1. fresh file (no file) -> creates defaultProjectTrust: always
 test_fresh_no_file() {
@@ -42,7 +37,7 @@ import json,sys
 json.dump({"defaultProjectTrust":"ask","skills":["/tmp/skills"],"packages":["git:github.com/x/y@main"],"lastChangelogVersion":"1.2.3"}, open(sys.argv[1],"w"), indent=2)
 PY
   wire_pi_default_trust_always "$f"
-  python3 - "$f" <<'PY' || { echo "  FAIL: py check"; FAIL=$((FAIL+1)); exit 0; }
+  python3 - "$f" <<'PY' || { bad "ask upgraded — py assertion failed" "$(cat "$f" 2>/dev/null | head -c 500)"; rm -rf "$d"; return 0; }
 import json,sys
 d=json.load(open(sys.argv[1]))
 assert d.get("defaultProjectTrust")=="always", d
