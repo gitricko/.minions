@@ -113,6 +113,7 @@ dts exec "curl -sf http://127.0.0.1:20128/healthz && echo server-up"
 | Permission bugs masked | Tested as root | Always run as uid 1000 (CI/Codespace parity) |
 | Mount "works" but file is stale | Bind-mount created once; container cached | Verify with md5 both sides; never trust a listing |
 | Orphan containers eat disk | No cleanup | `dts clean` after each session |
+| `rm -rf ~/.minions` fails "Device or resource busy" in DTS | Host ollama cache mounted at `$MINIONS_HOME/lib/ollama` via `-v /tmp/...:/home/.../lib/ollama` — `rm -rf` cannot remove a mountpoint | Unmount before removal: try `umount -l` plus `sudo umount -l`/`sudo -n umount -l` (DTS runs as uid 1000, needs sudo); check `mountpoint -q` then fallback to parsing `mount` output |
 
 ## Support files
 

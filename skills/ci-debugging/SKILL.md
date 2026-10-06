@@ -102,6 +102,9 @@ so they're downloaded on failure. See `ci-log-capture` skill.
 | Test "passes" but artifact is empty | `if-no-files-found: warn` masks empty upload | Check artifact size/content, not just job status |
 | Fail only in CI, never locally | NGINX/CI PATH differs, env var unset, runner image change | Compare `env` output between local and CI |
 | Fail only sometimes (flaky) | Race condition, retry logic, provider rate-limit | Look for "retry" loops and timeouts; bump tolerance only if truly ephemeral |
+| `rm -rf` reports success but `verify CLEAN` fails with leftover mount | Docker volume mount (`-v host:container/path`) blocks removal — `rm -rf` cannot delete a mountpoint | Check `mount | grep $HOME` in failure logs; unmount with `umount -l` plus `sudo umount -l` fallback (container runs as uid 1000) before retrying removal |
+| `--keep-config` test fails "removed X (should preserve)" | Install never created X because its setup is disabled by default | Ensure install creates empty placeholder dirs (`mkdir -p ~/.mnemon ~/.ollama ~/.9router`) even when disabled so the uninstall contract has something to preserve |
+| Uninstall test deletes real `~/.mnemon`/`~/.hermes` on host/codespace | Test ran with real `$HOME` instead of isolated `mktemp -d` — codespace mnemon is the memory layer, deleting it kills the session's model proxy | Always run uninstall/purge tests with `HOME=$(mktemp -d)` and clean up; never `rm -rf` with real `$HOME` in tests or scripts |
 
 ## Anti-patterns
 
