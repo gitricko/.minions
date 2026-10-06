@@ -31,8 +31,8 @@ install_ollama() {
         aarch64|arm64) arch="arm64" ;;
     esac
 
-    ollama_version="${OLLAMA_VERSION:-0.35.0}"
-    # Strip leading 'v' if present (versions.env stores v0.35.1)
+    ollama_version="${OLLAMA_VERSION:-0.40.0}"
+    # Strip leading 'v' if present (versions.env stores v0.40.0)
     ollama_version="${ollama_version#v}"
 
     # Determine asset name and URL
