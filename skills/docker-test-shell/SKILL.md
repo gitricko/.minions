@@ -113,7 +113,10 @@ dts exec "curl -sf http://127.0.0.1:20128/healthz && echo server-up"
 | Permission bugs masked | Tested as root | Always run as uid 1000 (CI/Codespace parity) |
 | Mount "works" but file is stale | Bind-mount created once; container cached | Verify with md5 both sides; never trust a listing |
 | Orphan containers eat disk | No cleanup | `dts clean` after each session |
-| `rm -rf ~/.minions` fails "Device or resource busy" in DTS | Host ollama cache mounted at `$MINIONS_HOME/lib/ollama` via `-v /tmp/...:/home/.../lib/ollama` — `rm -rf` cannot remove a mountpoint | Unmount before removal: try `umount -l` plus `sudo umount -l`/`sudo -n umount -l` (DTS runs as uid 1000, needs sudo); check `mountpoint -q` then fallback to parsing `mount` output |
+| `rm -rf ~/.minions` fails "Device or resource busy" in DTS | Host ollama cache mounted at `$MINIONS_HOME/lib/ollama` via `-v /tmp/...:/home/.../lib/ollama` — `rm -rf` cannot remove a mountpoint | Mount cache outside the tree (`/tmp/cache:ro`) instead; if legacy mount remains, unmount with `umount -l` plus `sudo umount -l` fallback (container runs as uid 1000) |
+| `mkdir -p lib/ollama` fails "Read-only filesystem" through symlink | Dir symlink `lib/ollama -> /tmp/cache:ro` makes `mkdir -p` traverse the ro target | Symlink files not dirs: `lib/ollama/ollama -> /tmp/cache/ollama`; `mkdir -p lib/ollama` then creates a real dir |
+| `mkdir ~/.minions` fails "Permission denied" in DTS | Base image pre-creates `$HOME` owned by root; conditional `[ -d $home ] || chown` skipped the fix | Always `mkdir -p $home && chown $uid:$gid $home` unconditionally in `dts up` |
+| Cache not mounted so install re-downloads and fails | Version string `v0.40.0` vs cache dir `ollama-0.40.0-...` — un-stripped `v` leaves `OLLAMA_HOST_CACHE` empty | Normalize `version=${version#v}` and map arch aliases before building the cache path |
 
 ## Support files
 
