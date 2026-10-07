@@ -250,6 +250,7 @@ jobs:
         id: ollama_version
         run: |
           version=$(sed -n '/name: OLLAMA/{n;s/.*version: *"\(.*\)".*/\1/p;}' etc/deps.yaml | head -1)
+          version=${version#v}
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Cache Ollama binary

@@ -159,8 +159,13 @@ echo "=== Test 1: install.sh ==="
 # OmniRoute/9Router (services aren't up yet). The pi-failover extension
 # install previously triggered 'pi extensions reload' which connected to
 # 20128/7352 and spammed "Connection error".
+# Note: install.sh failure must not trigger set -e abort on the command
+# substitution — use set +e around the capture so we reach the error handler
+# and print the install log (otherwise the script dies silently at `a=$(false)`).
+set +e
 install_out=$("${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1")
 install_rc=$?
+set -e
 if [ $install_rc -eq 0 ]; then
     # Check for connection attempts during install (should be none)
     if echo "$install_out" | grep -qE "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352"; then
