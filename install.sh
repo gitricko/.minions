@@ -284,9 +284,8 @@ ensure_node_v22
 log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
 setup_mnemon_all "${MINIONS_HOME}"
-# Ensure HOME dot dirs exist so `uninstall.sh --keep-config` can preserve them
-# (mnemon setup is disabled; 9router/ollama dirs only appear after boot).
-mkdir -p "${HOME}/.mnemon" "${HOME}/.ollama" "${HOME}/.9router" 2>/dev/null || true
+# HOME dot dirs (~/.mnemon, ~/.ollama, ~/.9router) are created by boot.sh/services,
+# not by install.sh — install only ensures ~/.hermes, ~/.pi, ~/.omniroute, ~/.minions.
 
 if [ "${INSTALL_PI}" -eq 1 ]; then
     log_info "Installing Pi-Agent..."
@@ -520,6 +519,7 @@ fi
 echo "    - Mnemon:      ${MINIONS_HOME}/bin/mnemon (if available)"
 echo ""
 echo "  Next step: run '${MINIONS_HOME}/boot.sh' to start the stack"
+echo "  To remove: run '${MINIONS_HOME}/uninstall.sh --force' (or add --keep-config to preserve data)"
 if [ -t 1 ]; then
     echo "  Or open a new shell / source your rc file: source ~/.bashrc"
 fi

@@ -31,7 +31,7 @@ Flag interactions:
   Default uninstall.sh --force --verify: deletes then verifies in one run.
 
 Without --force on non-TTY, fails with hint: use --force instead of hanging.
---dry-run and --verify-only never prompt.
+--dry-run and --verify never prompt (dry-run implies no prompt).
 EOF
 }
 

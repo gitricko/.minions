@@ -46,7 +46,7 @@ test_default_purge_clean() {
   tmp="$(mktemp -d)"
   mkdir -p "$tmp/.minions/bin" "$tmp/.hermes/config" "$tmp/.pi/agent" "$tmp/.omniroute" "$tmp/.9router/db" "$tmp/.mnemon/data" "$tmp/.ollama/models"
   touch "$tmp/.hermes/config.yaml" "$tmp/.pi/agent/settings.json"
-  HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify >"$tmp/out" 2>&1; rc=$?
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify >"$tmp/out" 2>&1; rc=$?; set -e
   if [ $rc -eq 0 ] && grep -q "^CLEAN" "$tmp/out" && [ ! -d "$tmp/.minions" ] && [ ! -d "$tmp/.hermes" ] && [ ! -d "$tmp/.pi" ] && [ ! -d "$tmp/.omniroute" ] && [ ! -d "$tmp/.9router" ] && [ ! -d "$tmp/.mnemon" ] && [ ! -d "$tmp/.ollama" ]; then ok "default purge CLEAN"; else bad "default purge CLEAN" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 600)"; fi
   rm -rf "$tmp"
 }
@@ -85,7 +85,7 @@ test_idempotent() {
   tmp="$(mktemp -d)"
   mkdir -p "$tmp/.minions" "$tmp/.hermes"
   HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force >"$tmp/out" 2>&1 || true
-  HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify >"$tmp/out2" 2>&1; rc=$?
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify >"$tmp/out2" 2>&1; rc=$?; set -e
   if [ $rc -eq 0 ] && grep -q "^CLEAN" "$tmp/out2"; then ok "idempotent CLEAN"; else bad "idempotent" "rc=$rc out=$(cat "$tmp/out2" 2>/dev/null | head -c 500)"; fi
   rm -rf "$tmp"
 }
@@ -155,6 +155,60 @@ test_dry_run_verify() {
   rm -rf "$tmp"
 }
 
+
+# 12. operation order: stop before rm (finding 10)
+test_operation_order() {
+  log_info "Test: operation order stop before rm"
+  if [ ! -f "$SCRIPT" ]; then bad "operation order" "missing script"; return 0; fi
+  # verify uninstall.sh stops services before deleting MINIONS_HOME by checking source order
+  if grep -q "_stop_one\|stop_service" "$SCRIPT" && awk '/_stop_one|stop_service/{s=1} /safe_rm_target.*MINIONS_HOME/{if(s) {print "order ok"; exit 0} else {exit 1}}' "$SCRIPT" | grep -q "order ok"; then
+    ok "operation order stop before rm"
+  else
+    # fallback: ensure stop logic appears before deletion in file
+    stop_line=$(grep -n "stop_service\|_stop_one\|Stop services" "$SCRIPT" | head -1 | cut -d: -f1)
+    rm_line=$(grep -n "safe_rm_target.*MINIONS_HOME\|rm.*MINIONS_HOME" "$SCRIPT" | head -1 | cut -d: -f1)
+    if [ -n "$stop_line" ] && [ -n "$rm_line" ] && [ "$stop_line" -lt "$rm_line" ]; then ok "operation order stop before rm (line $stop_line < $rm_line)"; else bad "operation order" "stop=$stop_line rm=$rm_line"; fi
+  fi
+}
+
+# 13. self-deletion: running from inside MINIONS_HOME still deletes
+test_self_deletion() {
+  log_info "Test: self-deletion via installed copy"
+  if [ ! -f "$SCRIPT" ]; then bad "self-deletion" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  cp "$SCRIPT" "$tmp/.minions/uninstall.sh"
+  chmod +x "$tmp/.minions/uninstall.sh"
+  mkdir -p "$tmp/.hermes" "$tmp/.pi"
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$tmp/.minions/uninstall.sh" --force >"$tmp/out" 2>&1; rc=$?; set -e
+  if [ ! -d "$tmp/.minions" ] && [ ! -d "$tmp/.hermes" ]; then ok "self-deletion deletes via installed copy"; else bad "self-deletion" "rc=$rc .minions=$([ -d "$tmp/.minions" ] && echo yes || echo no) hermes=$([ -d "$tmp/.hermes" ] && echo yes || echo no) out=$(cat "$tmp/out" 2>/dev/null | head -c 400)"; fi
+  rm -rf "$tmp"
+}
+
+# 14. rc absent: no rc files -> still CLEAN, no error
+test_rc_absent() {
+  log_info "Test: rc absent still CLEAN"
+  if [ ! -f "$SCRIPT" ]; then bad "rc absent" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify >"$tmp/out" 2>&1; rc=$?; set -e
+  if [ $rc -eq 0 ] && grep -q "^CLEAN" "$tmp/out"; then ok "rc absent CLEAN"; else bad "rc absent" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 400)"; fi
+  rm -rf "$tmp"
+}
+
+# 15. keep-config preserves contents not just dirs
+test_keep_config_contents() {
+  log_info "Test: keep-config preserves contents"
+  if [ ! -f "$SCRIPT" ]; then bad "keep-config contents" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions/bin" "$tmp/.hermes"
+  echo "secret" > "$tmp/.hermes/config.yaml"
+  echo "data" > "$tmp/.hermes/keep.txt"
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --keep-config --force >"$tmp/out" 2>&1; rc=$?; set -e
+  if [ ! -d "$tmp/.minions" ] && [ -f "$tmp/.hermes/config.yaml" ] && [ "$(cat "$tmp/.hermes/config.yaml" 2>/dev/null)" = "secret" ] && [ -f "$tmp/.hermes/keep.txt" ]; then ok "keep-config preserves contents"; else bad "keep-config contents" "minions_gone=$([ ! -d "$tmp/.minions" ] && echo yes || echo no) config=$(cat "$tmp/.hermes/config.yaml" 2>/dev/null | head -c 100)"; fi
+  rm -rf "$tmp"
+}
+
 run_all() {
   test_help
   test_dry_run_no_mutation
@@ -167,6 +221,10 @@ run_all() {
   test_nontty_requires_force
   test_minions_home_guard
   test_dry_run_verify
+  test_operation_order
+  test_self_deletion
+  test_rc_absent
+  test_keep_config_contents
   echo ""
   echo "Results: $PASS passed, $FAIL failed"
   [ "$FAIL" -eq 0 ] || { echo "FAIL"; exit 1; }

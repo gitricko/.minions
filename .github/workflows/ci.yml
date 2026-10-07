@@ -488,6 +488,10 @@ jobs:
           export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh
 
+          # Snapshot service logs before uninstall deletes ~/.minions/var/log (finding 8)
+          mkdir -p "${CI_LOGS_DIR}/var-log-snapshot"
+          cp -r "${HOME}/.minions/var/log/." "${CI_LOGS_DIR}/var-log-snapshot/" 2>/dev/null || true
+
           # Test uninstall.sh default purge (verify CLEAN)
           echo "=== Real Install: uninstall.sh default purge ==="
           bash uninstall.sh --force --verify 2>&1 | tee "${CI_LOGS_DIR}/uninstall_purge.log"
@@ -518,6 +522,26 @@ jobs:
               echo "FAIL: Real Install reinstall missing ~/.minions or binaries"
               exit 1
           fi
+          # Verify reinstall actually boots and passes self-check (finding 9)
+          echo "=== Real Install: boot after reinstall ==="
+          export PATH="${HOME}/.minions/bin:${PATH}"
+          timeout 120s bash "${HOME}/.minions/boot.sh" >"${CI_LOGS_DIR}/reinstall-boot.log" 2>&1 || {
+              echo "FAIL: boot after reinstall failed"
+              cat "${CI_LOGS_DIR}/reinstall-boot.log"
+              exit 1
+          }
+          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" "${CI_LOGS_DIR}/reinstall-boot.log"; then
+              echo "FAIL: reinstall boot missing completion marker"
+              cat "${CI_LOGS_DIR}/reinstall-boot.log"
+              exit 1
+          fi
+          echo "✓ Real Install: boot after reinstall ok"
+          bash self-check.sh --ci >"${CI_LOGS_DIR}/reinstall-self-check.log" 2>&1 || {
+              echo "FAIL: self-check --ci after reinstall failed"
+              cat "${CI_LOGS_DIR}/reinstall-self-check.log"
+              exit 1
+          }
+          echo "✓ Real Install: self-check after reinstall ok"
 
           # uninstall.sh --keep-config (preserves dot folders)
           echo "=== Real Install: uninstall.sh --keep-config ==="
