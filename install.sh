@@ -284,8 +284,9 @@ ensure_node_v22
 log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
 setup_mnemon_all "${MINIONS_HOME}"
-# HOME dot dirs (~/.mnemon, ~/.ollama, ~/.9router) are created by boot.sh/services,
-# not by install.sh — install only ensures ~/.hermes, ~/.pi, ~/.omniroute, ~/.minions.
+# HOME dot dirs for keep-config contract — DTS reinstall has no boot, so
+# install must ensure them (boot also creates them idempotently).
+mkdir -p "${HOME}/.mnemon" "${HOME}/.ollama" "${HOME}/.9router" 2>/dev/null || true
 
 if [ "${INSTALL_PI}" -eq 1 ]; then
     log_info "Installing Pi-Agent..."
