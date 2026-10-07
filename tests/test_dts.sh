@@ -453,7 +453,7 @@ fi
 # Test 9.6: uninstall.sh — default purge (verify CLEAN)
 echo ""
 echo "=== Test 9.6: uninstall.sh default purge ==="
-if "${DTS_SCRIPT}" exec "cd /src && bash uninstall.sh --force --verify 2>&1 | tee /tmp/uninstall_purge.log"; then
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --force --verify 2>&1 | tee /tmp/uninstall_purge.log"; then
     log_info "uninstall.sh --force --verify exit 0"
 else
     log_error "uninstall.sh --force --verify failed"
@@ -484,7 +484,7 @@ done
 # install so all dot folders (~/.hermes, ~/.omniroute, ...) exist for keep-config
 echo ""
 echo "=== Test 9.7: reinstall after uninstall (clean cycle) ==="
-if "${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1 | tee /tmp/reinstall.log"; then
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash install.sh 2>&1 | tee /tmp/reinstall.log"; then
     log_info "Reinstall after uninstall exit 0"
 else
     log_error "Reinstall after uninstall failed"
@@ -503,7 +503,7 @@ fi
 # Test 9.8: uninstall.sh --keep-config (preserves dot folders)
 echo ""
 echo "=== Test 9.8: uninstall.sh --keep-config ==="
-if "${DTS_SCRIPT}" exec "cd /src && bash uninstall.sh --keep-config --force --verify 2>&1 | tee /tmp/uninstall_keep.log"; then
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --keep-config --force --verify 2>&1 | tee /tmp/uninstall_keep.log"; then
     log_info "uninstall.sh --keep-config --force --verify exit 0"
 else
     log_error "uninstall.sh --keep-config failed"
