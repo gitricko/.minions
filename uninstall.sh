@@ -394,7 +394,7 @@ if [ "$DO_DELETE" = "1" ]; then
         done
       fi
       # Fallback: parse mount table for any mount under MINIONS_HOME
-      for mp in $(mount 2>/dev/null | awk -v home="${MINIONS_HOME}" '$3==home || index($3, home"/")==1 {print $3}' | sort -r); do
+      for mp in $(mount 2>/dev/null | awk -v home="${MINIONS_HOME}" 'length(home) && ($3==home || index($3, home"/")==1) {print $3}' | sort -r); do
         _try_umount "$mp" || true
         log_info "unmounted $mp (via mount table)"
       done

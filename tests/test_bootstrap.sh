@@ -118,6 +118,7 @@ test_tarball_standalone() {
     cp -r "$PROJECT_ROOT/lib"/* "$STAGE_DIR/lib/" 2>/dev/null || true
     cp -r "$PROJECT_ROOT/etc"/* "$STAGE_DIR/etc/" 2>/dev/null || true
     cp "$PROJECT_ROOT/install.sh" "$STAGE_DIR/install.sh" 2>/dev/null || true
+    cp "$PROJECT_ROOT/uninstall.sh" "$STAGE_DIR/uninstall.sh" 2>/dev/null || true
     cp "$PROJECT_ROOT/boot.sh" "$STAGE_DIR/boot.sh" 2>/dev/null || true
     cp "$PROJECT_ROOT/stop.sh" "$STAGE_DIR/stop.sh" 2>/dev/null || true
     cp "$PROJECT_ROOT/status.sh" "$STAGE_DIR/status.sh" 2>/dev/null || true
