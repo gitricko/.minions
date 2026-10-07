@@ -74,7 +74,7 @@ cmd_up() {
         # Logs mount: uid-1000 writes /tmp/ci; without this chown the host dir
         # stays owned by the runner uid and in-container writes silently fail.
         mkdir -p /tmp/ci && chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/ci
-        [ -d \"${home}\" ] || (mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home})
+        mkdir -p ${home} && chown ${CONTAINER_UID}:${CONTAINER_GID} ${home}
     " >/dev/null
     # Ollama mount: outside ~/.minions — symlink binary so install.sh
     # finds ${MINIONS_HOME}/lib/ollama/ollama without a volume inside the tree.
