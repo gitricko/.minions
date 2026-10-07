@@ -149,7 +149,7 @@ export OLLAMA_HOST_CACHE
 log_info "DTS container started"
 
 # Install system prerequisites
-"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev python3-yaml build-essential jq git ca-certificates software-properties-common sqlite3"
+"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev python3-yaml build-essential jq git ca-certificates software-properties-common sqlite3 zstd"
 log_info "System prerequisites installed"
 
 # Test 1: install.sh

@@ -108,6 +108,8 @@ so they're downloaded on failure. See `ci-log-capture` skill.
 | `var=$(failing_cmd); rc=$?` error handler never runs and log stays empty | `set -e` aborts at a failing command substitution before the next line, so the `[FAIL] + tail` branch is dead code | Wrap the capture: `set +e; var=$(cmd 2>&1); rc=$?; set -e` so the handler can print diagnostics |
 | `mkdir` fails "Read-only filesystem" or "Permission denied" on a path that is a symlink | Dir symlink `lib/ollama -> /tmp/cache:ro` makes `mkdir -p lib/ollama` walk through the ro mount; or the base image pre-creates `$HOME` owned by root and a conditional `[ -d $home ] or chown` skipped the fix | Mount cache outside the tree (`/tmp/cache:ro`) and symlink files not dirs (`lib/ollama/ollama -> /tmp/cache/ollama`); always `mkdir -p $home && chown` unconditionally |
 | Cache miss causes re-download then a different downstream failure | Version string carries `v` prefix (`v0.40.0` in deps.yaml) but cache dir is `ollama-0.40.0-...` — un-stripped key leaves `OLLAMA_HOST_CACHE` empty so the container mounts nothing | Normalize before use: `version=${version#v}` and map arch aliases before building `OLLAMA_HOST_CACHE` |
+| `bash install.sh \| tee log` reports success while install OOMed | Pipe exit is `tee`'s 0 when `pipefail` is off, masking left-side failure — downstream keep-config then sees missing dot dirs | Prefix the pipe: `set -o pipefail; cmd \| tee log` so failure propagates |
+| `npm install` OOM `JavaScript heap out of memory` in constrained container | `NODE_OPTIONS=--max-old-space-size=512` too small for large package (e.g. omniroute@3.8.x) under DTS/CI limits | Raise heap in shared `install_npm_package` wrapper (512 → 2048) |
 
 ## Anti-patterns
 
