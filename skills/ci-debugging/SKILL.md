@@ -111,6 +111,7 @@ so they're downloaded on failure. See `ci-log-capture` skill.
 | `bash install.sh \| tee log` reports success while install OOMed | Pipe exit is `tee`'s 0 when `pipefail` is off, masking left-side failure — downstream keep-config then sees missing dot dirs | Prefix the pipe: `set -o pipefail; cmd \| tee log` so failure propagates |
 | `npm install` OOM `JavaScript heap out of memory` in constrained container | `NODE_OPTIONS=--max-old-space-size=512` too small for large package (e.g. `omniroute@3.8.x`) under DTS/CI limits | Raise heap in shared `install_npm_package` wrapper (512 → 2048) |
 | `.tar.zst` extract fails `stdin: not in gzip format` or `zstd required` | DTS container lacks `zstd` and `tar -xzf` handles gzip only — `.tar.zst` needs `zstd -dc \| tar -xf` or `tar --zstd -xf` | Install `zstd` in DTS prereqs and fix `lib/download.sh` `.tar.zst` branch to use `tar --zstd -xf` fallback; add `/tmp/ollama-cache/ollama` host-cache copy fast-path in `lib/ollama.sh` to skip re-download on reinstall |
+| `Dependency drift (advisory)` fails but overall CI still green | Drift is `continue-on-error: true` — the job fails to surface `OUTDATED` but does not block merge; easy to ignore until 4-file sync invariant breaks `version-sync` | Run `check-updates.sh --json` to identify the outdated pin, then `bump.sh DEP=VERSION --open-pr` + `sync-readme-badges.sh` to fix all 4 files (see `version-single-source` skill) |
 
 ## Anti-patterns
 

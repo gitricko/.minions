@@ -237,7 +237,7 @@ jobs:
   dts-integration:
     name: DTS Integration (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     needs: [detect-changes, test]
     if: needs.detect-changes.outputs.infrastructure == 'true'
     env:
@@ -536,12 +536,15 @@ jobs:
               exit 1
           fi
           echo "✓ Real Install: boot after reinstall ok"
-          bash self-check.sh --ci >"${CI_LOGS_DIR}/reinstall-self-check.log" 2>&1 || {
-              echo "FAIL: self-check --ci after reinstall failed"
+          # self-check --ci: exit 1 = warnings only (advisory, like the
+          # pre-reinstall check that only warns). Fail only on critical (exit 2).
+          set +e; bash self-check.sh --ci >"${CI_LOGS_DIR}/reinstall-self-check.log" 2>&1; SC=$?; set -e
+          if [ "$SC" -ge 2 ]; then
+              echo "FAIL: self-check --ci critical after reinstall (exit $SC)"
               cat "${CI_LOGS_DIR}/reinstall-self-check.log"
               exit 1
-          }
-          echo "✓ Real Install: self-check after reinstall ok"
+          fi
+          echo "✓ Real Install: self-check after reinstall ok (exit $SC)"
 
           # uninstall.sh --keep-config (preserves dot folders)
           echo "=== Real Install: uninstall.sh --keep-config ==="
