@@ -47,17 +47,17 @@ dependencies:
 
 
   - name: NODE
-    version: "26.10.0"
+    version: "26.11.0"
     source_type: release_tarball
     repo: nodejs/node
     release_url: https://nodejs.org/dist/v{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "ca70e9e349de048b9522abb3adc05b3bd6f43c5ffd3ec57916c7da292f59f022"
-      linux_arm64: "7a6353f63eb3d04765004b4adf172616243e4522434635cb1d26288658b04ab5"
-      macos_x64: "fdaa8c236bd054de59059743ed8d2766de154d81853ca26ad89aca899696170a"
-      macos_arm64: "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af"
+      linux_x64: "db6342d36ebdb3cbd72103d0ce5ccc528620f6c9df72a11f4ccb384bf1bef678"
+      linux_arm64: "81a3cca833d080354236b5411a49003db8848ee003b122e212b88038692f7a11"
+      macos_x64: "052517dc6e6127d08a8441d38b6cfbfc8972e89b5b7d287792f8ccb05887dfcc"
+      macos_arm64: "9ba071a58cc50e6f454effa70de1b2c9e853e2c98c9ee65e5dfd3601041fc064"
 
   - name: UV
     version: "0.12.23"
