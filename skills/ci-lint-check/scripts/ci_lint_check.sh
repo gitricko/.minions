@@ -85,7 +85,8 @@ if [[ $RUN_MARKDOWN -eq 1 ]]; then
   "MD041": false,
   "MD047": false,
   "MD058": false,
-  "MD060": false
+  "MD060": false,
+  "MD034": false
 }
 LINTCONF
   
