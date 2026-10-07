@@ -50,10 +50,7 @@ ninerouter_preconfigure() {
               "oc/muse-spark-1.2-contributor-free",
               "oc/muse-spark-1.3-contributor-free",
               "oc/union-alpha",
-              "oc/big-pickle",
-              "oc/mimo-v2.6-flash-free",
-              "oc/nemotron-3-ultra-free",
-              "oc/nemotron-3.5-lightning-free"
+              "oc/mimo-v2.6-flash-free"
             ]
         }' >/dev/null 2>&1; then
         log_warn "ninerouter_preconfigure: failed to create auto-fastest combo"

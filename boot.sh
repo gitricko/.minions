@@ -151,6 +151,7 @@ start_service "9router" \
     --port "${NINEROUTER_PORT}" \
     --no-browser \
     --skip-update \
+    --log \
     >> "${boot_log}" 2>&1 || log_error "Failed to start 9Router"
 
 wait_for_port "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 300 "9router"
