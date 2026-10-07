@@ -83,6 +83,7 @@ cmd_up() {
             mkdir -p /home/ubuntu/.minions/bin /home/ubuntu/.minions/lib/ollama
             ln -sfn /tmp/ollama-cache/ollama /home/ubuntu/.minions/lib/ollama/ollama 2>/dev/null || true
             ln -sfn /tmp/ollama-cache/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
+            chown -R ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions 2>/dev/null || true
             chown -h ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions/lib/ollama/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
         " >/dev/null 2>&1 || true
     fi
