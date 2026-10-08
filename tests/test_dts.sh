@@ -450,9 +450,9 @@ else
     exit 1
 fi
 
-# Test 9.6: uninstall.sh — default purge (verify CLEAN)
+# Test 10: uninstall.sh — default purge (verify CLEAN)
 echo ""
-echo "=== Test 9.6: uninstall.sh default purge ==="
+echo "=== Test 10: uninstall.sh default purge ==="
 if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --force --verify 2>&1 | tee /tmp/uninstall_purge.log"; then
     log_info "uninstall.sh --force --verify exit 0"
 else
@@ -480,10 +480,10 @@ for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
     fi
 done
 
-# Test 9.7: reinstall after uninstall (install → uninstall → install cycle) — full
+# Test 11: reinstall after uninstall (install → uninstall → install cycle) — full
 # install so all dot folders (~/.hermes, ~/.omniroute, ...) exist for keep-config
 echo ""
-echo "=== Test 9.7: reinstall after uninstall (clean cycle) ==="
+echo "=== Test 11: reinstall after uninstall (clean cycle) ==="
 if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash install.sh 2>&1 | tee /tmp/reinstall.log"; then
     log_info "Reinstall after uninstall exit 0"
 else
@@ -500,9 +500,9 @@ else
     exit 1
 fi
 
-# Test 9.8: uninstall.sh --keep-config (preserves dot folders)
+# Test 12: uninstall.sh --keep-config (preserves dot folders)
 echo ""
-echo "=== Test 9.8: uninstall.sh --keep-config ==="
+echo "=== Test 12: uninstall.sh --keep-config ==="
 if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --keep-config --force --verify 2>&1 | tee /tmp/uninstall_keep.log"; then
     log_info "uninstall.sh --keep-config --force --verify exit 0"
 else
@@ -537,9 +537,9 @@ for d in .hermes .pi .omniroute .9router .mnemon .ollama; do
     fi
 done
 
-# Test 9.5: Standalone piped install (curl|bash) — Phase 22.5
+# Test 13: Standalone piped install (curl|bash) — Phase 22.5
 echo ""
-echo "=== Test 9.5: Standalone piped install (curl|bash) ==="
+echo "=== Test 13: Standalone piped install (curl|bash) ==="
 # Run the literal one-liner from an EMPTY cwd (no /src bind mount context).
 # Uses BOOTSTRAP_URL to point at the local repo tarball (avoids network flake).
 # We create a tarball of the current repo and serve it via file:// for speed.
@@ -605,9 +605,9 @@ else
     exit 1
 fi
 
-# Test 9.6: Dev mode in repo (git checkout with .git + skills + wiki)
+# Test 14: Dev mode in repo (git checkout with .git + skills + wiki)
 echo ""
-echo "=== Test 9.6: Dev mode in repo ==="
+echo "=== Test 14: Dev mode in repo ==="
 DEV_HOME="/home/ubuntu/.minions-dev"
 "${DTS_SCRIPT}" exec "rm -rf $DEV_HOME"
 # Run install.sh from /src (the bind-mounted repo WITH .git)

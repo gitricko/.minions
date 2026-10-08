@@ -89,6 +89,10 @@ fi
 
 # Self-deletion safety: if running from inside MINIONS_HOME, re-exec via /tmp copy
 # Must run BEFORE any other logic that consumes ORIGINAL_ARGS; use absolute $0 via realpath
+# Clean up the re-exec temp copy when the re-exec'd process exits (leak fix).
+if [ "${MINIONS_UNINSTALL_REEXEC:-}" = "1" ] && [ -n "${MINIONS_UNINSTALL_TMP:-}" ]; then
+  trap 'rm -f "${MINIONS_UNINSTALL_TMP}" 2>/dev/null || true' EXIT INT TERM
+fi
 if [ "${MINIONS_UNINSTALL_REEXEC:-}" != "1" ] && [ -n "${MINIONS_HOME:-}" ]; then
   _self_canonical=$(realpath -m "${0:-}" 2>/dev/null || readlink -m "${0:-}" 2>/dev/null || echo "${0:-}")
   _home_canonical=$(_canonicalize "${MINIONS_HOME}")
@@ -98,6 +102,7 @@ if [ "${MINIONS_UNINSTALL_REEXEC:-}" != "1" ] && [ -n "${MINIONS_HOME:-}" ]; the
       cp "$_self_canonical" "$tmp_copy" 2>/dev/null || cp "${BASH_SOURCE[0]:-$0}" "$tmp_copy" 2>/dev/null || true
       chmod +x "$tmp_copy" 2>/dev/null || true
       export MINIONS_UNINSTALL_REEXEC=1
+      export MINIONS_UNINSTALL_TMP="$tmp_copy"
       # shellcheck disable=SC2145
       exec bash "$tmp_copy" "${ORIGINAL_ARGS[@]}"
       ;;
@@ -176,25 +181,22 @@ safe_rm_target() {
 # Dry-run: print plan and exit
 if [ "$DRY_RUN" = "1" ]; then
   # For dry-run, show WOULD REMOVE vs WOULD KEEP respecting --keep-config
+  # Output is strict `WOULD REMOVE: <abs-path>` / `WOULD KEEP: <abs-path>` for machine parsing.
   # MINIONS_HOME always would be removed
   if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
     echo "WOULD REMOVE: $MINIONS_HOME"
   else
-    echo "WOULD KEEP: $MINIONS_HOME (absent)"
+    echo "WOULD KEEP: $MINIONS_HOME"
   fi
   for d in "${DATA_DIRS[@]}"; do
     if [ "$KEEP_CONFIG" = "1" ]; then
       # kept
-      if [ -e "$d" ] || [ -L "$d" ]; then
-        echo "WOULD KEEP: $d"
-      else
-        echo "WOULD KEEP: $d (absent)"
-      fi
+      echo "WOULD KEEP: $d"
     else
       if [ -e "$d" ] || [ -L "$d" ]; then
         echo "WOULD REMOVE: $d"
       else
-        echo "WOULD KEEP: $d (absent)"
+        echo "WOULD KEEP: $d"
       fi
     fi
   done
@@ -203,7 +205,7 @@ if [ "$DRY_RUN" = "1" ]; then
       echo "WOULD KEEP: $rc"
     else
       if [ -f "$rc" ] && grep -q "# .minions - added by installer" "$rc" 2>/dev/null; then
-        echo "WOULD REMOVE: $rc (installer block)"
+        echo "WOULD REMOVE: $rc"
       else
         echo "WOULD KEEP: $rc"
       fi
@@ -421,15 +423,29 @@ fi
 if [ "$DO_DELETE" = "1" ] && [ "$KEEP_CONFIG" = "0" ]; then
   for rc in "${RC_FILES[@]}"; do
     if [ -f "$rc" ] && grep -q "# .minions - added by installer" "$rc" 2>/dev/null; then
-      # remove exact 3-line block: comment, export MINIONS_HOME, export PATH
+      # remove installer block: marker line through the following export PATH line inclusive.
+      # Keep a .bak and use atomic mv so a failed write never truncates the rc.
       tmpf="$(mktemp)"
+      bakf="${rc}.bak"
+      cp -p "$rc" "$bakf" 2>/dev/null || true
       awk '
-        /# \.minions - added by installer/ { skip=2; next }
-        skip>0 { skip--; next }
+        /# \.minions - added by installer/ { in_block=1; next }
+        in_block {
+          # consume the 1-2 export lines that belong to the block; stop on first non-export
+          if ($0 ~ /^export (MINIONS_HOME|PATH)=/) { if (++n >= 2) { in_block=0; n=0 } next }
+          in_block=0; n=0
+        }
         { print }
-      ' "$rc" > "$tmpf" 2>/dev/null && cat "$tmpf" > "$rc" 2>/dev/null || true
-      rm -f "$tmpf" 2>/dev/null || true
-      log_info "cleaned $rc"
+      ' "$rc" > "$tmpf" 2>/dev/null
+      if [ -s "$tmpf" ] || [ ! -s "$rc" ]; then
+        # preserve mode; mv is atomic on same filesystem
+        chmod --reference="$rc" "$tmpf" 2>/dev/null || true
+        mv -f "$tmpf" "$rc" 2>/dev/null || cat "$tmpf" > "$rc" 2>/dev/null || true
+        log_info "cleaned $rc (backup $bakf)"
+      else
+        log_warn "skip rc rewrite for $rc: awk produced empty output (keeping original)"
+        rm -f "$tmpf" 2>/dev/null || true
+      fi
     fi
   done
 fi
