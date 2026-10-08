@@ -91,4 +91,10 @@ dependencies:
       macos_x64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
       macos_arm64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
 
+  - name: TAILSCALE
+    version: "v1.104.1"
+    source_type: github_tag
+    repo: tailscale/tailscale
+    sha_source: none
+
 
