@@ -47,7 +47,6 @@ install_tailscale() {
     # Strip leading 'v' for pkgs URL (pkgs uses bare 1.104.1, deps.yaml stores v1.104.1)
     tailscale_version="${tailscale_version#v}"
 
-    platform=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
     case "${arch}" in
         x86_64|amd64) arch="amd64" ;;
