@@ -211,6 +211,7 @@ if [ -d "${SCRIPT_DIR}/lib" ]; then
     cp -f "${SCRIPT_DIR}"/stop.sh "${MINIONS_HOME}/stop.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/status.sh "${MINIONS_HOME}/status.sh" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}"/self-check.sh "${MINIONS_HOME}/self-check.sh" 2>/dev/null || true
+    cp -f "${SCRIPT_DIR}"/uninstall.sh "${MINIONS_HOME}/uninstall.sh"
 fi
 
 # Ensure python3 + pyyaml for sync-versions.sh (single source of truth).
@@ -283,6 +284,9 @@ ensure_node_v22
 log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
 setup_mnemon_all "${MINIONS_HOME}"
+# HOME dot dirs for keep-config contract — DTS reinstall has no boot, so
+# install must ensure them (boot also creates them idempotently).
+mkdir -p "${HOME}/.mnemon" "${HOME}/.ollama" "${HOME}/.9router" 2>/dev/null || true
 
 if [ "${INSTALL_PI}" -eq 1 ]; then
     log_info "Installing Pi-Agent..."
@@ -516,6 +520,7 @@ fi
 echo "    - Mnemon:      ${MINIONS_HOME}/bin/mnemon (if available)"
 echo ""
 echo "  Next step: run '${MINIONS_HOME}/boot.sh' to start the stack"
+echo "  To remove: run '${MINIONS_HOME}/uninstall.sh --force' (or add --keep-config to preserve data)"
 if [ -t 1 ]; then
     echo "  Or open a new shell / source your rc file: source ~/.bashrc"
 fi

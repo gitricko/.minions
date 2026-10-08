@@ -149,7 +149,7 @@ export OLLAMA_HOST_CACHE
 log_info "DTS container started"
 
 # Install system prerequisites
-"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev python3-yaml build-essential jq git ca-certificates software-properties-common sqlite3"
+"${DTS_SCRIPT}" apt "curl wget nodejs npm ripgrep ffmpeg python3 python3-venv python3-dev python3-yaml build-essential jq git ca-certificates software-properties-common sqlite3 zstd"
 log_info "System prerequisites installed"
 
 # Test 1: install.sh
@@ -159,8 +159,13 @@ echo "=== Test 1: install.sh ==="
 # OmniRoute/9Router (services aren't up yet). The pi-failover extension
 # install previously triggered 'pi extensions reload' which connected to
 # 20128/7352 and spammed "Connection error".
+# Note: install.sh failure must not trigger set -e abort on the command
+# substitution — use set +e around the capture so we reach the error handler
+# and print the install log (otherwise the script dies silently at `a=$(false)`).
+set +e
 install_out=$("${DTS_SCRIPT}" exec "cd /src && bash install.sh 2>&1")
 install_rc=$?
+set -e
 if [ $install_rc -eq 0 ]; then
     # Check for connection attempts during install (should be none)
     if echo "$install_out" | grep -qE "Connection error|127\.0\.0\.1:20128|127\.0\.0\.1:7352"; then
@@ -445,9 +450,124 @@ else
     exit 1
 fi
 
-# Test 9.5: Standalone piped install (curl|bash) — Phase 22.5
+# Test 10: uninstall.sh — default purge (verify CLEAN)
 echo ""
-echo "=== Test 9.5: Standalone piped install (curl|bash) ==="
+echo "=== Test 10: uninstall.sh default purge ==="
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --force --verify 2>&1 | tee /tmp/uninstall_purge.log"; then
+    log_info "uninstall.sh --force --verify exit 0"
+else
+    log_error "uninstall.sh --force --verify failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_purge.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q '^CLEAN$' /tmp/uninstall_purge.log"; then
+    log_info "uninstall.sh verify CLEAN"
+else
+    log_error "uninstall.sh verify not CLEAN"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_purge.log"
+    cleanup
+    exit 1
+fi
+# Verify entire folders gone (default purge)
+for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
+    if ! "${DTS_SCRIPT}" exec "test -e /home/ubuntu/$d" 2>/dev/null; then
+        log_info "uninstall.sh removed ~/$d (default purge)"
+    else
+        log_error "uninstall.sh left ~/$d (default purge)"
+        cleanup
+        exit 1
+    fi
+done
+
+# Test 11: reinstall after uninstall (install → uninstall → install cycle) — full
+# install so all dot folders (~/.hermes, ~/.omniroute, ...) exist for keep-config
+echo ""
+echo "=== Test 11: reinstall after uninstall (clean cycle) ==="
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash install.sh 2>&1 | tee /tmp/reinstall.log"; then
+    log_info "Reinstall after uninstall exit 0"
+else
+    log_error "Reinstall after uninstall failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "test -d /home/ubuntu/.minions && test -f /home/ubuntu/.minions/bin/pi"; then
+    log_info "Reinstall restored ~/.minions with binaries"
+else
+    log_error "Reinstall missing ~/.minions or binaries"
+    cleanup
+    exit 1
+fi
+# Verify reinstall actually boots and passes self-check (F9)
+if "${DTS_SCRIPT}" exec "timeout 120s bash /home/ubuntu/.minions/boot.sh 2>&1 | tee /tmp/reinstall-boot.log; test \${PIPESTATUS[0]} -eq 0"; then
+    log_info "Reinstall boot exit 0"
+else
+    log_error "Reinstall boot failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-boot.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q 'READY FOR FIRSTMATE DISPATCH\|stack is UP' /tmp/reinstall-boot.log"; then
+    log_info "Reinstall boot reached READY/stack is UP"
+else
+    log_error "Reinstall boot missing completion marker"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-boot.log"
+    cleanup
+    exit 1
+fi
+set +e
+"${DTS_SCRIPT}" exec "bash /home/ubuntu/.minions/self-check.sh --ci > /tmp/reinstall-self-check.log 2>&1; echo \$? > /tmp/reinstall-sc.rc"
+SC=$("${DTS_SCRIPT}" exec "cat /tmp/reinstall-sc.rc 2>/dev/null || echo 99")
+set -e
+if [ "$SC" -ge 2 ]; then
+    log_error "self-check --ci critical after reinstall (exit $SC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-self-check.log"
+    cleanup
+    exit 1
+fi
+log_info "Reinstall self-check ok (exit $SC)"
+
+# Test 12: uninstall.sh --keep-config (preserves dot folders)
+echo ""
+echo "=== Test 12: uninstall.sh --keep-config ==="
+if "${DTS_SCRIPT}" exec "cd /src && set -o pipefail; bash uninstall.sh --keep-config --force --verify 2>&1 | tee /tmp/uninstall_keep.log"; then
+    log_info "uninstall.sh --keep-config --force --verify exit 0"
+else
+    log_error "uninstall.sh --keep-config failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_keep.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q '^CLEAN$' /tmp/uninstall_keep.log"; then
+    log_info "uninstall.sh --keep-config verify CLEAN"
+else
+    log_error "uninstall.sh --keep-config verify not CLEAN"
+    "${DTS_SCRIPT}" exec "cat /tmp/uninstall_keep.log"
+    cleanup
+    exit 1
+fi
+# Verify MINIONS_HOME gone, dot folders preserved
+if ! "${DTS_SCRIPT}" exec "test -e /home/ubuntu/.minions" 2>/dev/null; then
+    log_info "uninstall.sh --keep-config removed ~/.minions"
+else
+    log_error "uninstall.sh --keep-config left ~/.minions"
+    cleanup
+    exit 1
+fi
+for d in .hermes .pi .omniroute .9router .mnemon .ollama; do
+    if "${DTS_SCRIPT}" exec "test -e /home/ubuntu/$d" 2>/dev/null; then
+        log_info "uninstall.sh --keep-config preserved ~/$d"
+    else
+        log_error "uninstall.sh --keep-config removed ~/$d (should preserve)"
+        cleanup
+        exit 1
+    fi
+done
+
+# Test 13: Standalone piped install (curl|bash) — Phase 22.5
+echo ""
+echo "=== Test 13: Standalone piped install (curl|bash) ==="
 # Run the literal one-liner from an EMPTY cwd (no /src bind mount context).
 # Uses BOOTSTRAP_URL to point at the local repo tarball (avoids network flake).
 # We create a tarball of the current repo and serve it via file:// for speed.
@@ -513,9 +633,9 @@ else
     exit 1
 fi
 
-# Test 9.6: Dev mode in repo (git checkout with .git + skills + wiki)
+# Test 14: Dev mode in repo (git checkout with .git + skills + wiki)
 echo ""
-echo "=== Test 9.6: Dev mode in repo ==="
+echo "=== Test 14: Dev mode in repo ==="
 DEV_HOME="/home/ubuntu/.minions-dev"
 "${DTS_SCRIPT}" exec "rm -rf $DEV_HOME"
 # Run install.sh from /src (the bind-mounted repo WITH .git)

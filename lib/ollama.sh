@@ -24,6 +24,17 @@ install_ollama() {
     fi
 
     echo "Installing Ollama..."
+    # DTS host cache fast-path: /tmp/ollama-cache is host's pre-downloaded binary (ro mount)
+    if [ -f "/tmp/ollama-cache/ollama" ]; then
+        mkdir -p "${install_dir}"
+        cp -f "/tmp/ollama-cache/ollama" "${install_dir}/ollama" 2>/dev/null || true
+        if [ -x "${install_dir}/ollama" ]; then
+            chmod +x "${install_dir}/ollama"
+            fix_macos_quarantine "${install_dir}/ollama"
+            echo "Ollama installed from DTS host cache (/tmp/ollama-cache)"
+            return 0
+        fi
+    fi
     platform=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
     case "${arch}" in
@@ -31,8 +42,8 @@ install_ollama() {
         aarch64|arm64) arch="arm64" ;;
     esac
 
-    ollama_version="${OLLAMA_VERSION:-0.35.0}"
-    # Strip leading 'v' if present (versions.env stores v0.35.1)
+    ollama_version="${OLLAMA_VERSION:-0.40.0}"
+    # Strip leading 'v' if present (versions.env stores v0.40.0)
     ollama_version="${ollama_version#v}"
 
     # Determine asset name and URL

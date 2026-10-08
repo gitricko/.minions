@@ -14,12 +14,12 @@
 [![Shell](https://img.shields.io/badge/shell-bash-1f425f.svg)](./install.sh)
 [![Platform](https://img.shields.io/badge/platform-linux_(x86__64%2Farm64)-brightgreen.svg)](#requirements)
 [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-2026.9.24-purple?logo=github)](https://github.com/NousResearch/hermes-agent)
-[![PI Agent](https://img.shields.io/badge/PI%20Agent-1.0.4-brown?logo=github)](https://pi.dev)
+[![PI Agent](https://img.shields.io/badge/PI%20Agent-1.1.0-brown?logo=github)](https://pi.dev)
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.51-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
 [![9Router](https://img.shields.io/badge/9Router-0.5.95-green?logo=npm)](https://www.npmjs.com/package/9router)
-[![Ollama](https://img.shields.io/badge/Ollama-0.35.1-yellow?logo=ollama)](https://github.com/ollama/ollama)
+[![Ollama](https://img.shields.io/badge/Ollama-0.40.1-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.10-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
-[![Node.js](https://img.shields.io/badge/Node.js-26.10.0-brightgreen?logo=node.js)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-26.11.1-brightgreen?logo=node.js)](https://nodejs.org)
 [![uv](https://img.shields.io/badge/uv-0.12.23-blue?logo=astral)](https://github.com/astral-sh/uv)
 
 <a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">

@@ -135,6 +135,11 @@ jobs:
           set -e
           bash tests/test_pi_trust.sh
 
+      - name: Run uninstall tests
+        run: |
+          set -e
+          bash tests/test_uninstall.sh
+
       - name: Knowledge layer global checks (F1 shell syntax, F3 JSON, F5 no .devcontainer refs)
         run: |
           # These validate file integrity without needing services/install.
@@ -232,7 +237,7 @@ jobs:
   dts-integration:
     name: DTS Integration (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     needs: [detect-changes, test]
     if: needs.detect-changes.outputs.infrastructure == 'true'
     env:
@@ -245,6 +250,7 @@ jobs:
         id: ollama_version
         run: |
           version=$(sed -n '/name: OLLAMA/{n;s/.*version: *"\(.*\)".*/\1/p;}' etc/deps.yaml | head -1)
+          version=${version#v}
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Cache Ollama binary
@@ -481,6 +487,89 @@ jobs:
           # Now run CLI integration test using the same HOME
           export PATH="${HOME}/.minions/bin:${PATH}"
           bash tests/test_cli_integration.sh
+
+          # Snapshot service logs before uninstall deletes ~/.minions/var/log (finding 8)
+          mkdir -p "${CI_LOGS_DIR}/var-log-snapshot"
+          cp -r "${HOME}/.minions/var/log/." "${CI_LOGS_DIR}/var-log-snapshot/" 2>/dev/null || true
+
+          # Test uninstall.sh default purge (verify CLEAN)
+          echo "=== Real Install: uninstall.sh default purge ==="
+          bash uninstall.sh --force --verify 2>&1 | tee "${CI_LOGS_DIR}/uninstall_purge.log"
+          if grep -q '^CLEAN$' "${CI_LOGS_DIR}/uninstall_purge.log"; then
+              echo "✓ Real Install: uninstall.sh verify CLEAN"
+          else
+              echo "FAIL: Real Install uninstall verify not CLEAN"
+              cat "${CI_LOGS_DIR}/uninstall_purge.log"
+              exit 1
+          fi
+          # Verify entire folders gone
+          for d in .minions .hermes .pi .omniroute .9router .mnemon .ollama; do
+              if [ ! -e "${HOME}/${d}" ]; then
+                  echo "✓ Real Install: uninstall.sh removed ~/${d} (default purge)"
+              else
+                  echo "FAIL: Real Install uninstall left ~/${d}"
+                  exit 1
+              fi
+          done
+
+          # Reinstall after uninstall (clean cycle) — full install so all dot
+          # folders (~/.hermes, ~/.omniroute, etc.) exist for the keep-config test
+          echo "=== Real Install: reinstall after uninstall ==="
+          bash install.sh 2>&1 | tee "${CI_LOGS_DIR}/reinstall.log"
+          if [ -d "${HOME}/.minions" ] && [ -f "${HOME}/.minions/bin/pi" ]; then
+              echo "✓ Real Install: reinstall restored ~/.minions with binaries"
+          else
+              echo "FAIL: Real Install reinstall missing ~/.minions or binaries"
+              exit 1
+          fi
+          # Verify reinstall actually boots and passes self-check (finding 9)
+          echo "=== Real Install: boot after reinstall ==="
+          export PATH="${HOME}/.minions/bin:${PATH}"
+          timeout 120s bash "${HOME}/.minions/boot.sh" >"${CI_LOGS_DIR}/reinstall-boot.log" 2>&1 || {
+              echo "FAIL: boot after reinstall failed"
+              cat "${CI_LOGS_DIR}/reinstall-boot.log"
+              exit 1
+          }
+          if ! grep -q "READY FOR FIRSTMATE DISPATCH\|stack is UP" "${CI_LOGS_DIR}/reinstall-boot.log"; then
+              echo "FAIL: reinstall boot missing completion marker"
+              cat "${CI_LOGS_DIR}/reinstall-boot.log"
+              exit 1
+          fi
+          echo "✓ Real Install: boot after reinstall ok"
+          # self-check --ci: exit 1 = warnings only (advisory, like the
+          # pre-reinstall check that only warns). Fail only on critical (exit 2).
+          set +e; bash self-check.sh --ci >"${CI_LOGS_DIR}/reinstall-self-check.log" 2>&1; SC=$?; set -e
+          if [ "$SC" -ge 2 ]; then
+              echo "FAIL: self-check --ci critical after reinstall (exit $SC)"
+              cat "${CI_LOGS_DIR}/reinstall-self-check.log"
+              exit 1
+          fi
+          echo "✓ Real Install: self-check after reinstall ok (exit $SC)"
+
+          # uninstall.sh --keep-config (preserves dot folders)
+          echo "=== Real Install: uninstall.sh --keep-config ==="
+          bash uninstall.sh --keep-config --force --verify 2>&1 | tee "${CI_LOGS_DIR}/uninstall_keep.log"
+          if grep -q '^CLEAN$' "${CI_LOGS_DIR}/uninstall_keep.log"; then
+              echo "✓ Real Install: uninstall.sh --keep-config verify CLEAN"
+          else
+              echo "FAIL: Real Install uninstall --keep-config verify not CLEAN"
+              cat "${CI_LOGS_DIR}/uninstall_keep.log"
+              exit 1
+          fi
+          if [ ! -e "${HOME}/.minions" ]; then
+              echo "✓ Real Install: uninstall.sh --keep-config removed ~/.minions"
+          else
+              echo "FAIL: Real Install uninstall --keep-config left ~/.minions"
+              exit 1
+          fi
+          for d in .hermes .pi .omniroute .9router .mnemon .ollama; do
+              if [ -e "${HOME}/${d}" ]; then
+                  echo "✓ Real Install: uninstall.sh --keep-config preserved ~/${d}"
+              else
+                  echo "FAIL: Real Install uninstall --keep-config removed ~/${d} (should preserve)"
+                  exit 1
+              fi
+          done
 
       # ── Collect diagnostic logs (uploaded every run; if-no-files-found: warn) ──
       - name: Collect diagnostic logs (Real Install)

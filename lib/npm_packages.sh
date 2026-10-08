@@ -35,7 +35,7 @@ install_npm_package() {
     mkdir -p "${npm_prefix}/lib/node_modules"
 
     echo "Installing ${pkg_name}@${pkg_version}..."
-    NODE_OPTIONS="--max-old-space-size=512" \
+    NODE_OPTIONS="--max-old-space-size=2048" \
     "${system_npm}" install "${pkg_name}@${pkg_version}" \
         --prefix "${npm_prefix}" \
         --no-audit \
