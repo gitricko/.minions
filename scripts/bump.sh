@@ -100,13 +100,28 @@ for plat in platforms:
     arch = plat.split('_', 1)[1]
     try:
         if sha_source == 'shasums':
-            fname = f"node-v{ver}-{node_os(plat)}-{arch}.tar.xz"
-            text = load('SHASUMS256.txt')
-            m = re.search(r'^([0-9a-f]{64})\s+' + re.escape(fname) + r'$', text, re.M)
-            if not m:
-                print(f"bump.sh: SHA not found for {plat} ({fname})", file=sys.stderr)
-                continue
-            result[plat] = m.group(1)
+            # OLLAMA uses sha256sum.txt with ollama-* assets; NODE uses SHASUMS256.txt
+            if dep == 'OLLAMA':
+                if plat.startswith('macos'):
+                    fname = 'ollama-darwin.tgz'
+                else:
+                    arch_map = {'x64': 'amd64', 'arm64': 'arm64'}
+                    fname = f"ollama-linux-{arch_map.get(arch, arch)}.tar.zst"
+                text = load('sha256sum.txt')
+                # sha256sum.txt lines are '<sha>  ./<fname>' — allow optional './'
+                m = re.search(r'^([0-9a-f]{64})\s+(?:\./)?' + re.escape(fname) + r'$', text, re.M)
+                if not m:
+                    print(f"bump.sh: SHA not found for {plat} ({fname})", file=sys.stderr)
+                    continue
+                result[plat] = m.group(1)
+            else:
+                fname = f"node-v{ver}-{node_os(plat)}-{arch}.tar.xz"
+                text = load('SHASUMS256.txt')
+                m = re.search(r'^([0-9a-f]{64})\s+' + re.escape(fname) + r'$', text, re.M)
+                if not m:
+                    print(f"bump.sh: SHA not found for {plat} ({fname})", file=sys.stderr)
+                    continue
+                result[plat] = m.group(1)
         elif sha_source == 'release_assets':
             target = UV_TARGET.get(plat)
             if not target:

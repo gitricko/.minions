@@ -82,6 +82,7 @@ dependencies:
     version: "v0.40.1"
     source_type: github_tag
     repo: ollama/ollama
+    release_url: https://github.com/ollama/ollama/releases/download/{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
