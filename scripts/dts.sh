@@ -65,7 +65,14 @@ cmd_up() {
         OLLAMA_MOUNT="-v ${OLLAMA_HOST_CACHE}:/tmp/ollama-cache:ro"
     fi
 
-    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" ${OLLAMA_MOUNT} "${IMAGE}" sleep infinity >/dev/null
+    # Tailscale host cache: same pattern as Ollama — mount at /tmp/tailscale-cache
+    # so uninstall stays CLEAN and --verify honest. Optional, opt-in feature.
+    TAILSCALE_MOUNT=""
+    if [ -n "${TAILSCALE_HOST_CACHE:-}" ] && [ -d "${TAILSCALE_HOST_CACHE}" ]; then
+        TAILSCALE_MOUNT="-v ${TAILSCALE_HOST_CACHE}:/tmp/tailscale-cache:ro"
+    fi
+
+    docker run -d --name "${CONTAINER}" -v "${REPO_PATH}:${MOUNT}" -v "${LOGS_DIR}:/tmp/ci" ${OLLAMA_MOUNT} ${TAILSCALE_MOUNT} "${IMAGE}" sleep infinity >/dev/null
     sleep 1
     # Ensure uid-1000 user exists and owns the mount (Ubuntu/Debian: ubuntu user)
     docker exec -u 0:0 "${CONTAINER}" bash -c "
@@ -85,6 +92,13 @@ cmd_up() {
             ln -sfn /tmp/ollama-cache/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
             chown -R ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions 2>/dev/null || true
             chown -h ${CONTAINER_UID}:${CONTAINER_GID} /home/ubuntu/.minions/lib/ollama/ollama /home/ubuntu/.minions/bin/ollama 2>/dev/null || true
+        " >/dev/null 2>&1 || true
+    fi
+    # Tailscale mount: outside ~/.minions — lib/tailscale.sh fast-path copies from /tmp/tailscale-cache
+    if [ -n "${TAILSCALE_MOUNT}" ]; then
+        docker exec -u 0:0 "${CONTAINER}" bash -c "
+            mkdir -p /tmp/tailscale-cache
+            chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/tailscale-cache 2>/dev/null || true
         " >/dev/null 2>&1 || true
     fi
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')

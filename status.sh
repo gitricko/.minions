@@ -40,6 +40,51 @@ check_pid() {
     return 1
 }
 
+# Tailscale is opt-in — presence-gated, guarded against set -e (tailscale status returns non-zero when logged out)
+check_tailscale() {
+    # Prefer managed socket if present
+    _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
+    _ts_cli=""
+    if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+        _ts_cli="${MINIONS_HOME}/bin/tailscale"
+    elif command -v tailscale >/dev/null 2>&1; then
+        _ts_cli="$(command -v tailscale)"
+    fi
+    if [ -z "${_ts_cli}" ]; then
+        echo "— not installed (install with install.sh --tailscale)"
+        return 0
+    fi
+    # If pidfile exists and live, prefer it; else fall back to status probe (avoids EPERM lie for root daemon)
+    if [ -f "${MINIONS_HOME}/var/run/tailscaled.pid" ]; then
+        _ts_pid=$(cat "${MINIONS_HOME}/var/run/tailscaled.pid" 2>/dev/null || true)
+        if [ -n "${_ts_pid:-}" ] && kill -0 "${_ts_pid}" 2>/dev/null; then
+            echo "✅ (pid ${_ts_pid})"
+            return 0
+        fi
+    fi
+    # Fallback: pgrep or status (guarded)
+    if command -v pgrep >/dev/null 2>&1 && pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+        echo "✅ (running)"
+        return 0
+    fi
+    # Try status without failing the script (set -e guard)
+    set +e
+    if [ -n "${_ts_socket:-}" ] && [ -S "${_ts_socket}" ]; then
+        TAILSCALE_SOCKET="${_ts_socket}" "${_ts_cli}" status >/dev/null 2>&1
+        _rc=$?
+    else
+        "${_ts_cli}" status >/dev/null 2>&1
+        _rc=$?
+    fi
+    set -e
+    if [ "${_rc:-1}" -eq 0 ]; then
+        echo "✅ (status ok)"
+        return 0
+    fi
+    echo "❌"
+    return 1
+}
+
 echo ".minions status:"
 echo ""
 
@@ -68,6 +113,16 @@ if command -v hermes >/dev/null 2>&1; then
 else
     echo "❌"
 fi
+
+# Check Tailscale (opt-in)
+echo "  tailscale   (opt-in)"
+# Guarded — check_tailscale returns non-zero when not running but status.sh must not abort
+set +e
+_tailscale_out=$(check_tailscale 2>&1)
+_tailscale_rc=$?
+set -e
+echo "  ${_tailscale_out}"
+check_tailscale >/dev/null 2>&1 || true
 
 # Check ready marker
 echo ""

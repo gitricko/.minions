@@ -104,6 +104,8 @@ INSTALL_OMNIROUTE=1
 INSTALL_NINEROUTER=1
 INSTALL_PI=1
 INSTALL_OLLAMA=1
+INSTALL_TAILSCALE=0
+TAILSCALE_MODE="userspace"
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
@@ -132,8 +134,21 @@ while [ $# -gt 0 ]; do
             INSTALL_OLLAMA=0
             shift
             ;;
+        --tailscale)
+            INSTALL_TAILSCALE=1
+            TAILSCALE_MODE="userspace"
+            shift
+            ;;
+        --tailscale-root)
+            INSTALL_TAILSCALE=1
+            TAILSCALE_MODE="root"
+            shift
+            ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama] [--tailscale] [--tailscale-root]"
+            echo ""
+            echo "  --tailscale       Install Tailscale (userspace, no sudo)"
+            echo "  --tailscale-root  Install Tailscale and defer to systemd (requires root)"
             echo ""
             echo "Environment variables (set before running):"
             echo "  OMNIROUTE_PORT=20128  (default)"
@@ -262,6 +277,8 @@ cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null 
 # shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/ollama.sh"
 # shellcheck disable=SC1091
+. "${MINIONS_HOME}/lib/tailscale.sh"
+# shellcheck disable=SC1091
 . "${MINIONS_HOME}/lib/pi-settings.sh"
 
 # Step 2: Source versions (generated from deps.yaml)
@@ -311,6 +328,20 @@ fi
 if [ "${INSTALL_OLLAMA}" -eq 1 ]; then
     log_info "Installing Ollama..."
     ensure_ollama "${MINIONS_HOME}"
+fi
+
+if [ "${INSTALL_TAILSCALE}" -eq 1 ]; then
+    log_info "Installing Tailscale (${TAILSCALE_MODE} mode)..."
+    # Non-fatal: opt-in feature, fail open so base install still succeeds
+    if ! ensure_tailscale "${MINIONS_HOME}"; then
+        log_warn "Tailscale install failed (mode=${TAILSCALE_MODE}) — continuing without it"
+    fi
+    # Persist choice for boot.sh presence gate + mode (standalone needs it)
+    mkdir -p "${MINIONS_HOME}/etc"
+    {
+        echo "INSTALL_TAILSCALE=${INSTALL_TAILSCALE}"
+        echo "TAILSCALE_MODE=${TAILSCALE_MODE}"
+    } >> "${MINIONS_HOME}/etc/knowledge.env"
 fi
 
 # Phase 22: install mnemon plugin (idempotent)
