@@ -215,12 +215,13 @@ if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscal
                 _TS_CLI="$(command -v tailscale 2>/dev/null || echo tailscale)"
             fi
             _TS_STATUS="$(TAILSCALE_SOCKET="${TAILSCALE_SOCKET}" "${_TS_CLI}" status 2>&1 || true)"
+            _TS_FIRST_LINE="$(printf '%s' "${_TS_STATUS}" | head -n 1)"
             case "${_TS_STATUS}" in
                 *"Logged out."*) log_warn "Tailscale: not logged in — run: tailscale up (or: sudo tailscale up --authkey=\$TAILSCALE_AUTHKEY)" ;;
-                *"stopped"*|*"no state"*) log_info "Tailscale: daemon starting (status: ${_TS_STATUS%%$'\n'*})" ;;
-                *) log_info "Tailscale: ${_TS_STATUS%%$'\n'*}" ;;
+                *"stopped"*|*"no state"*) log_info "Tailscale: daemon starting (status: ${_TS_FIRST_LINE})" ;;
+                *) log_info "Tailscale: ${_TS_FIRST_LINE}" ;;
             esac
-            unset _TS_DAEMON _TS_CLI _TS_STATUS
+            unset _TS_DAEMON _TS_CLI _TS_STATUS _TS_FIRST_LINE
         fi
     fi
 else

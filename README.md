@@ -20,7 +20,7 @@
 [![Ollama](https://img.shields.io/badge/Ollama-0.40.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.10-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
 [![Node.js](https://img.shields.io/badge/Node.js-26.11.1-brightgreen?logo=node.js)](https://nodejs.org)
-[![uv](https://img.shields.io/badge/uv-0.12.23-blue?logo=astral)](https://github.com/astral-sh/uv)
+[![uv](https://img.shields.io/badge/uv-0.12.24-blue?logo=astral)](https://github.com/astral-sh/uv)
 
 <a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">
     <img src="https://github.com/gitricko/.minions/actions/workflows/ci.yml/badge.svg" alt="Latest CI Status">
