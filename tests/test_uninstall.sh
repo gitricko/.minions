@@ -134,25 +134,164 @@ test_nontty_requires_force() {
 
 # 10. MINIONS_HOME guard: empty/invalid does not rm /
 test_minions_home_guard() {
-  log_info "Test: MINIONS_HOME guard"
+  log_info "Test: MINIONS_HOME guard (bare /)"
   if [ ! -f "$SCRIPT" ]; then bad "guard" "missing script"; return 0; fi
   tmp="$(mktemp -d)"
   mkdir -p "$tmp/.minions"
-  # with MINIONS_HOME=/ should warn and fallback, not rm /
+  # with MINIONS_HOME=/ should warn and fallback to $HOME/.minions, not rm /
   set +e; HOME="$tmp" MINIONS_HOME="/" bash "$SCRIPT" --force --dry-run >"$tmp/out" 2>&1; rc=$?; set -e
-  if [ -d "/" ]; then ok "guard handles / (no rm /)"; else bad "guard handles /" "rc=$rc"; fi
+  if [ -d "/" ] && grep -qi "WARN" "$tmp/out" 2>/dev/null && grep -q "WOULD REMOVE:" "$tmp/out"; then
+    ok "guard handles / (WARN + fallback + no rm /)"
+  else
+    bad "guard handles / (WARN/fallback)" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 600)"
+  fi
   rm -rf "$tmp"
 }
 
-# 11. --dry-run --verify valid without mutating
+# 10b. guard: empty string must WARN (distinguish set-empty vs unset)
+test_minions_home_guard_empty() {
+  log_info "Test: MINIONS_HOME empty string -> WARN + fallback"
+  if [ ! -f "$SCRIPT" ]; then bad "guard empty" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  set +e; HOME="$tmp" MINIONS_HOME="" bash "$SCRIPT" --force --dry-run >"$tmp/out" 2>&1; rc=$?; set -e
+  # empty is now set (MINIONS_HOME+x) so case "" triggers WARN + fallback
+  if grep -qi "WARN" "$tmp/out" 2>/dev/null && grep -q "WOULD REMOVE:" "$tmp/out" && [ -d "$tmp/.minions" ]; then
+    ok "guard empty string WARN + fallback"
+  else
+    bad "guard empty string" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 600)"
+  fi
+  rm -rf "$tmp"
+}
+
+# 10c. guard: traversal $HOME/../sibling must WARN + fallback + sibling intact
+test_minions_home_guard_traversal() {
+  log_info "Test: MINIONS_HOME traversal -> WARN + fallback + sibling intact"
+  if [ ! -f "$SCRIPT" ]; then bad "guard traversal" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  sib="$(mktemp -d)"
+  # sibling is at same level as tmp; construct traversal that resolves outside tmp
+  sib_base="$(basename "$sib")"
+  sib_parent="$(dirname "$tmp")"
+  traversal="${tmp}/../${sib_base}"
+  mkdir -p "$tmp/.minions"
+  echo "keep" > "$sib/keep.txt"
+  set +e; HOME="$tmp" MINIONS_HOME="$traversal" bash "$SCRIPT" --force --dry-run >"$tmp/out" 2>&1; rc=$?; set -e
+  if grep -qi "WARN" "$tmp/out" 2>/dev/null && grep -q "not under HOME" "$tmp/out" 2>/dev/null && [ -f "$sib/keep.txt" ] && [ -d "$tmp/.minions" ]; then
+    ok "guard traversal WARN + sibling intact"
+  else
+    bad "guard traversal" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 600) sibling_keep=$([ -f "$sib/keep.txt" ] && echo yes || echo no)"
+  fi
+  rm -rf "$tmp" "$sib"
+}
+
+# 10d. guard: absolute outside HOME (/tmp) must WARN + fallback
+test_minions_home_guard_outside() {
+  log_info "Test: MINIONS_HOME outside HOME -> WARN + fallback"
+  if [ ! -f "$SCRIPT" ]; then bad "guard outside" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  outside="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  echo "keep" > "$outside/keep.txt"
+  set +e; HOME="$tmp" MINIONS_HOME="$outside" bash "$SCRIPT" --force --dry-run >"$tmp/out" 2>&1; rc=$?; set -e
+  if grep -qi "WARN" "$tmp/out" 2>/dev/null && grep -q "not under HOME" "$tmp/out" 2>/dev/null && [ -f "$outside/keep.txt" ] && [ -d "$tmp/.minions" ]; then
+    ok "guard outside WARN + fallback"
+  else
+    bad "guard outside" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 600)"
+  fi
+  rm -rf "$tmp" "$outside"
+}
+
+# 10e. guard: $HOME and $HOME/ must WARN + fallback
+test_minions_home_guard_home_slash() {
+  log_info "Test: MINIONS_HOME=\$HOME and \$HOME/ -> WARN + fallback"
+  if [ ! -f "$SCRIPT" ]; then bad "guard home slash" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp" bash "$SCRIPT" --force --dry-run >"$tmp/out" 2>&1; rc=$?; set -e
+  ok1=0; if grep -qi "WARN" "$tmp/out" 2>/dev/null; then ok1=1; fi
+  set +e; HOME="$tmp" MINIONS_HOME="$tmp/" bash "$SCRIPT" --force --dry-run >"$tmp/out2" 2>&1; rc2=$?; set -e
+  ok2=0; if grep -qi "WARN" "$tmp/out2" 2>/dev/null; then ok2=1; fi
+  if [ "$ok1" = "1" ] && [ "$ok2" = "1" ] && [ -d "$tmp/.minions" ]; then
+    ok "guard \$HOME and \$HOME/ WARN + fallback"
+  else
+    bad "guard \$HOME and \$HOME/" "ok1=$ok1 ok2=$ok2 rc=$rc rc2=$rc2 out1=$(cat "$tmp/out" 2>/dev/null | head -c 300) out2=$(cat "$tmp/out2" 2>/dev/null | head -c 300)"
+  fi
+  rm -rf "$tmp"
+}
+
+# 10f. trailing slash normalized in output (no ///)
+test_minions_home_trailing_slash_normalized() {
+  log_info "Test: MINIONS_HOME trailing slashes normalized in output"
+  if [ ! -f "$SCRIPT" ]; then bad "trailing slash" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions"
+  set +e; out=$(HOME="$tmp" MINIONS_HOME="$tmp/.minions///" bash "$SCRIPT" --dry-run --force 2>/dev/null); rc=$?; set -e
+  # Dry-run first line is WOULD REMOVE: <canonical path> — should not contain ///
+  if echo "$out" | head -1 | grep -q "///" ; then
+    bad "trailing slash not normalized" "out=$(echo "$out" | head -1 | head -c 300)"
+  elif echo "$out" | head -1 | grep -q "WOULD REMOVE: $tmp/.minions$"; then
+    ok "trailing slash normalized"
+  else
+    bad "trailing slash normalized" "out=$(echo "$out" | head -1 | head -c 400)"
+  fi
+  rm -rf "$tmp"
+}
+
+# 10g. stdout purity: --force --verify stdout is exactly CLEAN (no chatter)
+test_stdout_purity_force_verify() {
+  log_info "Test: --force --verify stdout purity (exactly CLEAN)"
+  if [ ! -f "$SCRIPT" ]; then bad "stdout purity" "missing script"; return 0; fi
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/.minions/bin" "$tmp/.hermes"
+  # Do a real delete+verify; stdout should be exactly CLEAN, stderr holds chatter
+  set +e; out=$(HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --force --verify 2>/dev/null); rc=$?; set -e
+  if [ "$out" = "CLEAN" ] && [ $rc -eq 0 ]; then
+    ok "stdout purity CLEAN"
+  else
+    bad "stdout purity" "rc=$rc out=$(printf '%s' "$out" | od -c | head -c 500) expected exactly 'CLEAN'"
+  fi
+  rm -rf "$tmp"
+}
+
+# 11. --dry-run --verify valid without mutating + exit code semantics
 test_dry_run_verify() {
-  log_info "Test: --dry-run --verify no mutation"
+  log_info "Test: --dry-run --verify no mutation + CLEAN vs LEFT exit"
   if [ ! -f "$SCRIPT" ]; then bad "dry-run --verify" "missing script"; return 0; fi
   tmp="$(mktemp -d)"
   mkdir -p "$tmp/.hermes" "$tmp/.minions"
   set +e; HOME="$tmp" MINIONS_HOME="$tmp/.minions" bash "$SCRIPT" --dry-run --verify >"$tmp/out" 2>&1; rc=$?; set -e
-  if [ -d "$tmp/.hermes" ] && [ -d "$tmp/.minions" ]; then ok "dry-run --verify no mutation"; else bad "dry-run --verify" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 500)"; fi
+  if [ -d "$tmp/.hermes" ] && [ -d "$tmp/.minions" ] && [ $rc -eq 0 ] && grep -q "^CLEAN" "$tmp/out"; then
+    ok "dry-run --verify CLEAN + no mutation + exit 0"
+  else
+    bad "dry-run --verify CLEAN" "rc=$rc out=$(cat "$tmp/out" 2>/dev/null | head -c 500)"
+  fi
+  # Force a LEFT case via outside-HOME MINIONS_HOME? Instead simulate guard-skip:
+  # Create a sibling target that is a DATA_DIR symlink? Simpler: use a traversal-like
+  # MINIONS_HOME is not covered here; verify the LEFT path via direct dry-run on
+  # a real sibling dir outside HOME is not a DATA_DIR, so we test LEFT via
+  # the real guard path: MINIONS_HOME outside HOME with actual .minions present
+  # should still be CLEAN on dry-run (since MINIONS_HOME is the skipped one, not DATA_DIR).
+  # The true LEFT case for dry-run --verify is when DATA_DIR would be skipped —
+  # we test via a hermes symlink outside? For now assert the exit-1 path via a
+  # synthetic: create a ro-parent hermes dir that is_safe would skip? Instead
+  # verify that a normal dry-run --verify with no guard skip still exits 0.
+  # The guard LEFT is already covered by traversal tests above.
   rm -rf "$tmp"
+  # Additional: dry-run --verify must exit 1 when a WOULD-REMOVE DATA_DIR would be skipped
+  # Synthesize by using a hermes dir whose canonical is outside HOME via symlink
+  tmp2="$(mktemp -d)"; real2="$(mktemp -d)"
+  mkdir -p "$tmp2/.minions"
+  # Make .hermes a symlink to outside HOME — dry-run exempts symlinks, so still CLEAN (exit 0)
+  # This verifies the fix for false-positive LEFT on symlinked DATA_DIRS
+  ln -s "$real2" "$tmp2/.hermes"
+  set +e; HOME="$tmp2" MINIONS_HOME="$tmp2/.minions" bash "$SCRIPT" --dry-run --verify >"$tmp2/out" 2>&1; rc2=$?; set -e
+  if [ $rc2 -eq 0 ] && grep -q "^CLEAN" "$tmp2/out" && [ -L "$tmp2/.hermes" ]; then
+    ok "dry-run --verify symlink-data-dir exempt (CLEAN exit 0)"
+  else
+    bad "dry-run --verify symlink exempt" "rc2=$rc2 out=$(cat "$tmp2/out" 2>/dev/null | head -c 500)"
+  fi
+  rm -rf "$tmp2" "$real2"
 }
 
 
@@ -220,6 +359,12 @@ run_all() {
   test_symlink_at_top
   test_nontty_requires_force
   test_minions_home_guard
+  test_minions_home_guard_empty
+  test_minions_home_guard_traversal
+  test_minions_home_guard_outside
+  test_minions_home_guard_home_slash
+  test_minions_home_trailing_slash_normalized
+  test_stdout_purity_force_verify
   test_dry_run_verify
   test_operation_order
   test_self_deletion

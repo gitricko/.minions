@@ -65,7 +65,7 @@ _canonicalize() {
     echo "$_c"
   fi
 }
-if [ -n "${MINIONS_HOME:-}" ]; then
+if [ -n "${MINIONS_HOME+x}" ]; then
   case "${MINIONS_HOME}" in
     ""|"/"|"$HOME"|"$HOME/") log_warn "MINIONS_HOME=${MINIONS_HOME} is unsafe, falling back to ${DEFAULT_MINIONS_HOME}"; MINIONS_HOME="$DEFAULT_MINIONS_HOME" ;;
     /*)
@@ -73,7 +73,10 @@ if [ -n "${MINIONS_HOME:-}" ]; then
       _canon_home=$(_canonicalize "$HOME")
       _canon_target=$(_canonicalize "$MINIONS_HOME")
       case "$_canon_target" in
-        "$_canon_home"/*) ;; # under HOME, honor
+        "$_canon_home"/*)
+          # Normalize for consistent output (strip trailing slashes, resolve ..)
+          MINIONS_HOME="$_canon_target"
+          ;;
         *)
           log_warn "MINIONS_HOME=${MINIONS_HOME} is not under HOME (${HOME}), falling back to ${DEFAULT_MINIONS_HOME}"
           MINIONS_HOME="$DEFAULT_MINIONS_HOME"
@@ -227,7 +230,11 @@ if [ "$DRY_RUN" = "1" ]; then
     # We implement by checking if any WOULD REMOVE target currently exists but would NOT be removed — none.
     # Thus CLEAN is correct for a consistent plan; but if plan is inconsistent (guard skips), we must detect.
     # Check: if MINIONS_HOME is under HOME and WOULD REMOVE but is_safe_target says skip, that's LEFT.
-    if [ -e "$MINIONS_HOME" ] || [ -L "$MINIONS_HOME" ]; then
+    if [ -L "$MINIONS_HOME" ]; then
+      # Symlink at top: the real run removes the link only (rm -f) — always safe.
+      # Do not report LEFT (would be a false positive vs. the real deletion).
+      :
+    elif [ -e "$MINIONS_HOME" ]; then
       if ! is_safe_target "$MINIONS_HOME"; then
         echo "LEFT: $MINIONS_HOME"
         _dry_left=1
@@ -235,8 +242,13 @@ if [ "$DRY_RUN" = "1" ]; then
     fi
     if [ "$KEEP_CONFIG" = "0" ]; then
       for d in "${DATA_DIRS[@]}"; do
-        # WOULD REMOVE: if it exists but is_safe_target would skip, it would be LEFT
-        if [ -e "$d" ] || [ -L "$d" ]; then
+        # WOULD REMOVE: if it exists but is_safe_target would skip, it would be LEFT.
+        # Symlinks are exempt: safe_rm_target removes the link only (rm -f), which is
+        # always safe — mirror that here so dry-run --verify matches the real run.
+        if [ -L "$d" ]; then
+          continue
+        fi
+        if [ -e "$d" ]; then
           if ! is_safe_target "$d"; then
             echo "LEFT: $d"
             _dry_left=1
@@ -252,8 +264,12 @@ if [ "$DRY_RUN" = "1" ]; then
     fi
     if [ "$_dry_left" = "0" ]; then
       echo "CLEAN"
+      unset _dry_left
+      exit 0
+    else
+      unset _dry_left
+      exit 1
     fi
-    unset _dry_left
   fi
   exit 0
 fi
@@ -382,7 +398,8 @@ if [ "$DO_DELETE" = "1" ]; then
       # ollama cache at $MINIONS_HOME/lib/ollama - rm -rf fails on mountpoints).
       # DTS runs as uid 1000 so umount needs sudo when available; try both.
       _try_umount() {
-        for _u in "umount -l" "umount" "sudo umount -l" "sudo umount" "sudo -n umount -l"; do
+        # Non-interactive sudo (-n) first so we never block on a password prompt mid-deletion.
+        for _u in "umount -l" "umount" "sudo -n umount -l" "sudo -n umount" "sudo umount -l" "sudo umount"; do
           $_u "$1" 2>/dev/null && return 0
         done
         return 1

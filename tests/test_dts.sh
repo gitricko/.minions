@@ -499,6 +499,34 @@ else
     cleanup
     exit 1
 fi
+# Verify reinstall actually boots and passes self-check (F9)
+if "${DTS_SCRIPT}" exec "timeout 120s bash /home/ubuntu/.minions/boot.sh 2>&1 | tee /tmp/reinstall-boot.log; test \${PIPESTATUS[0]} -eq 0"; then
+    log_info "Reinstall boot exit 0"
+else
+    log_error "Reinstall boot failed"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-boot.log"
+    cleanup
+    exit 1
+fi
+if "${DTS_SCRIPT}" exec "grep -q 'READY FOR FIRSTMATE DISPATCH\|stack is UP' /tmp/reinstall-boot.log"; then
+    log_info "Reinstall boot reached READY/stack is UP"
+else
+    log_error "Reinstall boot missing completion marker"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-boot.log"
+    cleanup
+    exit 1
+fi
+set +e
+"${DTS_SCRIPT}" exec "bash /home/ubuntu/.minions/self-check.sh --ci > /tmp/reinstall-self-check.log 2>&1; echo \$? > /tmp/reinstall-sc.rc"
+SC=$("${DTS_SCRIPT}" exec "cat /tmp/reinstall-sc.rc 2>/dev/null || echo 99")
+set -e
+if [ "$SC" -ge 2 ]; then
+    log_error "self-check --ci critical after reinstall (exit $SC)"
+    "${DTS_SCRIPT}" exec "cat /tmp/reinstall-self-check.log"
+    cleanup
+    exit 1
+fi
+log_info "Reinstall self-check ok (exit $SC)"
 
 # Test 12: uninstall.sh --keep-config (preserves dot folders)
 echo ""
