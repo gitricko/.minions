@@ -183,9 +183,8 @@ log_info "Pulling mnemon embedding model (nomic-embed-text)..."
 pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
 
 # Step 3b: Tailscale (opt-in, presence-gated, non-fatal)
-# - If --tailscale-root was chosen, defer to systemd (do NOT start a second daemon).
-# - Otherwise use userspace networking with socket under MINIONS_HOME so status/stop can work unprivileged.
-if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscale" ] || command -v tailscaled >/dev/null 2>&1 || command -v tailscale >/dev/null 2>&1; then
+# Gate ONLY on managed install (MINIONS_HOME/bin) — not system tailscale (fixes #2)
+if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
     if [ "${TAILSCALE_MODE}" = "root" ]; then
         if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet tailscaled 2>/dev/null; then
             log_info "Tailscale: systemd tailscaled already active — deferring (root mode)"
@@ -208,20 +207,28 @@ if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscal
                 _TS_DAEMON="$(command -v tailscaled 2>/dev/null || echo tailscaled)"
             fi
             start_service "tailscaled" "${_TS_DAEMON}" --statedir "${TAILSCALE_STATEDIR}" --socket "${TAILSCALE_SOCKET}" --tun=userspace-networking >> "${boot_log}" 2>&1 || log_warn "Failed to start tailscaled (non-fatal)"
-            # Best-effort status probe — guarded against set -e and missing socket
+            # Status probe with retry — userspace sock can take 2-5s (fixes #4)
             if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
                 _TS_CLI="${MINIONS_HOME}/bin/tailscale"
             else
                 _TS_CLI="$(command -v tailscale 2>/dev/null || echo tailscale)"
             fi
-            _TS_STATUS="$(TAILSCALE_SOCKET="${TAILSCALE_SOCKET}" "${_TS_CLI}" status 2>&1 || true)"
+            _TS_STATUS=""
+            _ts_attempt=0
+            while [ "${_ts_attempt}" -lt 5 ]; do
+                _TS_STATUS="$(TAILSCALE_SOCKET="${TAILSCALE_SOCKET}" "${_TS_CLI}" status 2>&1 || true)"
+                case "${_TS_STATUS}" in
+                    *"stopped"*|*"no state"*) _ts_attempt=$((_ts_attempt + 1)); sleep 1; continue ;;
+                    *) break ;;
+                esac
+            done
             _TS_FIRST_LINE="$(printf '%s' "${_TS_STATUS}" | head -n 1)"
             case "${_TS_STATUS}" in
                 *"Logged out."*) log_warn "Tailscale: not logged in — run: tailscale up (or: sudo tailscale up --authkey=\$TAILSCALE_AUTHKEY)" ;;
                 *"stopped"*|*"no state"*) log_info "Tailscale: daemon starting (status: ${_TS_FIRST_LINE})" ;;
                 *) log_info "Tailscale: ${_TS_FIRST_LINE}" ;;
             esac
-            unset _TS_DAEMON _TS_CLI _TS_STATUS _TS_FIRST_LINE
+            unset _TS_DAEMON _TS_CLI _TS_STATUS _TS_FIRST_LINE _ts_attempt
         fi
     fi
 else

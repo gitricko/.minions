@@ -122,7 +122,6 @@ _tailscale_out=$(check_tailscale 2>&1)
 _tailscale_rc=$?
 set -e
 echo "  ${_tailscale_out}"
-check_tailscale >/dev/null 2>&1 || true
 
 # Check ready marker
 echo ""

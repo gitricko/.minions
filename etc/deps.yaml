@@ -93,8 +93,13 @@ dependencies:
 
   - name: TAILSCALE
     version: "v1.104.1"
-    source_type: github_tag
+    source_type: release_tarball
     repo: tailscale/tailscale
+    release_url: https://pkgs.tailscale.com/stable/
     sha_source: none
+    platforms: [linux_x64, linux_arm64]
+    sha256:
+      linux_x64: "108d1d96ecf410d305571e173516f27038f870919a9b89c914a167c6d33a4528"
+      linux_arm64: "f60294374967f3dfd8cf57bbbd474d6cfce32d123e3a8ddeab82a87940daa806"
 
 

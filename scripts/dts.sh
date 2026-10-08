@@ -95,11 +95,9 @@ cmd_up() {
         " >/dev/null 2>&1 || true
     fi
     # Tailscale mount: outside ~/.minions — lib/tailscale.sh fast-path copies from /tmp/tailscale-cache
+    # ro mount: no chown needed (and would fail on ro); Ollama pattern same (fixes #11)
     if [ -n "${TAILSCALE_MOUNT}" ]; then
-        docker exec -u 0:0 "${CONTAINER}" bash -c "
-            mkdir -p /tmp/tailscale-cache
-            chown -R ${CONTAINER_UID}:${CONTAINER_GID} /tmp/tailscale-cache 2>/dev/null || true
-        " >/dev/null 2>&1 || true
+        docker exec -u 0:0 "${CONTAINER}" bash -c "mkdir -p /tmp/tailscale-cache" >/dev/null 2>&1 || true
     fi
     home=$(docker exec "${CONTAINER}" bash -c "getent passwd ${CONTAINER_UID} | cut -d: -f6" | tr -d '\n')
     log "container ready. home=${home}. Install packages via: dts apt '<pkgs>' (root)"

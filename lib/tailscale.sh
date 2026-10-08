@@ -47,6 +47,11 @@ install_tailscale() {
     # Strip leading 'v' for pkgs URL (pkgs uses bare 1.104.1, deps.yaml stores v1.104.1)
     tailscale_version="${tailscale_version#v}"
 
+    os=$(uname -s)
+    if [ "${os}" != "Linux" ]; then
+        echo "Tailscale managed install is Linux-only (pkgs host has no Darwin tarball; use brew on macOS)" >&2
+        return 1
+    fi
     arch=$(uname -m)
     case "${arch}" in
         x86_64|amd64) arch="amd64" ;;
@@ -55,22 +60,27 @@ install_tailscale() {
         *) echo "Unsupported architecture for Tailscale: ${arch}" >&2; return 1 ;;
     esac
 
-    # pkgs.tailscale.com stable tarballs are the versioned distribution for linux.
-    # For darwin the same pkgs host serves darwin builds when available; if the
-    # URL 404s we surface a clear error and let the caller decide (install.sh
-    # treats Tailscale as non-fatal).
+    # pkgs.tailscale.com stable tarballs are the versioned distribution.
+    # Verified: Linux only — pkgs has no Darwin tarball for 1.104.1 (see above guard).
     # Asset pattern: tailscale_<version>_<arch>.tgz  (e.g. tailscale_1.104.1_amd64.tgz)
     asset="tailscale_${tailscale_version}_${arch}.tgz"
     url="https://pkgs.tailscale.com/stable/${asset}"
 
     echo "Installing Tailscale v${tailscale_version} (${arch}) from ${url}..."
 
+    # Resolve per-platform sha256 from versions.env (populated via deps.yaml)
+    tailscale_sha=""
+    case "${arch}" in
+        amd64) tailscale_sha="${TAILSCALE_SHA256_LINUX_X64:-}" ;;
+        arm64) tailscale_sha="${TAILSCALE_SHA256_LINUX_ARM64:-}" ;;
+    esac
+
     # Download to install_dir (use download_file helper if available, else curl)
     tarball="${install_dir}/${asset}"
     mkdir -p "${install_dir}"
 
     if command -v download_file >/dev/null 2>&1; then
-        if ! download_file "${url}" "${tarball}" ""; then
+        if ! download_file "${url}" "${tarball}" "${tailscale_sha}"; then
             echo "Failed to download Tailscale from ${url}" >&2
             return 1
         fi
@@ -94,7 +104,7 @@ install_tailscale() {
     fi
 
     # Extract
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d -t tailscale.XXXXXX)
     if command -v extract_tarball >/dev/null 2>&1; then
         if ! extract_tarball "${tarball}" "${tmp_dir}"; then
             echo "Failed to extract ${tarball}" >&2
