@@ -96,6 +96,8 @@ dependencies:
     source_type: release_tarball
     repo: tailscale/tailscale
     release_url: https://pkgs.tailscale.com/stable/
+    # sha_source none: pkgs host has no shasums manifest; shas pinned manually
+    # via verified download (see lib/tailscale.sh). bump.sh will not auto-fetch.
     sha_source: none
     platforms: [linux_x64, linux_arm64]
     sha256:

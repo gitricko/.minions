@@ -56,8 +56,7 @@ install_tailscale() {
     case "${arch}" in
         x86_64|amd64) arch="amd64" ;;
         aarch64|arm64) arch="arm64" ;;
-        armv7l|arm) arch="arm" ;;
-        *) echo "Unsupported architecture for Tailscale: ${arch}" >&2; return 1 ;;
+        *) echo "Unsupported architecture for Tailscale: ${arch} (managed install supports amd64/arm64 only)" >&2; return 1 ;;
     esac
 
     # pkgs.tailscale.com stable tarballs are the versioned distribution.
@@ -90,17 +89,34 @@ install_tailscale() {
                 echo "Failed to download Tailscale from ${url}" >&2
                 return 1
             fi
+            if [ -n "${tailscale_sha}" ]; then
+                _actual=$(sha256sum "${tarball}.tmp" 2>/dev/null | awk '{print $1}') || _actual=$(shasum -a 256 "${tarball}.tmp" 2>/dev/null | awk '{print $1}')
+                if [ "${_actual}" != "${tailscale_sha}" ]; then
+                    echo "Checksum mismatch for ${url} (expected ${tailscale_sha}, got ${_actual})" >&2
+                    rm -f "${tarball}.tmp"
+                    return 1
+                fi
+            fi
             mv "${tarball}.tmp" "${tarball}"
         elif command -v wget >/dev/null 2>&1; then
             if ! wget -q --tries=3 -O "${tarball}.tmp" "${url}"; then
                 echo "Failed to download Tailscale from ${url}" >&2
                 return 1
             fi
+            if [ -n "${tailscale_sha}" ]; then
+                _actual=$(sha256sum "${tarball}.tmp" 2>/dev/null | awk '{print $1}') || _actual=$(shasum -a 256 "${tarball}.tmp" 2>/dev/null | awk '{print $1}')
+                if [ "${_actual}" != "${tailscale_sha}" ]; then
+                    echo "Checksum mismatch for ${url} (expected ${tailscale_sha}, got ${_actual})" >&2
+                    rm -f "${tarball}.tmp"
+                    return 1
+                fi
+            fi
             mv "${tarball}.tmp" "${tarball}"
         else
             echo "Neither curl nor wget found for Tailscale download" >&2
             return 1
         fi
+        unset _actual
     fi
 
     # Extract

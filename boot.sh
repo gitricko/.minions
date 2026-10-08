@@ -108,14 +108,14 @@ wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 wire_pi_default_trust_always "${HOME}/.pi/agent/settings.json"
 
 # Tailscale install choice (persisted by install.sh --tailscale) — presence-gated boot.
-# Source knowledge.env if present to get TAILSCALE_MODE (userspace|root); default userspace.
+# Source knowledge.env if present to get TAILSCALE_MODE/TAILSCALE_SOCKET.
 if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
     # shellcheck disable=SC1091
     . "${MINIONS_HOME}/etc/knowledge.env"
 fi
 TAILSCALE_MODE="${TAILSCALE_MODE:-userspace}"
 TAILSCALE_STATEDIR="${MINIONS_HOME}/var/tailscale"
-TAILSCALE_SOCKET="${MINIONS_HOME}/var/run/tailscaled.sock"
+TAILSCALE_SOCKET="${TAILSCALE_SOCKET:-${MINIONS_HOME}/var/run/tailscaled.sock}"
 export TAILSCALE_SOCKET
 
 # Ensure directories exist
