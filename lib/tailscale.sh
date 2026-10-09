@@ -201,13 +201,15 @@ ensure_tailscale() {
 _ts_ensure_wrapper() {
     _ts_home=$1
     # bin/ts wrapper: auto-wires --socket via MINIONS_HOME (fixes TAILSCALE_SOCKET ignored by v1.104.1 and ~ not expanding after =).
-    # Always passes --socket; no [ -S ] race (see 6088199341).
+    # Always passes --socket; no [ -S ] race (see 6088199341). Binary resolved via dirname $0 so MINIONS_HOME override doesn't break it (6089149500).
     cat > "${_ts_home}/bin/ts" <<'TSWRAP'
 #!/bin/sh
-# minions ts wrapper — delegates to tailscale with managed --socket when present
-# Uses MINIONS_HOME (exported in .bashrc) to resolve socket correctly in CI/ssh.
-SOCK="${MINIONS_HOME:-$HOME/.minions}/var/run/tailscaled.sock"
-exec "${MINIONS_HOME:-$HOME/.minions}/bin/tailscale" --socket="$SOCK" "$@"
+# minions ts wrapper — delegates to tailscale with managed --socket
+# Binary fixed to wrapper dir (dirname $0); socket via MINIONS_HOME with HOME/getent fallback.
+TS_BIN="$(dirname "$0")/tailscale"
+if [ ! -x "$TS_BIN" ]; then echo "ts: tailscale not found at $TS_BIN" >&2; exit 1; fi
+if [ -n "${MINIONS_HOME:-}" ]; then SOCK="$MINIONS_HOME/var/run/tailscaled.sock"; else _h="${HOME:-}"; [ -n "$_h" ] || _h="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)"; [ -n "$_h" ] || _h="$HOME"; SOCK="$_h/.minions/var/run/tailscaled.sock"; unset _h; fi
+exec "$TS_BIN" --socket="$SOCK" "$@"
 TSWRAP
     chmod +x "${_ts_home}/bin/ts"
     unset _ts_home

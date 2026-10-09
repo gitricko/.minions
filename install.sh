@@ -157,7 +157,7 @@ while [ $# -gt 0 ]; do
             echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama] [--no-tailscale] [--tailscale] [--tailscale-root]"
             echo ""
             echo "  --no-tailscale    Skip Tailscale (default: installed, userspace)"
-            echo "  --tailscale       Install Tailscale (userspace, no sudo) [default, compat alias]"
+            echo "  --tailscale       Install Tailscale (userspace, no sudo) [default]"
             echo "  --tailscale-root  Install Tailscale and defer to systemd (requires root)"
             echo ""
             echo "Environment variables (set before running):"
@@ -381,6 +381,7 @@ fi
 # | 0 (--no-tailscale)     | (none)           | 0           | N/A             |
 # | 0                      | --tailscale      | 1           | userspace       |
 # | 1 (root)               | (none)           | 1           | root preserved  |
+# | 1 (root)               | --tailscale      | 1           | userspace       |
 # | 1 (root)               | --no-tailscale   | 0           | N/A             |
 if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
     # shellcheck disable=SC1091
@@ -407,7 +408,9 @@ fi
     echo "MODE=${MODE}"
     echo "MINIONS_REPO_ROOT=${MINIONS_REPO_ROOT}"
     echo "INSTALL_TAILSCALE=${INSTALL_TAILSCALE}"
-    echo "TAILSCALE_MODE=${TAILSCALE_MODE}"
+    if [ "${INSTALL_TAILSCALE}" = "1" ]; then
+        echo "TAILSCALE_MODE=${TAILSCALE_MODE}"
+    fi
     echo "TAILSCALE_SOCKET=${_prev_tailscale_socket}"
 } > "${MINIONS_HOME}/etc/knowledge.env"
 unset _prev_tailscale_socket

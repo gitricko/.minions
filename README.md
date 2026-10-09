@@ -161,14 +161,15 @@ ts up                                      # interactive: prints URL to open in 
 ts up --authkey=tskey-auth-XXXX            # headless (create at https://login.tailscale.com/admin/settings/keys)
 ts status                                  # tailnet + 100.x shown after login
 ts ip -4
-ts down            # or ts logout to clear identity
+ts down            # disconnect from tailnet (keeps identity)
+ts logout           # clear node identity (full reset)
 ```
 
 Notes:
 
 - Run `~/.minions/boot.sh` after `install.sh` to start the daemon (idempotent; second boot prints "already running").
 - Login state persists in `~/.minions/var/tailscale` (survives `stop.sh`/`boot.sh`).
-- To skip Tailscale: `./install.sh --no-tailscale` (re-running bare `./install.sh` after `--no-tailscale` stays off; `--tailscale` remains as a compat alias for the default).
+- To skip Tailscale: `./install.sh --no-tailscale` (re-running bare `./install.sh` after `--no-tailscale` stays off; `--tailscale` is an explicit alias for the default).
 - macOS: managed tarball is Linux-only; use `brew install tailscale/tailscale` on macOS.
 - Security: userspace daemon without `up` has no inbound, no tailnet exposure — only the local socket and outbound HTTPS on `up`.
 

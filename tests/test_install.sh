@@ -179,5 +179,80 @@ if [ "${CI_REAL_INSTALL:-0}" -eq 1 ]; then
     fi
 fi
 
+# Test 5: Tailscale wrapper unit test (no Docker/network needed)
+echo ""
+echo "=== Test 5: Tailscale wrapper ==="
+
+# 5a. _ts_ensure_wrapper generates a wrapper that references dirname $0
+_tmp_dir=$(mktemp -d)
+mkdir -p "${_tmp_dir}/bin" "${_tmp_dir}/lib/tailscale"
+# Create dummy tailscale binary
+echo '#!/bin/sh' > "${_tmp_dir}/bin/tailscale"
+chmod +x "${_tmp_dir}/bin/tailscale"
+
+# Source lib functions (need MINIONS_HOME + versions.env)
+MINIONS_HOME="${_tmp_dir}"
+export MINIONS_HOME
+touch "${_tmp_dir}/etc/versions.env" 2>/dev/null || { mkdir -p "${_tmp_dir}/etc"; touch "${_tmp_dir}/etc/versions.env"; }
+. "${PROJECT_ROOT}/lib/tailscale.sh"
+
+_ts_ensure_wrapper "${_tmp_dir}"
+if [ -f "${_tmp_dir}/bin/ts" ] && [ -x "${_tmp_dir}/bin/ts" ]; then
+    log_info "wrapper bin/ts created and executable"
+else
+    log_error "wrapper bin/ts not created or not executable"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# 5b. Wrapper contains dirname-based binary resolution
+if grep -q 'dirname "$0"' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper uses dirname \$0 for binary resolution"
+else
+    log_error "wrapper missing dirname \$0 binary resolution"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# 5c. Wrapper contains MINIONS_HOME socket resolution
+if grep -q 'MINIONS_HOME' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper uses MINIONS_HOME for socket resolution"
+else
+    log_error "wrapper missing MINIONS_HOME socket resolution"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# 5d. Wrapper always passes --socket (no [ -S ] race)
+if grep -q -- '--socket=' "${_tmp_dir}/bin/ts" && ! grep -q '\[ -S ' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper always passes --socket (no existence check)"
+else
+    log_error "wrapper missing --socket or has existence check"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# 5e. Wrapper has binary existence check
+if grep -q 'not found at' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper validates binary exists before exec"
+else
+    log_error "wrapper missing binary existence check"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# 5f. Wrapper has $HOME/getent fallback for socket
+if grep -q 'getent passwd' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper has HOME/getent fallback for socket"
+else
+    log_error "wrapper missing HOME/getent fallback"
+    rm -rf "${_tmp_dir}"
+    exit 1
+fi
+
+# Cleanup
+rm -rf "${_tmp_dir}"
+unset MINIONS_HOME
+
 echo ""
 echo "=== All install tests passed ==="
