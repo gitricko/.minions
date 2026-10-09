@@ -190,6 +190,50 @@ else
   echo "   (skipped)"
 fi
 
+# ── 3b. Tailscale (default, skip if not installed — not a warning) ─────────
+section "Tailscale"
+
+if ! should_skip "tailscale"; then
+  _ts_bin=""
+  if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then _ts_bin="${MINIONS_HOME}/bin/tailscale"
+  elif command -v tailscale >/dev/null 2>&1; then _ts_bin="$(command -v tailscale)"
+  fi
+  _tsd_bin=""
+  if [ -x "${MINIONS_HOME}/bin/tailscaled" ]; then _tsd_bin="${MINIONS_HOME}/bin/tailscaled"
+  elif command -v tailscaled >/dev/null 2>&1; then _tsd_bin="$(command -v tailscaled)"
+  fi
+  if [ -z "${_ts_bin}" ] && [ -z "${_tsd_bin}" ]; then
+    echo "   (not installed — skip, install with: ~/.minions/install.sh  [default]  or  ~/.minions/install.sh --no-tailscale to skip)"
+    json_add "tailscale:installed" "ok" "not installed — skip" "{}"
+  else
+    # Managed socket probe (guarded, no set -e abort) — use --socket (TAILSCALE_SOCKET env not honoured by v1.104.1)
+    _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
+    _ts_cli="${_ts_bin:-tailscale}"
+    set +e
+    if [ -n "${_ts_socket}" ] && [ -S "${_ts_socket}" ]; then
+      "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
+      _ts_rc=$?
+    else
+      "${_ts_cli}" status >/dev/null 2>&1
+      _ts_rc=$?
+    fi
+    set -e
+    if [ "${_ts_rc:-1}" -eq 0 ]; then
+      _ok "Tailscale" "installed, status ok"
+      json_add "tailscale:status" "ok" "status ok" "{}"
+    elif pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+      _ok "Tailscale" "installed, daemon running (not yet logged in)"
+      json_add "tailscale:status" "ok" "daemon running" "{}"
+    else
+      _warn "Tailscale" "installed but not running — run: tailscale up"
+      json_add "tailscale:status" "warn" "not running" "{}"
+    fi
+    unset _ts_bin _tsd_bin _ts_socket _ts_cli _ts_rc
+  fi
+else
+  echo "   (skipped)"
+fi
+
 # ── 4. Ollama (mnemon embeddings) ────────────────────────────────────────
 section "Ollama"
 

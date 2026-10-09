@@ -107,6 +107,17 @@ fi
 wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 wire_pi_default_trust_always "${HOME}/.pi/agent/settings.json"
 
+# Tailscale install choice (persisted by install.sh --tailscale) — presence-gated boot.
+# Source knowledge.env if present to get TAILSCALE_MODE/TAILSCALE_SOCKET.
+if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/etc/knowledge.env"
+fi
+TAILSCALE_MODE="${TAILSCALE_MODE:-userspace}"
+TAILSCALE_STATEDIR="${MINIONS_HOME}/var/tailscale"
+TAILSCALE_SOCKET="${TAILSCALE_SOCKET:-${MINIONS_HOME}/var/run/tailscaled.sock}"
+export TAILSCALE_SOCKET
+
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
 
@@ -171,6 +182,59 @@ log_info "Pulling mnemon embedding model (nomic-embed-text)..."
 . "${LIB_DIR}/ollama.sh"
 pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
 
+# Step 3b: Tailscale (opt-in, presence-gated, non-fatal)
+# Gate ONLY on managed install (MINIONS_HOME/bin) — not system tailscale (fixes #2)
+if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+    if [ "${TAILSCALE_MODE}" = "root" ]; then
+        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet tailscaled 2>/dev/null; then
+            log_info "Tailscale: systemd tailscaled already active — deferring (root mode)"
+        elif pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+            log_info "Tailscale: tailscaled already running — skipping start (root mode)"
+        else
+            log_info "Tailscale: root mode requested but no systemd/pgrep daemon found — skipping (run: sudo tailscale up)"
+        fi
+    else
+        # Guard against existing daemon (any mode) to avoid double-start + socket collision
+        if pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+            log_info "Tailscale: tailscaled already running — skipping start"
+        else
+            log_info "Starting Tailscale (userspace, statedir=${TAILSCALE_STATEDIR}, socket=${TAILSCALE_SOCKET})..."
+            mkdir -p "${TAILSCALE_STATEDIR}" "$(dirname "${TAILSCALE_SOCKET}")"
+            # Prefer managed binary, fall back to PATH
+            if [ -x "${MINIONS_HOME}/bin/tailscaled" ]; then
+                _TS_DAEMON="${MINIONS_HOME}/bin/tailscaled"
+            else
+                _TS_DAEMON="$(command -v tailscaled 2>/dev/null || echo tailscaled)"
+            fi
+            start_service "tailscaled" "${_TS_DAEMON}" --statedir "${TAILSCALE_STATEDIR}" --socket "${TAILSCALE_SOCKET}" --tun=userspace-networking >> "${boot_log}" 2>&1 || log_warn "Failed to start tailscaled (non-fatal)"
+            # Status probe with retry — userspace sock can take 2-5s (fixes #4)
+            if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+                _TS_CLI="${MINIONS_HOME}/bin/tailscale"
+            else
+                _TS_CLI="$(command -v tailscale 2>/dev/null || echo tailscale)"
+            fi
+            _TS_STATUS=""
+            _ts_attempt=0
+            while [ "${_ts_attempt}" -lt 5 ]; do
+                _TS_STATUS="$("${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"
+                case "${_TS_STATUS}" in
+                    *"stopped"*|*"no state"*) _ts_attempt=$((_ts_attempt + 1)); sleep 1; continue ;;
+                    *) break ;;
+                esac
+            done
+            _TS_FIRST_LINE="$(printf '%s' "${_TS_STATUS}" | head -n 1)"
+            case "${_TS_STATUS}" in
+                *"Logged out."*) log_warn "Tailscale: not logged in — run: tailscale up (or: sudo tailscale up --authkey=\$TAILSCALE_AUTHKEY)" ;;
+                *"stopped"*|*"no state"*) log_info "Tailscale: daemon starting (status: ${_TS_FIRST_LINE})" ;;
+                *) log_info "Tailscale: ${_TS_FIRST_LINE}" ;;
+            esac
+            unset _TS_DAEMON _TS_CLI _TS_STATUS _TS_FIRST_LINE _ts_attempt
+        fi
+    fi
+else
+    log_info "Tailscale: not installed — skipping (install with install.sh --tailscale)"
+fi
+
 # Step 4: Configure 9Router (auto-fastest combo, disable login/API key)
 log_info "Preconfiguring 9Router..."
 # shellcheck disable=SC1091
@@ -208,6 +272,7 @@ if [ -x "${HERMES_BIN}" ]; then
         "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
         "${HERMES_BIN}" config set telemetry.shared_metrics.enabled false
         "${HERMES_BIN}" config set telemetry.shared_metrics.send false
+        "${HERMES_BIN}" config set telemetry.shared_metrics.offer_version 2
     } >> "${boot_log}" 2>&1 || {
         log_warn "Hermes config had issues (see ${boot_log})"
     }

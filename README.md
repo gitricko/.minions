@@ -20,7 +20,7 @@
 [![Ollama](https://img.shields.io/badge/Ollama-0.40.2-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.10-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
 [![Node.js](https://img.shields.io/badge/Node.js-26.11.1-brightgreen?logo=node.js)](https://nodejs.org)
-[![uv](https://img.shields.io/badge/uv-0.12.23-blue?logo=astral)](https://github.com/astral-sh/uv)
+[![uv](https://img.shields.io/badge/uv-0.13.0-blue?logo=astral)](https://github.com/astral-sh/uv)
 
 <a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">
     <img src="https://github.com/gitricko/.minions/actions/workflows/ci.yml/badge.svg" alt="Latest CI Status">
@@ -52,6 +52,7 @@
 - **Hermes** (CLI)
 - **Mnemon** (memory layer)
 - **Skills/Wikis** (Useful skills and llm-wiki)
+- **Tailscale** (default, userspace — `ts` wrapper; opt-out with `--no-tailscale`)
 
 ---
 
@@ -145,6 +146,32 @@ export NINEROUTER_PORT=7353
 ~/.minions/status.sh          # health + readiness checks
 ~/.minions/stop.sh            # stop running services
 ```
+
+---
+
+## Tailscale
+
+Installed by default (userspace, no `sudo`). The daemon starts on `boot.sh` with `--tun=userspace-networking` — no TUN device, no kernel networking. Without `up`, it is local-only: a socket at `~/.minions/var/run/tailscaled.sock` and no tailnet membership.
+
+Use the `ts` wrapper (on `PATH` via `~/.minions/bin`) — it auto-wires `--socket=$MINIONS_HOME/var/run/tailscaled.sock`. Bare `tailscale --socket=~` does not expand (`~` after `=` is literal) and `TAILSCALE_SOCKET` env is ignored by `v1.104.1`, so always use `ts` or an absolute `--socket` path with `$HOME`/`$MINIONS_HOME`.
+
+```bash
+ts status                                  # Logged out. == daemon reachable
+ts up                                      # interactive: prints URL to open in browser (hangs waiting)
+ts up --authkey=tskey-auth-XXXX            # headless (create at https://login.tailscale.com/admin/settings/keys)
+ts status                                  # tailnet + 100.x shown after login
+ts ip -4
+ts down            # disconnect from tailnet (keeps identity)
+ts logout           # clear node identity (full reset)
+```
+
+Notes:
+
+- Run `~/.minions/boot.sh` after `install.sh` to start the daemon (idempotent; second boot prints "already running").
+- Login state persists in `~/.minions/var/tailscale` (survives `stop.sh`/`boot.sh`).
+- To skip Tailscale: `./install.sh --no-tailscale` (re-running bare `./install.sh` after `--no-tailscale` stays off; `--tailscale` is an explicit alias for the default).
+- macOS: managed tarball is Linux-only; use `brew install tailscale/tailscale` on macOS.
+- Security: userspace daemon without `up` has no inbound, no tailnet exposure — only the local socket and outbound HTTPS on `up`.
 
 ---
 

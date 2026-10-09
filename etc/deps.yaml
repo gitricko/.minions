@@ -60,17 +60,17 @@ dependencies:
       macos_arm64: "0ef9b443000681bffc062ec126d53f97933ea9b086ea73dcba0480d87e639b39"
 
   - name: UV
-    version: "0.12.23"
+    version: "0.13.0"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
-      linux_arm64: "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
-      macos_x64: "960da44cb4b73685206ddd250b19e0a117fa41095710c1038f081f5cb613efb4"
-      macos_arm64: "50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544"
+      linux_x64: "1468ebd5a5541121837c5a2817b9972ba6090fa6caa3d142620850a47fb75154"
+      linux_arm64: "3ccfb6af6e242433eb552f7d9676abd5412c6595c497e990d9c8cb7b5bd4d2c3"
+      macos_x64: "5f44dcbde809b632f47c36fadb241cb4d6f9af71d0c8f172b5d2026d3dde742c"
+      macos_arm64: "a9c1b29002cf3c83f07fa9cd8a887a3be0107d90e23189721221e7257db8e3d6"
 
   - name: MNEMON
     version: "v0.2.10"
@@ -90,5 +90,18 @@ dependencies:
       linux_arm64: "92b3ef3d5e10f5849273bfa1345000f2a8ce8bc834e95061ff5b9df5d08e3c3f"
       macos_x64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
       macos_arm64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
+
+  - name: TAILSCALE
+    version: "v1.104.1"
+    source_type: release_tarball
+    repo: tailscale/tailscale
+    release_url: https://pkgs.tailscale.com/stable/
+    # sha_source none: pkgs host has no shasums manifest; shas pinned manually
+    # via verified download (see lib/tailscale.sh). bump.sh will not auto-fetch.
+    sha_source: none
+    platforms: [linux_x64, linux_arm64]
+    sha256:
+      linux_x64: "108d1d96ecf410d305571e173516f27038f870919a9b89c914a167c6d33a4528"
+      linux_arm64: "f60294374967f3dfd8cf57bbbd474d6cfce32d123e3a8ddeab82a87940daa806"
 
 

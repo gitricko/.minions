@@ -14,7 +14,7 @@ log_info() { echo "[INFO] $*"; }
 log_warn() { echo "[WARN] $*"; }
 
 # Stop in reverse order
-for service in ollama pi hermes 9router omniroute; do
+for service in tailscaled ollama pi hermes 9router omniroute; do
     if [ -f "${MINIONS_HOME}/var/run/${service}.pid" ]; then
         stop_service "${service}"
     fi
