@@ -206,12 +206,12 @@ if ! should_skip "tailscale"; then
     echo "   (not installed — skip, install with install.sh --tailscale)"
     json_add "tailscale:installed" "ok" "not installed — skip" "{}"
   else
-    # Managed socket probe (guarded, no set -e abort)
+    # Managed socket probe (guarded, no set -e abort) — use --socket (TAILSCALE_SOCKET env not honoured by v1.104.1)
     _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
     _ts_cli="${_ts_bin:-tailscale}"
     set +e
     if [ -n "${_ts_socket}" ] && [ -S "${_ts_socket}" ]; then
-      TAILSCALE_SOCKET="${_ts_socket}" "${_ts_cli}" status >/dev/null 2>&1
+      "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
       _ts_rc=$?
     else
       "${_ts_cli}" status >/dev/null 2>&1

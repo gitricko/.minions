@@ -62,7 +62,7 @@ check_tailscale() {
             return 0
         fi
     fi
-    # Fallback: pgrep or status (guarded)
+    # Fallback: pgrep or status (guarded) — use --socket for custom socket (TAILSCALE_SOCKET env is not honoured by v1.104.1)
     if command -v pgrep >/dev/null 2>&1 && pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
         echo "✅ (running)"
         return 0
@@ -70,7 +70,7 @@ check_tailscale() {
     # Try status without failing the script (set -e guard)
     set +e
     if [ -n "${_ts_socket:-}" ] && [ -S "${_ts_socket}" ]; then
-        TAILSCALE_SOCKET="${_ts_socket}" "${_ts_cli}" status >/dev/null 2>&1
+        "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
         _rc=$?
     else
         "${_ts_cli}" status >/dev/null 2>&1

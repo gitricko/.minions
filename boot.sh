@@ -216,7 +216,7 @@ if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscal
             _TS_STATUS=""
             _ts_attempt=0
             while [ "${_ts_attempt}" -lt 5 ]; do
-                _TS_STATUS="$(TAILSCALE_SOCKET="${TAILSCALE_SOCKET}" "${_TS_CLI}" status 2>&1 || true)"
+                _TS_STATUS="$("${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"
                 case "${_TS_STATUS}" in
                     *"stopped"*|*"no state"*) _ts_attempt=$((_ts_attempt + 1)); sleep 1; continue ;;
                     *) break ;;
