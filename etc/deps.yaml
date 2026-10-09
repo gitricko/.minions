@@ -60,7 +60,7 @@ dependencies:
       macos_arm64: "0ef9b443000681bffc062ec126d53f97933ea9b086ea73dcba0480d87e639b39"
 
   - name: UV
-    version: "0.12.24"
+    version: "0.13.0"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
