@@ -163,7 +163,7 @@ install_tailscale() {
     return 0
 }
 
-# Ensure Tailscale is available (opt-in)
+# Ensure Tailscale is available (default)
 # Usage: ensure_tailscale <minions_home>
 ensure_tailscale() {
     minions_home=$1
@@ -175,13 +175,14 @@ ensure_tailscale() {
         if [ -x "${minions_home}/lib/tailscale/tailscaled" ]; then
             ln -sf "${minions_home}/lib/tailscale/tailscaled" "${minions_home}/bin/tailscaled"
         fi
+        _ts_ensure_wrapper "${minions_home}"
         return 0
     fi
 
     echo "Tailscale not found, installing..."
     mkdir -p "${minions_home}/lib/tailscale"
     if ! install_tailscale "${minions_home}/lib/tailscale"; then
-        echo "WARNING: Tailscale install failed (opt-in, non-fatal)" >&2
+        echo "WARNING: Tailscale install failed (default, non-fatal)" >&2
         return 1
     fi
 
@@ -193,5 +194,21 @@ ensure_tailscale() {
     if [ -x "${minions_home}/lib/tailscale/tailscaled" ]; then
         ln -sf "${minions_home}/lib/tailscale/tailscaled" "${minions_home}/bin/tailscaled"
     fi
+    _ts_ensure_wrapper "${minions_home}"
     return 0
+}
+
+_ts_ensure_wrapper() {
+    _ts_home=$1
+    # bin/ts wrapper: auto-wires --socket via MINIONS_HOME (fixes TAILSCALE_SOCKET ignored by v1.104.1 and ~ not expanding after =).
+    # Always passes --socket; no [ -S ] race (see 6088199341).
+    cat > "${_ts_home}/bin/ts" <<'TSWRAP'
+#!/bin/sh
+# minions ts wrapper — delegates to tailscale with managed --socket when present
+# Uses MINIONS_HOME (exported in .bashrc) to resolve socket correctly in CI/ssh.
+SOCK="${MINIONS_HOME:-$HOME/.minions}/var/run/tailscaled.sock"
+exec "${MINIONS_HOME:-$HOME/.minions}/bin/tailscale" --socket="$SOCK" "$@"
+TSWRAP
+    chmod +x "${_ts_home}/bin/ts"
+    unset _ts_home
 }

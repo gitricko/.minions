@@ -190,7 +190,7 @@ else
   echo "   (skipped)"
 fi
 
-# ── 3b. Tailscale (opt-in, skip if not installed — not a warning) ─────────
+# ── 3b. Tailscale (default, skip if not installed — not a warning) ─────────
 section "Tailscale"
 
 if ! should_skip "tailscale"; then
@@ -203,7 +203,7 @@ if ! should_skip "tailscale"; then
   elif command -v tailscaled >/dev/null 2>&1; then _tsd_bin="$(command -v tailscaled)"
   fi
   if [ -z "${_ts_bin}" ] && [ -z "${_tsd_bin}" ]; then
-    echo "   (not installed — skip, install with install.sh --tailscale)"
+    echo "   (not installed — skip, install with: ./install.sh  [default]  or  ./install.sh --no-tailscale to skip)"
     json_add "tailscale:installed" "ok" "not installed — skip" "{}"
   else
     # Managed socket probe (guarded, no set -e abort) — use --socket (TAILSCALE_SOCKET env not honoured by v1.104.1)

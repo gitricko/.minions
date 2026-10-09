@@ -104,8 +104,10 @@ INSTALL_OMNIROUTE=1
 INSTALL_NINEROUTER=1
 INSTALL_PI=1
 INSTALL_OLLAMA=1
-INSTALL_TAILSCALE=0
+INSTALL_TAILSCALE=1
 TAILSCALE_MODE="userspace"
+# Tracks whether a tailscale flag was explicitly passed this run
+_TAILSCALE_FLAG=0
 
 # Port configuration (env-overridable with defaults)
 OMNIROUTE_PORT="${OMNIROUTE_PORT:-20128}"
@@ -134,20 +136,28 @@ while [ $# -gt 0 ]; do
             INSTALL_OLLAMA=0
             shift
             ;;
+        --no-tailscale)
+            INSTALL_TAILSCALE=0
+            _TAILSCALE_FLAG=1
+            shift
+            ;;
         --tailscale)
             INSTALL_TAILSCALE=1
             TAILSCALE_MODE="userspace"
+            _TAILSCALE_FLAG=1
             shift
             ;;
         --tailscale-root)
             INSTALL_TAILSCALE=1
             TAILSCALE_MODE="root"
+            _TAILSCALE_FLAG=1
             shift
             ;;
         -h|--help)
-            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama] [--tailscale] [--tailscale-root]"
+            echo "Usage: install.sh [--no-hermes] [--no-omniroute] [--no-9router] [--no-pi] [--no-ollama] [--no-tailscale] [--tailscale] [--tailscale-root]"
             echo ""
-            echo "  --tailscale       Install Tailscale (userspace, no sudo)"
+            echo "  --no-tailscale    Skip Tailscale (default: installed, userspace)"
+            echo "  --tailscale       Install Tailscale (userspace, no sudo) [default, compat alias]"
             echo "  --tailscale-root  Install Tailscale and defer to systemd (requires root)"
             echo ""
             echo "Environment variables (set before running):"
@@ -364,17 +374,25 @@ else
 fi
 
 # Persist knowledge mode for boot.sh (it may run from ${MINIONS_HOME} with no .git)
-# Merge Tailscale vars with existing file so re-running without --tailscale
-# does not erase a prior opt-in (round 2 regression #1, #2).
+# Re-run state machine (see PR #65 6088199341): explicit flag wins, bare re-run preserves previous.
+# | Prev INSTALL_TAILSCALE | Curr flag        | New INSTALL | New MODE        |
+# | 1 (default)            | (none)           | 1           | preserved (root/userspace) |
+# | 1                      | --no-tailscale   | 0           | N/A             |
+# | 0 (--no-tailscale)     | (none)           | 0           | N/A             |
+# | 0                      | --tailscale      | 1           | userspace       |
+# | 1 (root)               | (none)           | 1           | root preserved  |
+# | 1 (root)               | --no-tailscale   | 0           | N/A             |
 if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
     # shellcheck disable=SC1091
     # shellcheck disable=SC1090
     _prev_install_tailscale=$(grep '^INSTALL_TAILSCALE=' "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null | cut -d= -f2 || true)
     _prev_tailscale_mode=$(grep '^TAILSCALE_MODE=' "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null | cut -d= -f2 || true)
     _prev_tailscale_socket=$(grep '^TAILSCALE_SOCKET=' "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null | cut -d= -f2 || true)
-    if [ "${INSTALL_TAILSCALE}" = "0" ] && [ "${_prev_install_tailscale:-0}" = "1" ]; then
-        INSTALL_TAILSCALE=1
-        TAILSCALE_MODE="${_prev_tailscale_mode:-userspace}"
+    if [ "${_TAILSCALE_FLAG}" -eq 0 ] && [ -n "${_prev_install_tailscale:-}" ]; then
+        INSTALL_TAILSCALE="${_prev_install_tailscale}"
+        if [ "${INSTALL_TAILSCALE}" = "1" ] && [ -n "${_prev_tailscale_mode:-}" ]; then
+            TAILSCALE_MODE="${_prev_tailscale_mode}"
+        fi
     fi
     if [ -z "${_prev_tailscale_socket:-}" ]; then
         _prev_tailscale_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
