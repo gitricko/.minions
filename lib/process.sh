@@ -114,7 +114,8 @@ _ts_start_daemon() {
     fi
     echo "Starting tailscaled..."
     if [ "${_TS_MODE:-userspace}" = "kernel" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-        # shellcheck disable=SC2086
+        # shellcheck disable=SC2086,SC2024
+        # SC2024: redirect intentionally by user shell (log under $HOME, not root-owned) — sudo is for the daemon
         sudo -n nohup setsid "${_tsd_bin}" "$@" >>"${log_file}" 2>&1 </dev/null &
         pid=$!
         # sudo pid is the daemon's parent; give kernel time to fork

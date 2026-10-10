@@ -210,7 +210,7 @@ _ts_ensure_wrapper() {
 TS_BIN="$(dirname "$0")/tailscale"
 if [ ! -x "$TS_BIN" ]; then echo "ts: tailscale not found at $TS_BIN" >&2; exit 1; fi
 if [ -n "${MINIONS_HOME:-}" ]; then SOCK="$MINIONS_HOME/var/run/tailscaled.sock"; else _h="${HOME:-}"; [ -n "$_h" ] || _h="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)"; [ -n "$_h" ] || _h="$HOME"; SOCK="$_h/.minions/var/run/tailscaled.sock"; unset _h; fi
-if [ -S "$SOCK" ] && [ ! -w "$SOCK" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then exec sudo -n "$TS_BIN" --socket="$SOCK" "$@"; fi
+if [ ! -w "$SOCK" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then exec sudo -n "$TS_BIN" --socket="$SOCK" "$@"; fi
 exec "$TS_BIN" --socket="$SOCK" "$@"
 TSWRAP
     chmod +x "${_ts_home}/bin/ts"

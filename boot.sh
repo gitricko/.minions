@@ -270,7 +270,11 @@ TSEOF
             if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
                 if grep -q "^TAILSCALE_MODE=" "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null; then
                     _tmp_ke="${MINIONS_HOME}/etc/knowledge.env.tmp.$$"
-                    sed "s/^TAILSCALE_MODE=.*/TAILSCALE_MODE=${_TS_MODE}/" "${MINIONS_HOME}/etc/knowledge.env" > "${_tmp_ke}" && mv "${_tmp_ke}" "${MINIONS_HOME}/etc/knowledge.env" || rm -f "${_tmp_ke}"
+                    if sed "s/^TAILSCALE_MODE=.*/TAILSCALE_MODE=${_TS_MODE}/" "${MINIONS_HOME}/etc/knowledge.env" > "${_tmp_ke}"; then
+                        mv "${_tmp_ke}" "${MINIONS_HOME}/etc/knowledge.env"
+                    else
+                        rm -f "${_tmp_ke}"
+                    fi
                     unset _tmp_ke
                 fi
             fi
