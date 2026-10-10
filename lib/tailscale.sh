@@ -38,7 +38,7 @@ install_tailscale() {
         if [ -x "${install_dir}/tailscale" ]; then
             chmod +x "${install_dir}/tailscale"
             fix_macos_quarantine "${install_dir}/tailscale" 2>/dev/null || true
-            echo "Tailscale installed from DTS host cache (/tmp/tailscale-cache) — single binary"
+            echo "Tailscale installed from DTS host cache (/tmp/tailscale-cache) -- single binary"
             return 0
         fi
     fi
@@ -60,7 +60,7 @@ install_tailscale() {
     esac
 
     # pkgs.tailscale.com stable tarballs are the versioned distribution.
-    # Verified: Linux only — pkgs has no Darwin tarball for 1.104.1 (see above guard).
+    # Verified: Linux only -- pkgs has no Darwin tarball for 1.104.1 (see above guard).
     # Asset pattern: tailscale_<version>_<arch>.tgz  (e.g. tailscale_1.104.1_amd64.tgz)
     asset="tailscale_${tailscale_version}_${arch}.tgz"
     url="https://pkgs.tailscale.com/stable/${asset}"
@@ -202,13 +202,15 @@ _ts_ensure_wrapper() {
     _ts_home=$1
     # bin/ts wrapper: auto-wires --socket via MINIONS_HOME (fixes TAILSCALE_SOCKET ignored by v1.104.1 and ~ not expanding after =).
     # Always passes --socket; no [ -S ] race (see 6088199341). Binary resolved via dirname $0 so MINIONS_HOME override doesn't break it (6089149500).
+    # Auto sudo when socket is root-owned (kernel mode) -- no password prompt (ponytail: no chmod, upgrade to group ACL when multi-user).
     cat > "${_ts_home}/bin/ts" <<'TSWRAP'
 #!/bin/sh
-# minions ts wrapper — delegates to tailscale with managed --socket
+# minions ts wrapper -- delegates to tailscale with managed --socket
 # Binary fixed to wrapper dir (dirname $0); socket via MINIONS_HOME with HOME/getent fallback.
 TS_BIN="$(dirname "$0")/tailscale"
 if [ ! -x "$TS_BIN" ]; then echo "ts: tailscale not found at $TS_BIN" >&2; exit 1; fi
 if [ -n "${MINIONS_HOME:-}" ]; then SOCK="$MINIONS_HOME/var/run/tailscaled.sock"; else _h="${HOME:-}"; [ -n "$_h" ] || _h="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)"; [ -n "$_h" ] || _h="$HOME"; SOCK="$_h/.minions/var/run/tailscaled.sock"; unset _h; fi
+if [ -S "$SOCK" ] && [ ! -w "$SOCK" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then exec sudo -n "$TS_BIN" --socket="$SOCK" "$@"; fi
 exec "$TS_BIN" --socket="$SOCK" "$@"
 TSWRAP
     chmod +x "${_ts_home}/bin/ts"

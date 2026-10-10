@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# uninstall.sh — remove .minions and its HOME state (issue #61)
+# uninstall.sh -- remove .minions and its HOME state (issue #61)
 # Flags: --keep-config --dry-run --verify --force -h/--help
 set -euo pipefail
 
@@ -27,7 +27,7 @@ Usage: uninstall.sh [--keep-config] [--dry-run] [--verify] [--force] [-h|--help]
 Flag interactions:
   --dry-run alone: prints WOULD REMOVE: / WOULD KEEP: per path, changes nothing, exit 0.
   --verify alone (no deletion): scans and prints CLEAN (exit 0) or LEFT: <abs-path> per line (exit 1).
-  --dry-run --verify: valid — plans removal then verifies what would remain, without mutating.
+  --dry-run --verify: valid -- plans removal then verifies what would remain, without mutating.
   Default uninstall.sh --force --verify: deletes then verifies in one run.
 
 Without --force on non-TTY, fails with hint: use --force instead of hanging.
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Resolve MINIONS_HOME — mirrors install.sh: fixed ${HOME}/.minions, honor exported only if valid
+# Resolve MINIONS_HOME -- mirrors install.sh: fixed ${HOME}/.minions, honor exported only if valid
 DEFAULT_MINIONS_HOME="${HOME}/.minions"
 # Helper: canonicalize path (realpath -m if available, else normalize)
 _canonicalize() {
@@ -69,7 +69,7 @@ if [ -n "${MINIONS_HOME+x}" ]; then
   case "${MINIONS_HOME}" in
     ""|"/"|"$HOME"|"$HOME/") log_warn "MINIONS_HOME=${MINIONS_HOME} is unsafe, falling back to ${DEFAULT_MINIONS_HOME}"; MINIONS_HOME="$DEFAULT_MINIONS_HOME" ;;
     /*)
-      # Must be strictly under HOME — reject traversal and outside-HOME paths
+      # Must be strictly under HOME -- reject traversal and outside-HOME paths
       _canon_home=$(_canonicalize "$HOME")
       _canon_target=$(_canonicalize "$MINIONS_HOME")
       case "$_canon_target" in
@@ -218,20 +218,20 @@ if [ "$DRY_RUN" = "1" ]; then
     # Simulate verification of what would remain after the planned removal.
     # MINIONS_HOME would be gone; data dirs remain only if --keep-config; rc blocks remain if --keep-config.
     _dry_left=0
-    # DATA_DIRS would remain iff KEEP_CONFIG=1 — those are expected, not LEFT.
+    # DATA_DIRS would remain iff KEEP_CONFIG=1 -- those are expected, not LEFT.
     # So only check for leftovers that should have been removed.
     # Since dry-run never deletes, we report LEFT only if a path that WOULD be removed is missing from plan
     # i.e. no filesystem change, so we scan current state for paths that the plan would leave behind incorrectly.
     # Correct simulation: after dry-run, remaining = current state minus WOULD REMOVE set.
     # For now, since MINIONS_HOME WOULD be removed and with --keep-config data dirs are kept,
-    # the simulated remaining set is exactly do_verify with KEEP_CONFIG — which is CLEAN by definition.
+    # the simulated remaining set is exactly do_verify with KEEP_CONFIG -- which is CLEAN by definition.
     # To avoid lying, actually simulate: if a WOULD REMOVE target doesn't exist now, don't report LEFT.
     # So dry-run --verify is CLEAN iff do_verify would be CLEAN after performing WOULD REMOVE.
-    # We implement by checking if any WOULD REMOVE target currently exists but would NOT be removed — none.
+    # We implement by checking if any WOULD REMOVE target currently exists but would NOT be removed -- none.
     # Thus CLEAN is correct for a consistent plan; but if plan is inconsistent (guard skips), we must detect.
     # Check: if MINIONS_HOME is under HOME and WOULD REMOVE but is_safe_target says skip, that's LEFT.
     if [ -L "$MINIONS_HOME" ]; then
-      # Symlink at top: the real run removes the link only (rm -f) — always safe.
+      # Symlink at top: the real run removes the link only (rm -f) -- always safe.
       # Do not report LEFT (would be a false positive vs. the real deletion).
       :
     elif [ -e "$MINIONS_HOME" ]; then
@@ -244,7 +244,7 @@ if [ "$DRY_RUN" = "1" ]; then
       for d in "${DATA_DIRS[@]}"; do
         # WOULD REMOVE: if it exists but is_safe_target would skip, it would be LEFT.
         # Symlinks are exempt: safe_rm_target removes the link only (rm -f), which is
-        # always safe — mirror that here so dry-run --verify matches the real run.
+        # always safe -- mirror that here so dry-run --verify matches the real run.
         if [ -L "$d" ]; then
           continue
         fi
@@ -257,7 +257,7 @@ if [ "$DRY_RUN" = "1" ]; then
       done
       for rc in "${RC_FILES[@]}"; do
         if [ -f "$rc" ] && grep -q "# .minions - added by installer" "$rc" 2>/dev/null; then
-          # WOULD REMOVE block — check not applicable for safety
+          # WOULD REMOVE block -- check not applicable for safety
           :
         fi
       done
@@ -337,13 +337,13 @@ if [ "$FORCE" = "0" ] && [ "$DO_DELETE" = "1" ]; then
 fi
 
 # Operation order: 1) stop services, 2) data folders, 3) MINIONS_HOME last, then rc
-# 1) stop services — stdout reserved for CLEAN/LEFT, so redirect service chatter to stderr
+# 1) stop services -- stdout reserved for CLEAN/LEFT, so redirect service chatter to stderr
 if [ "$DO_DELETE" = "1" ]; then
-  # try lib/process.sh stop_service if available — guard against set -u abort inside sourced file
+  # try lib/process.sh stop_service if available -- guard against set -u abort inside sourced file
   _stop_one() {
     _svc="$1"
     if command -v stop_service >/dev/null 2>&1; then
-      # stop_service may print "not running" to stdout — redirect to stderr so verify stays pure
+      # stop_service may print "not running" to stdout -- redirect to stderr so verify stays pure
       set +e
       stop_service "$_svc" >&2 2>&1 || log_warn "stop $_svc failed or not running" >&2
       set -e
@@ -352,27 +352,29 @@ if [ "$DO_DELETE" = "1" ]; then
   if [ -f "${MINIONS_HOME}/lib/process.sh" ]; then
     # shellcheck disable=SC1090
     set +u; . "${MINIONS_HOME}/lib/process.sh" 2>/dev/null || true; set -u
-    for svc in omniroute 9router ollama; do _stop_one "$svc"; done
+    for svc in omniroute 9router ollama tailscaled; do _stop_one "$svc"; done
   elif [ -f "$(dirname -- "$0")/lib/process.sh" ]; then
     # shellcheck disable=SC1090
     set +u; . "$(dirname -- "$0")/lib/process.sh" 2>/dev/null || true; set -u
-    for svc in omniroute 9router ollama; do _stop_one "$svc"; done
+    for svc in omniroute 9router ollama tailscaled; do _stop_one "$svc"; done
   fi
   unset -f _stop_one
-  # Kill only pidfile-recorded PIDs — never blanket pkill -f ollama/omniroute/9router (Finding 3)
+  # Kill only pidfile-recorded PIDs -- never blanket pkill -f ollama/omniroute/9router (Finding 3)
   for _pidf in "${MINIONS_HOME}/var/run/"*.pid; do
     [ -f "$_pidf" ] || continue
     _pid=$(cat "$_pidf" 2>/dev/null || true)
-    if [ -n "${_pid:-}" ] && kill -0 "$_pid" 2>/dev/null; then
-      kill "$_pid" 2>/dev/null || true
-      sleep 1
-      kill -9 "$_pid" 2>/dev/null || true
+    if [ -n "${_pid:-}" ]; then
+      if kill -0 "$_pid" 2>/dev/null; then kill "$_pid" 2>/dev/null || true; sleep 1; kill -9 "$_pid" 2>/dev/null || true
+      elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "$_pid" 2>/dev/null; then sudo -n kill "$_pid" 2>/dev/null || true; sleep 1; sudo -n kill -9 "$_pid" 2>/dev/null || true
+      fi
     fi
   done
   unset _pid _pidf
-  # remove pidfiles/logs regardless
+  # remove pidfiles/logs regardless (may be root-owned in kernel mode)
   rm -f "${MINIONS_HOME}/var/run/"*.pid "${MINIONS_HOME}/var/run/ready" 2>/dev/null || true
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then sudo -n rm -f "${MINIONS_HOME}/var/run/"*.pid "${MINIONS_HOME}/var/run/ready" 2>/dev/null || true; fi
   rm -rf "${MINIONS_HOME}/var/log" 2>/dev/null || true
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then sudo -n rm -rf "${MINIONS_HOME}/var/log" 2>/dev/null || true; fi
   # give processes time to fully exit and release file handles
   sleep 1
 fi

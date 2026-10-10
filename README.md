@@ -52,7 +52,7 @@
 - **Hermes** (CLI)
 - **Mnemon** (memory layer)
 - **Skills/Wikis** (Useful skills and llm-wiki)
-- **Tailscale** (default, userspace — `ts` wrapper; opt-out with `--no-tailscale`)
+- **Tailscale** (default, userspace -- `ts` wrapper; opt-out with `--no-tailscale`)
 
 ---
 
@@ -151,9 +151,14 @@ export NINEROUTER_PORT=7353
 
 ## Tailscale
 
-Installed by default (userspace, no `sudo`). The daemon starts on `boot.sh` with `--tun=userspace-networking` — no TUN device, no kernel networking. Without `up`, it is local-only: a socket at `~/.minions/var/run/tailscaled.sock` and no tailnet membership.
+Installed by default. `boot.sh` auto-detects the best mode:
 
-Use the `ts` wrapper (on `PATH` via `~/.minions/bin`) — it auto-wires `--socket=$MINIONS_HOME/var/run/tailscaled.sock`. Bare `tailscale --socket=~` does not expand (`~` after `=` is literal) and `TAILSCALE_SOCKET` env is ignored by `v1.104.1`, so always use `ts` or an absolute `--socket` path with `$HOME`/`$MINIONS_HOME`.
+- **Kernel mode** (when `sudo -n true` and `/dev/net/tun` present -- Codespaces, VMs, bare metal): `tailscaled` runs via `sudo` with a real `tailscale0` interface and `100.64.0.0/10` route. Full mesh -- `ping 100.x`, `curl 100.x`, `ssh 100.x`, and provider `100.x` targets work directly. `ts` wrapper auto-uses `sudo` when the socket is root-owned.
+- **Userspace fallback** (no sudo/TUN -- locked-down containers, macOS): `tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1056`. No kernel interface; gVisor netstack only. `ts status`/`ts ping` (daemon RPC) work, but kernel `ping 100.x`/`curl 100.x` need the proxy.
+
+Without `up`, either mode is local-only: a socket at `~/.minions/var/run/tailscaled.sock` and no tailnet membership. Mode is re-detected every `boot.sh` run; `TAILSCALE_MODE` in `~/.minions/etc/knowledge.env` is visibility-only (re-detected, not binding).
+
+Use the `ts` wrapper (on `PATH` via `~/.minions/bin`) -- it auto-wires `--socket=$MINIONS_HOME/var/run/tailscaled.sock`. Bare `tailscale --socket=~` does not expand (`~` after `=` is literal) and `TAILSCALE_SOCKET` env is ignored by `v1.104.1`, so always use `ts` or an absolute `--socket` path with `$HOME`/`$MINIONS_HOME`.
 
 ```bash
 ts status                                  # Logged out. == daemon reachable
@@ -165,13 +170,24 @@ ts down            # disconnect from tailnet (keeps identity)
 ts logout           # clear node identity (full reset)
 ```
 
+Userspace proxy usage (only in fallback):
+
+```bash
+source ~/.minions/etc/tailscale.env   # sets ALL_PROXY=socks5://localhost:1055 + HTTP_PROXY=http://localhost:1056
+# or per-command:
+curl --proxy socks5h://localhost:1055 http://100.x:3000/
+ALL_PROXY=socks5://localhost:1055 curl http://100.x:3000/
+```
+
+If `ts ping 100.x` works but `ping 100.x`/`curl 100.x` fails, you are in userspace. Fix: ensure `sudo -n true` works and `/dev/net/tun` exists, then re-run `boot.sh` (it will switch to kernel on next boot).
+
 Notes:
 
 - Run `~/.minions/boot.sh` after `install.sh` to start the daemon (idempotent; second boot prints "already running").
 - Login state persists in `~/.minions/var/tailscale` (survives `stop.sh`/`boot.sh`).
 - To skip Tailscale: `./install.sh --no-tailscale` (re-running bare `./install.sh` after `--no-tailscale` stays off; `--tailscale` is an explicit alias for the default).
 - macOS: managed tarball is Linux-only; use `brew install tailscale/tailscale` on macOS.
-- Security: userspace daemon without `up` has no inbound, no tailnet exposure — only the local socket and outbound HTTPS on `up`.
+- Security: userspace daemon without `up` has no inbound, no tailnet exposure -- only the local socket and outbound HTTPS on `up`. Kernel daemon runs as root via `sudo -n` with no password prompt.
 
 ---
 
@@ -196,9 +212,9 @@ Notes:
 
 ## Docs worth reading
 
-- [`docs/scout-report-minions-v1.md`](docs/scout-report-minions-v1.md) — full implementation narrative and decisions
-- [`docs/IMPLEMENTATION-STATUS.md`](docs/IMPLEMENTATION-STATUS.md) — latest status and verification notes
-- [`docs/requirements-research.md`](docs/requirements-research.md) — requirements and early research context
+- [`docs/scout-report-minions-v1.md`](docs/scout-report-minions-v1.md) -- full implementation narrative and decisions
+- [`docs/IMPLEMENTATION-STATUS.md`](docs/IMPLEMENTATION-STATUS.md) -- latest status and verification notes
+- [`docs/requirements-research.md`](docs/requirements-research.md) -- requirements and early research context
 
 ---
 

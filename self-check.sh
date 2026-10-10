@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# self-check.sh — .minions boot-time health diagnostics
+# self-check.sh -- .minions boot-time health diagnostics
 # Ported from hermes-codespace, adapted for .minions.
 #
 # Probes all components of the .minions stack and produces a
 # human-readable health report + machine-parseable JSON summary.
 #
 # Flags:
-#   --ci  — skip service port probes (no services in CI), only validate
+#   --ci  -- skip service port probes (no services in CI), only validate
 #            file/symlink/config existence.
 #
 # Exit codes:
-#   0  — all checks passed (or only warnings)
-#   1  — one or more warnings (disk, cron, missing optional)
-#   2  — one or more critical failures (missing required files, broken symlinks)
+#   0  -- all checks passed (or only warnings)
+#   1  -- one or more warnings (disk, cron, missing optional)
+#   2  -- one or more critical failures (missing required files, broken symlinks)
 
 set -euo pipefail
 
@@ -93,7 +93,7 @@ echo ""
 echo " ════════════════════════════════════════════════════════════"
 echo "  ${BOLD}.MINIONS HEALTH REPORT${NC}"
 echo "  $(date -u)"
-[ "$CI_MODE" = "true" ] && echo "  ${YELLOW}CI MODE — service ports skipped${NC}"
+[ "$CI_MODE" = "true" ] && echo "  ${YELLOW}CI MODE -- service ports skipped${NC}"
 echo " ════════════════════════════════════════════════════════════"
 
 # ── 1. Services ──────────────────────────────────────────────────────────────
@@ -119,15 +119,15 @@ if ! should_skip "services" && [ "$CI_MODE" = "false" ]; then
     done
 
     if [ "$RESPONDED" = "true" ]; then
-      _ok "$NAME" ":$PORT — HTTP ${HTTP_CODE}"
+      _ok "$NAME" ":$PORT -- HTTP ${HTTP_CODE}"
       json_add "service:${NAME}" "ok" "HTTP ${HTTP_CODE}" "{\"port\":${PORT},\"http_code\":${HTTP_CODE}}"
     else
-      _fail "$NAME" ":$PORT — no response"
+      _fail "$NAME" ":$PORT -- no response"
       json_add "service:${NAME}" "fail" "no response" "{\"port\":${PORT}}"
     fi
   done
 elif [ "$CI_MODE" = "true" ]; then
-  echo "   (skipped — CI mode)"
+  echo "   (skipped -- CI mode)"
 else
   echo "   (skipped)"
 fi
@@ -147,7 +147,7 @@ if ! should_skip "models" && [ "$CI_MODE" = "false" ]; then
     json_add "models" "warn" "no models" "{\"count\":0}"
   fi
 elif [ "$CI_MODE" = "true" ]; then
-  echo "   (skipped — CI mode)"
+  echo "   (skipped -- CI mode)"
 else
   echo "   (skipped)"
 fi
@@ -190,7 +190,7 @@ else
   echo "   (skipped)"
 fi
 
-# ── 3b. Tailscale (default, skip if not installed — not a warning) ─────────
+# ── 3b. Tailscale (default, skip if not installed -- not a warning) ─────────
 section "Tailscale"
 
 if ! should_skip "tailscale"; then
@@ -203,32 +203,42 @@ if ! should_skip "tailscale"; then
   elif command -v tailscaled >/dev/null 2>&1; then _tsd_bin="$(command -v tailscaled)"
   fi
   if [ -z "${_ts_bin}" ] && [ -z "${_tsd_bin}" ]; then
-    echo "   (not installed — skip, install with: ~/.minions/install.sh  [default]  or  ~/.minions/install.sh --no-tailscale to skip)"
-    json_add "tailscale:installed" "ok" "not installed — skip" "{}"
+    echo "   (not installed -- skip, install with: ~/.minions/install.sh  [default]  or  ~/.minions/install.sh --no-tailscale to skip)"
+    json_add "tailscale:installed" "ok" "not installed -- skip" "{}"
   else
-    # Managed socket probe (guarded, no set -e abort) — use --socket (TAILSCALE_SOCKET env not honoured by v1.104.1)
+    # Managed socket probe (guarded, no set -e abort) -- use --socket (TAILSCALE_SOCKET env not honoured by v1.104.1)
     _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
     _ts_cli="${_ts_bin:-tailscale}"
+    _ts_mode="userspace"
+    if [ -S "${_ts_socket}" ] && [ ! -w "${_ts_socket}" ]; then _ts_mode="kernel"; elif [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then _ts_mode="userspace"; fi
     set +e
     if [ -n "${_ts_socket}" ] && [ -S "${_ts_socket}" ]; then
-      "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
-      _ts_rc=$?
+      if [ ! -w "${_ts_socket}" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        _ts_out="$(sudo -n "${_ts_cli}" --socket="${_ts_socket}" status 2>&1 || true)"
+        _ts_rc=$?; case "${_ts_out}" in *"Logged out."*) _ts_rc=0 ;; esac
+      else
+        "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
+        _ts_rc=$?
+      fi
     else
       "${_ts_cli}" status >/dev/null 2>&1
       _ts_rc=$?
     fi
     set -e
     if [ "${_ts_rc:-1}" -eq 0 ]; then
-      _ok "Tailscale" "installed, status ok"
-      json_add "tailscale:status" "ok" "status ok" "{}"
+      if [ "${_ts_mode}" = "kernel" ]; then _ok "Tailscale" "installed, status ok (kernel)"; json_add "tailscale:status" "ok" "status ok (kernel)" "{}"
+      else
+        if [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then _ok "Tailscale" "installed, status ok (userspace -- proxy :1056)"; json_add "tailscale:status" "ok" "status ok (userspace -- proxy :1056)" "{}"
+        else _ok "Tailscale" "installed, status ok"; json_add "tailscale:status" "ok" "status ok" "{}"; fi
+      fi
     elif pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
-      _ok "Tailscale" "installed, daemon running (not yet logged in)"
-      json_add "tailscale:status" "ok" "daemon running" "{}"
+      if [ "${_ts_mode}" = "kernel" ]; then _ok "Tailscale" "installed, daemon running (kernel, not yet logged in)"; json_add "tailscale:status" "ok" "daemon running (kernel)" "{}"
+      else _ok "Tailscale" "installed, daemon running (not yet logged in)"; json_add "tailscale:status" "ok" "daemon running" "{}"; fi
     else
-      _warn "Tailscale" "installed but not running — run: tailscale up"
+      _warn "Tailscale" "installed but not running -- run: ts up"
       json_add "tailscale:status" "warn" "not running" "{}"
     fi
-    unset _ts_bin _tsd_bin _ts_socket _ts_cli _ts_rc
+    unset _ts_bin _tsd_bin _ts_socket _ts_cli _ts_rc _ts_out _ts_mode
   fi
 else
   echo "   (skipped)"
@@ -257,7 +267,7 @@ if ! should_skip "ollama"; then
     json_add "ollama:api" "fail" "no response from :11434" "{}"
   fi
 
-  # 3. Model listed — retry up to 15s (server may still be scanning models)
+  # 3. Model listed -- retry up to 15s (server may still be scanning models)
   MODEL_LISTED=0
   for _attempt in 1 2 3 4 5; do
     MODEL_LISTED=$(ollama list 2>/dev/null | grep -c "nomic-embed-text" || true)
@@ -280,7 +290,7 @@ if ! should_skip "ollama"; then
     fi
   fi
 
-  # 4. Embedding generation — retry after model check (model may have loaded during retries above)
+  # 4. Embedding generation -- retry after model check (model may have loaded during retries above)
   EMBED_RESULT=""
   for _attempt in 1 2 3; do
     EMBED_RESULT=$(curl -s --max-time 30 -X POST http://localhost:11434/api/embed \
@@ -361,10 +371,10 @@ if ! should_skip "disk"; then
     fi
 
     if [ "$disk_pct" -ge 95 ] 2>/dev/null; then
-      _fail "Usage" "${disk_pct}% used (${disk_avail_gb}G free) — CRITICAL"
+      _fail "Usage" "${disk_pct}% used (${disk_avail_gb}G free) -- CRITICAL"
       json_add "disk" "fail" "${disk_pct}% used" "{\"used_pct\":${disk_pct},\"available_gb\":${disk_avail_gb}}"
     elif [ "$disk_pct" -ge "$DISK_WARN_PCT" ] 2>/dev/null; then
-      _warn "Usage" "${disk_pct}% used (${disk_avail_gb}G free) — threshold: ${DISK_WARN_PCT}%"
+      _warn "Usage" "${disk_pct}% used (${disk_avail_gb}G free) -- threshold: ${DISK_WARN_PCT}%"
       json_add "disk" "warn" "${disk_pct}% used" "{\"used_pct\":${disk_pct},\"available_gb\":${disk_avail_gb}}"
     else
       _ok "Usage" "${disk_pct}% used (${disk_avail_gb}G free)"
@@ -491,13 +501,13 @@ fi
 section "Summary"
 echo ""
 if [ "$CRITICAL" -gt 0 ]; then
-  echo "  ${RED}${BOLD}FAILED${NC} — ${CRITICAL} critical, ${WARNINGS} warning(s)"
+  echo "  ${RED}${BOLD}FAILED${NC} -- ${CRITICAL} critical, ${WARNINGS} warning(s)"
   EXIT_CODE=2
 elif [ "$WARNINGS" -gt 0 ]; then
-  echo "  ${YELLOW}${BOLD}WARNINGS${NC} — ${WARNINGS} warning(s), 0 critical"
+  echo "  ${YELLOW}${BOLD}WARNINGS${NC} -- ${WARNINGS} warning(s), 0 critical"
   EXIT_CODE=1
 else
-  echo "  ${GREEN}${BOLD}PASSED${NC} — all checks ok"
+  echo "  ${GREEN}${BOLD}PASSED${NC} -- all checks ok"
   EXIT_CODE=0
 fi
 echo ""
