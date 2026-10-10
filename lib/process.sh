@@ -127,8 +127,10 @@ _ts_start_daemon() {
             [ -n "${pid:-}" ] || pid=$(pgrep -f "[t]ailscaled" 2>/dev/null | head -1)
         fi
         if [ -n "${pid:-}" ]; then
-            # pidfile will be root-owned; use sudo to write if needed
-            if ! echo "${pid}" > "${pid_file}" 2>/dev/null; then sudo -n sh -c "echo ${pid} > ${pid_file}" 2>/dev/null || echo "${pid}" > "${pid_file}" 2>/dev/null || true; fi
+            # pidfile will be root-owned; use sudo to write if needed (6102925874 #4)
+            if ! echo "${pid}" > "${pid_file}" 2>/dev/null; then
+                sudo -n sh -c "echo ${pid} > ${pid_file}" 2>/dev/null || echo "${pid}" > "${pid_file}" 2>/dev/null || true
+            fi
         fi
     else
         nohup setsid "${_tsd_bin}" "$@" >>"${log_file}" 2>&1 </dev/null &

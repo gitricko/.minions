@@ -54,9 +54,11 @@ check_tailscale() {
         echo "-- not installed (install with install.sh --tailscale)"
         return 0
     fi
-    # Detect mode from socket ownership / proxy env
+    # Detect mode from socket ownership (kernel socket is root:root, world-writable srw-rw-rw- -- ownership not writability, 6102925874 #3)
     _ts_mode="userspace"
-    if [ -S "${_ts_socket}" ] && [ ! -w "${_ts_socket}" ]; then _ts_mode="kernel"; fi
+    _ts_sock_uid=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+    if [ -S "${_ts_socket}" ] && [ -n "${_ts_sock_uid:-}" ] && [ "${_ts_sock_uid}" != "$(id -u)" ]; then _ts_mode="kernel"; fi
+    unset _ts_sock_uid
     # If pidfile exists and live, prefer it; else fall back to status probe (avoids EPERM lie for root daemon)
     if [ -f "${MINIONS_HOME}/var/run/tailscaled.pid" ]; then
         _ts_pid=$(cat "${MINIONS_HOME}/var/run/tailscaled.pid" 2>/dev/null || true)
@@ -80,7 +82,8 @@ check_tailscale() {
     set +e
     _ts_status_out=""
     if [ -n "${_ts_socket:-}" ] && [ -S "${_ts_socket}" ]; then
-        if [ ! -w "${_ts_socket}" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        _ts_sock_uid=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+        if [ -n "${_ts_sock_uid:-}" ] && [ "${_ts_sock_uid}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
             _ts_status_out="$(sudo -n "${_ts_cli}" --socket="${_ts_socket}" status 2>&1 || true)"
             _rc=$?
             # sudo status returns non-zero when logged out but output contains "Logged out."

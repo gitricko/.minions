@@ -248,8 +248,16 @@ TSEOF
             fi
             _TS_STATUS=""
             _ts_attempt=0
+            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null)
+            # Root-owned socket (kernel mode) is world-writable (srw-rw-rw- root:root) -- ownership, not writability (6102925874 #2)
+            if [ -S "${TAILSCALE_SOCKET}" ] && [ -n "${_TS_SOCK_UID:-}" ] && [ "${_TS_SOCK_UID}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+                _TS_SUDO_STATUS=1
+            else
+                _TS_SUDO_STATUS=0
+            fi
+            unset _TS_SOCK_UID
             while [ "${_ts_attempt}" -lt 5 ]; do
-                if [ -S "${TAILSCALE_SOCKET}" ] && [ ! -w "${TAILSCALE_SOCKET}" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+                if [ "${_TS_SUDO_STATUS}" = "1" ]; then
                     _TS_STATUS="$(sudo -n "${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"
                 else
                     _TS_STATUS="$("${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"

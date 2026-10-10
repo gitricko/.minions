@@ -210,10 +210,13 @@ if ! should_skip "tailscale"; then
     _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
     _ts_cli="${_ts_bin:-tailscale}"
     _ts_mode="userspace"
-    if [ -S "${_ts_socket}" ] && [ ! -w "${_ts_socket}" ]; then _ts_mode="kernel"; elif [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then _ts_mode="userspace"; fi
+    _ts_sock_uid=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+    if [ -S "${_ts_socket}" ] && [ -n "${_ts_sock_uid:-}" ] && [ "${_ts_sock_uid}" != "$(id -u)" ]; then _ts_mode="kernel"; elif [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then _ts_mode="userspace"; fi
+    unset _ts_sock_uid
     set +e
     if [ -n "${_ts_socket}" ] && [ -S "${_ts_socket}" ]; then
-      if [ ! -w "${_ts_socket}" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+      _ts_sock_uid2=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+      if [ -n "${_ts_sock_uid2:-}" ] && [ "${_ts_sock_uid2}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
         _ts_out="$(sudo -n "${_ts_cli}" --socket="${_ts_socket}" status 2>&1 || true)"
         _ts_rc=$?; case "${_ts_out}" in *"Logged out."*) _ts_rc=0 ;; esac
       else
@@ -239,6 +242,7 @@ if ! should_skip "tailscale"; then
       json_add "tailscale:status" "warn" "not running" "{}"
     fi
     unset _ts_bin _tsd_bin _ts_socket _ts_cli _ts_rc _ts_out _ts_mode
+    unset _ts_sock_uid _ts_sock_uid2
   fi
 else
   echo "   (skipped)"

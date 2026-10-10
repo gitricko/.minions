@@ -223,11 +223,12 @@ else
     exit 1
 fi
 
-# 5d. Wrapper always passes --socket (no [ -S ] race)
-if grep -q -- '--socket=' "${_tmp_dir}/bin/ts" && ! grep -q '\[ -S ' "${_tmp_dir}/bin/ts"; then
-    log_info "wrapper always passes --socket (no existence check)"
+# 5d. Wrapper always passes --socket; sudo detection uses ownership (stat), not writability [ ! -w ]
+# (6102925874: root daemon socket is srw-rw-rw- world-writable -- writability test is wrong)
+if grep -q -- '--socket=' "${_tmp_dir}/bin/ts" && ! grep -q '\[ ! -w' "${_tmp_dir}/bin/ts"; then
+    log_info "wrapper always passes --socket; sudo detection uses ownership not writability"
 else
-    log_error "wrapper missing --socket or has existence check"
+    log_error "wrapper missing --socket or uses writability [ ! -w ] check"
     rm -rf "${_tmp_dir}"
     exit 1
 fi
