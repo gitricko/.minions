@@ -5,7 +5,6 @@
 #
 # Exit codes: 0 = pass, 1 = failure(s) found
 set -euo pipefail
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FAILURES=0
 
 pass() { echo "  OK: $1"; }

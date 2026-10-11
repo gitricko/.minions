@@ -15,10 +15,6 @@
 # Remove set -u to avoid unbound variable issues, or handle it carefully
 set -u
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DPS_YAML="${REPO_ROOT}/etc/deps.yaml"
-VERSIONS_ENV="${REPO_ROOT}/etc/versions.env"
-
 # Helper: parse check-updates.sh --json output and return name=value pairs
 parse_outdated() {
     local json_file="$1"
