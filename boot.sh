@@ -77,7 +77,7 @@ detect_knowledge_mode
 setup_knowledge_symlinks "${MINIONS_HOME}" "${MINIONS_REPO_ROOT:-}" "${MODE}"
 
 # Hermes user-skills link: ~/.hermes/skills/minions -> repo skills (dev) or
-# ~/.minions/skills (standalone) — so Hermes discovers the .minions skills.
+# ~/.minions/skills (standalone) -- so Hermes discovers the .minions skills.
 if [ "${MODE}" = "dev" ]; then
     _HERMES_SKILL_TARGET="${MINIONS_REPO_ROOT}/skills"
 else
@@ -86,7 +86,7 @@ fi
 setup_hermes_skill_link "${HOME}/.hermes" "${_HERMES_SKILL_TARGET}"
 
 # Hermes memories link: ~/.hermes/memories -> repo memories (dev) or
-# ~/.minions/memories (standalone) — so MEMORY.md/USER.md are git-tracked.
+# ~/.minions/memories (standalone) -- so MEMORY.md/USER.md are git-tracked.
 if [ "${MODE}" = "dev" ]; then
     _HERMES_MEM_TARGET="${MINIONS_REPO_ROOT}/memories"
 else
@@ -94,7 +94,7 @@ else
 fi
 setup_hermes_memories_link "${HOME}/.hermes" "${_HERMES_MEM_TARGET}"
 
-# Phase 24: Pi shared-skills wiring — re-assert the SAME skills/ Path on every
+# Phase 24: Pi shared-skills wiring -- re-assert the SAME skills/ Path on every
 # boot (idempotent; survives reinstall/drift). dev -> repo skills; standalone
 # -> ~/.minions/skills.
 # shellcheck disable=SC1091
@@ -106,6 +106,17 @@ else
 fi
 wire_pi_skills_path "${HOME}/.pi/agent/settings.json" "${_PI_SKILLS_PATH}"
 wire_pi_default_trust_always "${HOME}/.pi/agent/settings.json"
+
+# Tailscale install choice (persisted by install.sh --tailscale) -- presence-gated boot.
+# Source knowledge.env if present to get TAILSCALE_MODE/TAILSCALE_SOCKET.
+if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
+    # shellcheck disable=SC1091
+    . "${MINIONS_HOME}/etc/knowledge.env"
+fi
+TAILSCALE_MODE="${TAILSCALE_MODE:-userspace}"
+TAILSCALE_STATEDIR="${MINIONS_HOME}/var/tailscale"
+TAILSCALE_SOCKET="${TAILSCALE_SOCKET:-${MINIONS_HOME}/var/run/tailscaled.sock}"
+export TAILSCALE_SOCKET
 
 # Ensure directories exist
 mkdir -p "${MINIONS_HOME}/var/run" "${MINIONS_HOME}/var/log"
@@ -142,7 +153,7 @@ wait_for_port "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 300 "omniroute"
 # Step 2: 9Router
 log_info "Starting 9Router (${NINEROUTER_HOST}:${NINEROUTER_PORT})..."
 # 9Router 0.5.81 CLI: -H/--host, -p/--port, -n/--no-browser, --skip-update.
-# --no-browser + --skip-update are required in headless/CI environments —
+# --no-browser + --skip-update are required in headless/CI environments --
 # otherwise it tries to open a browser and runs an auto-update check that can
 # stall startup. Default port is 20128, so --port is mandatory here.
 start_service "9router" \
@@ -171,6 +182,118 @@ log_info "Pulling mnemon embedding model (nomic-embed-text)..."
 . "${LIB_DIR}/ollama.sh"
 pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
 
+# Step 3b: Tailscale (opt-in, presence-gated, non-fatal)
+# Gate ONLY on managed install (MINIONS_HOME/bin) -- not system tailscale (fixes #2)
+# Auto-detect kernel TUN when host allows it (sudo + /dev/net/tun) else fallback to userspace+proxy.
+_ts_can_use_kernel_tun() {
+    [ -c /dev/net/tun ] || return 1
+    command -v sudo >/dev/null 2>&1 || return 1
+    sudo -n true 2>/dev/null || return 1
+    if command -v ip >/dev/null 2>&1; then
+        sudo -n ip tuntap add dev tsprobe0 mode tun 2>/dev/null || return 1
+        sudo -n ip tuntap del dev tsprobe0 mode tun 2>/dev/null || true
+    fi
+    return 0
+}
+if [ -x "${MINIONS_HOME}/bin/tailscaled" ] || [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+    if [ "${TAILSCALE_MODE}" = "root" ]; then
+        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet tailscaled 2>/dev/null; then
+            log_info "Tailscale: systemd tailscaled already active -- deferring (root mode)"
+        elif pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+            log_info "Tailscale: tailscaled already running -- skipping start (root mode)"
+        else
+            log_info "Tailscale: root mode requested but no systemd/pgrep daemon found -- skipping (run: sudo tailscale up)"
+        fi
+    else
+        # Guard against existing daemon (any mode) to avoid double-start + socket collision
+        if pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+            log_info "Tailscale: tailscaled already running -- skipping start"
+        else
+            if _ts_can_use_kernel_tun; then _TS_MODE="kernel"; else _TS_MODE="userspace"; fi
+            mkdir -p "${TAILSCALE_STATEDIR}" "$(dirname "${TAILSCALE_SOCKET}")"
+            # Prefer managed binary, fall back to PATH
+            if [ -x "${MINIONS_HOME}/bin/tailscaled" ]; then
+                _TS_DAEMON="${MINIONS_HOME}/bin/tailscaled"
+            else
+                _TS_DAEMON="$(command -v tailscaled 2>/dev/null || echo tailscaled)"
+            fi
+            if [ "${_TS_MODE}" = "kernel" ]; then
+                log_info "Starting Tailscale (kernel, statedir=${TAILSCALE_STATEDIR}, socket=${TAILSCALE_SOCKET})..."
+                _ts_start_daemon "${_TS_DAEMON}" --statedir "${TAILSCALE_STATEDIR}" --socket "${TAILSCALE_SOCKET}" >> "${boot_log}" 2>&1 || log_warn "Failed to start tailscaled (non-fatal)"
+            else
+                log_info "Starting Tailscale (userspace, statedir=${TAILSCALE_STATEDIR}, socket=${TAILSCALE_SOCKET})..."
+                start_service "tailscaled" "${_TS_DAEMON}" --statedir "${TAILSCALE_STATEDIR}" --socket "${TAILSCALE_SOCKET}" --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1056 >> "${boot_log}" 2>&1 || log_warn "Failed to start tailscaled (non-fatal)"
+                # Persist proxy env for user shells (boot env dies with process)
+                mkdir -p "${MINIONS_HOME}/etc"
+                cat > "${MINIONS_HOME}/etc/tailscale.env" <<TSEOF
+# Generated by boot.sh (userspace mode) -- source this in your shell for outbound tailnet
+export ALL_PROXY=socks5://localhost:1055
+export HTTP_PROXY=http://localhost:1056
+export HTTPS_PROXY=http://localhost:1056
+export http_proxy=http://localhost:1056
+export https_proxy=http://localhost:1056
+TSEOF
+                log_warn "Tailscale: userspace fallback -- outbound tailnet needs proxy: source ${MINIONS_HOME}/etc/tailscale.env (or ALL_PROXY=socks5://localhost:1055); inbound kernel daemons not reachable (use tailscale serve/ssh)"
+                echo "Tailscale userspace -- proxy :1056 -- kernel daemons not reachable" >> "${boot_log}" 2>&1
+            fi
+            if [ "${_TS_MODE}" = "kernel" ]; then
+                # remove stale userspace proxy env if we switched to kernel
+                rm -f "${MINIONS_HOME}/etc/tailscale.env" 2>/dev/null || true
+            fi
+            # Status probe with retry -- userspace sock can take 2-5s (fixes #4); kernel socket may be root-owned
+            if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+                _TS_CLI="${MINIONS_HOME}/bin/tailscale"
+            else
+                _TS_CLI="$(command -v tailscale 2>/dev/null || echo tailscale)"
+            fi
+            _TS_STATUS=""
+            _ts_attempt=0
+            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null)
+            # Root-owned socket (kernel mode) is world-writable (srw-rw-rw- root:root) -- ownership, not writability (6102925874 #2)
+            if [ -S "${TAILSCALE_SOCKET}" ] && [ -n "${_TS_SOCK_UID:-}" ] && [ "${_TS_SOCK_UID}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+                _TS_SUDO_STATUS=1
+            else
+                _TS_SUDO_STATUS=0
+            fi
+            unset _TS_SOCK_UID
+            while [ "${_ts_attempt}" -lt 5 ]; do
+                if [ "${_TS_SUDO_STATUS}" = "1" ]; then
+                    _TS_STATUS="$(sudo -n "${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"
+                else
+                    _TS_STATUS="$("${_TS_CLI}" --socket="${TAILSCALE_SOCKET}" status 2>&1 || true)"
+                fi
+                case "${_TS_STATUS}" in
+                    *"stopped"*|*"no state"*) _ts_attempt=$((_ts_attempt + 1)); sleep 1; continue ;;
+                    *) break ;;
+                esac
+            done
+            _TS_FIRST_LINE="$(printf '%s' "${_TS_STATUS}" | head -n 1)"
+            case "${_TS_STATUS}" in
+                *"Logged out."*) log_warn "Tailscale: not logged in -- run: ts up (or: ts up --authkey=\$TAILSCALE_AUTHKEY) [mode=${_TS_MODE}]" ;;
+                *"stopped"*|*"no state"*) log_info "Tailscale: daemon starting (status: ${_TS_FIRST_LINE}) [mode=${_TS_MODE}]" ;;
+                *) log_info "Tailscale: ${_TS_FIRST_LINE} [mode=${_TS_MODE}]" ;;
+            esac
+            unset _TS_DAEMON _TS_CLI _TS_STATUS _TS_FIRST_LINE _ts_attempt
+            # Persist mode for visibility (re-detected every boot)
+            if [ -f "${MINIONS_HOME}/etc/knowledge.env" ]; then
+                if grep -q "^TAILSCALE_MODE=" "${MINIONS_HOME}/etc/knowledge.env" 2>/dev/null; then
+                    _tmp_ke="${MINIONS_HOME}/etc/knowledge.env.tmp.$$"
+                    if sed "s/^TAILSCALE_MODE=.*/TAILSCALE_MODE=${_TS_MODE}/" "${MINIONS_HOME}/etc/knowledge.env" > "${_tmp_ke}"; then
+                        mv "${_tmp_ke}" "${MINIONS_HOME}/etc/knowledge.env"
+                    else
+                        rm -f "${_tmp_ke}"
+                    fi
+                    unset _tmp_ke
+                fi
+            fi
+            unset _TS_MODE
+        fi
+    fi
+else
+    log_info "Tailscale: not installed -- skipping (install with install.sh --tailscale)"
+fi
+unset -f _ts_can_use_kernel_tun 2>/dev/null || true
+
 # Step 4: Configure 9Router (auto-fastest combo, disable login/API key)
 log_info "Preconfiguring 9Router..."
 # shellcheck disable=SC1091
@@ -195,7 +318,7 @@ else
     log_warn "OmniRoute preconfig had issues (see ${boot_log})"
 fi
 
-# Step 6: Configure Hermes CLI (model, providers, fallback) — matches hermes-codespace post-create
+# Step 6: Configure Hermes CLI (model, providers, fallback) -- matches hermes-codespace post-create
 log_info "Configuring Hermes..."
 HERMES_BIN="${MINIONS_HOME}/bin/hermes"
 if [ -x "${HERMES_BIN}" ]; then
@@ -208,6 +331,7 @@ if [ -x "${HERMES_BIN}" ]; then
         "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
         "${HERMES_BIN}" config set telemetry.shared_metrics.enabled false
         "${HERMES_BIN}" config set telemetry.shared_metrics.send false
+        "${HERMES_BIN}" config set telemetry.shared_metrics.offer_version 2
     } >> "${boot_log}" 2>&1 || {
         log_warn "Hermes config had issues (see ${boot_log})"
     }

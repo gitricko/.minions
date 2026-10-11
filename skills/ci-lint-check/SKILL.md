@@ -115,7 +115,7 @@ This guarantees identical validation in both environments. Never duplicate valid
 - **Mnemon seed validation** requires the validator script to exist
 - **Symlink check** validates boot script logic, not actual runtime symlinks
 - **MD034 / no-bare-urls** — version-like strings (`omniroute@3.8.x`) and bare URLs both trigger `MD034/no-bare-urls Bare URL used`. Wrap versions in backticks (`` `omniroute@3.8.x` ``) and real URLs in `<...>`; `ci_lint_check.sh` LINTCONF now sets `"MD034": false` — keep local config in sync with CI or Lint fails on CI despite passing locally.
-- **MD056 / table column count** — `||` inside a markdown table cell splits the row into an extra column (`Expected 3 Actual 4`). Replace `||` with `or` inside tables.
+- **MD056 / table column count** — unescaped `|` inside a markdown table cell splits the row (`Expected: 3; Actual: 5`). Escape every `|` as `\|` so `||` becomes `\|\|` and the 3-col table stays at 4 pipes. Run `bash skills/ci-lint-check/scripts/ci_lint_check.sh --markdown-only` before pushing any `SKILL.md` edit — catches MD056/MD013 without a CI round-trip.
 
 ## Integration with Git Hooks (Optional)
 

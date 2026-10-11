@@ -40,6 +40,73 @@ check_pid() {
     return 1
 }
 
+# Tailscale is opt-in -- presence-gated, guarded against set -e (tailscale status returns non-zero when logged out)
+check_tailscale() {
+    # Prefer managed socket if present
+    _ts_socket="${MINIONS_HOME}/var/run/tailscaled.sock"
+    _ts_cli=""
+    if [ -x "${MINIONS_HOME}/bin/tailscale" ]; then
+        _ts_cli="${MINIONS_HOME}/bin/tailscale"
+    elif command -v tailscale >/dev/null 2>&1; then
+        _ts_cli="$(command -v tailscale)"
+    fi
+    if [ -z "${_ts_cli}" ]; then
+        echo "-- not installed (install with install.sh --tailscale)"
+        return 0
+    fi
+    # Detect mode from socket ownership (kernel socket is root:root, world-writable srw-rw-rw- -- ownership not writability, 6102925874 #3)
+    _ts_mode="userspace"
+    _ts_sock_uid=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+    if [ -S "${_ts_socket}" ] && [ -n "${_ts_sock_uid:-}" ] && [ "${_ts_sock_uid}" != "$(id -u)" ]; then _ts_mode="kernel"; fi
+    unset _ts_sock_uid
+    # If pidfile exists and live, prefer it; else fall back to status probe (avoids EPERM lie for root daemon)
+    if [ -f "${MINIONS_HOME}/var/run/tailscaled.pid" ]; then
+        _ts_pid=$(cat "${MINIONS_HOME}/var/run/tailscaled.pid" 2>/dev/null || true)
+        if [ -n "${_ts_pid:-}" ] && kill -0 "${_ts_pid}" 2>/dev/null; then
+            if [ "${_ts_mode}" = "kernel" ]; then echo "✅ (kernel, pid ${_ts_pid})"; else
+                if [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then echo "✅ (userspace, pid ${_ts_pid} -- proxy :1056 -- kernel daemons not reachable)"; else echo "✅ (pid ${_ts_pid})"; fi
+            fi
+            return 0
+        fi
+        if [ -n "${_ts_pid:-}" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "${_ts_pid}" 2>/dev/null; then
+            echo "✅ (kernel, pid ${_ts_pid})"
+            return 0
+        fi
+    fi
+    # Fallback: pgrep or status (guarded) -- use --socket for custom socket (TAILSCALE_SOCKET env is not honoured by v1.104.1)
+    if command -v pgrep >/dev/null 2>&1 && pgrep -f "[t]ailscaled" >/dev/null 2>&1; then
+        if [ "${_ts_mode}" = "kernel" ]; then echo "✅ (kernel, running)"; else echo "✅ (running)"; fi
+        return 0
+    fi
+    # Try status without failing the script (set -e guard) -- try sudo when socket not writable
+    set +e
+    _ts_status_out=""
+    if [ -n "${_ts_socket:-}" ] && [ -S "${_ts_socket}" ]; then
+        _ts_sock_uid=$(stat -c %u "${_ts_socket}" 2>/dev/null || stat -f %u "${_ts_socket}" 2>/dev/null)
+        if [ -n "${_ts_sock_uid:-}" ] && [ "${_ts_sock_uid}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            _ts_status_out="$(sudo -n "${_ts_cli}" --socket="${_ts_socket}" status 2>&1 || true)"
+            _rc=$?
+            # sudo status returns non-zero when logged out but output contains "Logged out."
+            case "${_ts_status_out}" in *"Logged out."*) _rc=0 ;; esac
+        else
+            "${_ts_cli}" --socket="${_ts_socket}" status >/dev/null 2>&1
+            _rc=$?
+        fi
+    else
+        "${_ts_cli}" status >/dev/null 2>&1
+        _rc=$?
+    fi
+    set -e
+    if [ "${_rc:-1}" -eq 0 ]; then
+        if [ "${_ts_mode}" = "kernel" ]; then echo "✅ (kernel, status ok)"; else
+            if [ -f "${MINIONS_HOME}/etc/tailscale.env" ]; then echo "✅ (userspace, status ok -- proxy :1056)"; else echo "✅ (status ok)"; fi
+        fi
+        return 0
+    fi
+    echo "❌"
+    return 1
+}
+
 echo ".minions status:"
 echo ""
 
@@ -68,6 +135,15 @@ if command -v hermes >/dev/null 2>&1; then
 else
     echo "❌"
 fi
+
+# Check Tailscale (opt-in)
+echo "  tailscale   (opt-in)"
+# Guarded -- check_tailscale returns non-zero when not running but status.sh must not abort
+set +e
+_tailscale_out=$(check_tailscale 2>&1)
+_tailscale_rc=$?
+set -e
+echo "  ${_tailscale_out}"
 
 # Check ready marker
 echo ""

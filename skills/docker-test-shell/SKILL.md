@@ -120,6 +120,8 @@ dts exec "curl -sf http://127.0.0.1:20128/healthz && echo server-up"
 | `bash install.sh \| tee log` reports success while install failed | Pipe exit is `tee`'s 0 when `pipefail` is off, masking left-side failure | Prefix with `set -o pipefail; cmd \| tee log` |
 | `npm install` OOM `JavaScript heap out of memory` | `NODE_OPTIONS --max-old-space-size=512` too small for large package in constrained DTS/CI | Raise to 2048 in shared `install_npm_package` wrapper |
 | `.tar.zst` fails `stdin: not in gzip format` or `zstd required` | Missing `zstd` in DTS container and `tar -xzf` used for `.tar.zst` (needs `--zstd`/`-I zstd`) | Install `zstd` in `dts apt` prereqs; extract via `zstd -dc \| tar -xf` or `tar --zstd -xf`; prefer host cache copy `/tmp/ollama-cache/ollama` on reinstall to avoid re-download |
+| New optional binary re-downloads every DTS run | No `*_HOST_CACHE` mount for the new dep — same trap as Ollama before `OLLAMA_HOST_CACHE` | Mirror the Ollama pattern: mount host cache at `/tmp/<name>-cache:ro` (outside `MINIONS_HOME`), add `TAILSCALE_HOST_CACHE` handling in `scripts/dts.sh` and a fast-path `if [ -f /tmp/<name>-cache/<bin> ]` in `lib/<name>.sh` |
+| Daemon needs TUN/`NET_ADMIN` but tests run as uid 1000 | `tailscaled` fails to create TUN, or second daemon collides on control socket when systemd already runs one | Default to `--tun=userspace-networking` with `--statedir` + `--socket` under `MINIONS_HOME` (`TAILSCALE_SOCKET`), presence-gate boot on `command -v`, guard `systemctl is-active`/`pgrep` before `start_service`, and keep `status.sh`/`self-check.sh` `set -e`-safe |
 
 ## Support files
 

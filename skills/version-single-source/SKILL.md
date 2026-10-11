@@ -108,6 +108,8 @@ For release_tarball deps the pin omits the leading `v` (URL template already emb
 | Omitting shellcheck disable | CI `shellcheck` test fails with SC1091/SC2153 | Add `# shellcheck disable=SC1091,SC2153` above the source line |
 | Bumped `deps.yaml` but forgot derived files | `version-sync` fails "badges/versions.env out of date" | Run both `sync-versions.sh` and `sync-readme-badges.sh` |
 | Ran `bump.sh` without `--open-pr` for NODE/UV | SHA256 placeholders stale, install fetches wrong tarball | Use `--open-pr` so `populate_shas` fetches real SHAs |
+| Deferred pin for an opt-in dep ("pin later") | Latest drifts silently, `version-sync` passes but installed version unauditable | Pin every managed binary in `deps.yaml` even if install is opt-in (`--tailscale` still needs `TAILSCALE_VERSION`) |
+| Used `curl \| sh` latest for a dep that releases static tarballs on a separate host (e.g. `pkgs.tailscale.com`) | GitHub Releases has no assets, `sha_source: none` + `github_tag` is correct — tarball pin via `release_tarball` only if you actually fetch from GitHub | Verify upstream release layout first: if tarballs live off-GitHub, keep `github_tag`/`sha_source: none` and fetch from the vendor host with a `TAILSCALE_VERSION` pin |
 
 ## Real-world example
 

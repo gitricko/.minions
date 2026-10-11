@@ -65,26 +65,89 @@ stop_service() {
     fi
 
     echo "Stopping ${name} (pid ${pid})..."
-    kill "${pid}" 2>/dev/null || true
+    if ! kill "${pid}" 2>/dev/null; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then sudo -n kill "${pid}" 2>/dev/null || true; fi
+    fi
 
-    # Wait for graceful shutdown
+    # Wait for graceful shutdown (check both user and sudo)
     # shellcheck disable=SC2034
     for _ in 1 2 3 4 5; do
         if ! kill -0 "${pid}" 2>/dev/null; then
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "${pid}" 2>/dev/null; then sleep 1; continue; fi
             break
         fi
         sleep 1
     done
 
     # Force kill if still alive
-    if kill -0 "${pid}" 2>/dev/null; then
+    _still=0
+    if kill -0 "${pid}" 2>/dev/null; then _still=1; fi
+    if [ "$_still" = 0 ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "${pid}" 2>/dev/null; then _still=1; fi
+    if [ "$_still" = 1 ]; then
         echo "Force killing ${name}..."
         kill -9 "${pid}" 2>/dev/null || true
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then sudo -n kill -9 "${pid}" 2>/dev/null || true; fi
         sleep 0.5
     fi
+    unset _still
 
-    rm -f "${pid_file}"
+    rm -f "${pid_file}" 2>/dev/null || true
+    if [ -f "${pid_file}" ]; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then sudo -n rm -f "${pid_file}" 2>/dev/null || true; fi
+    fi
     echo "${name} stopped"
+}
+
+# Start tailscaled with optional sudo (kernel mode runs as root).
+# Usage: _ts_start_daemon <daemon_path> [args...]
+# Writes pidfile var/run/tailscaled.pid (root-owned when sudo used).
+_ts_start_daemon() {
+    _tsd_bin=$1; shift
+    pid_file="${MINIONS_HOME}/var/run/tailscaled.pid"
+    log_file="${MINIONS_HOME}/var/log/tailscaled.log"
+    if [ -f "${pid_file}" ]; then
+        existing_pid=$(cat "${pid_file}" 2>/dev/null || true)
+        if [ -n "${existing_pid:-}" ]; then
+            if kill -0 "${existing_pid}" 2>/dev/null; then echo "tailscaled already running (pid ${existing_pid})"; unset _tsd_bin existing_pid; return 0; fi
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "${existing_pid}" 2>/dev/null; then echo "tailscaled already running (pid ${existing_pid}, root)"; unset _tsd_bin existing_pid; return 0; fi
+        fi
+    fi
+    echo "Starting tailscaled..."
+    if [ "${_TS_MODE:-userspace}" = "kernel" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        # shellcheck disable=SC2086,SC2024
+        # SC2024: redirect intentionally by user shell (log under $HOME, not root-owned) — sudo is for the daemon
+        sudo -n nohup setsid "${_tsd_bin}" "$@" >>"${log_file}" 2>&1 </dev/null &
+        pid=$!
+        # sudo pid is the daemon's parent; give kernel time to fork
+        sleep 0.5
+        # find actual tailscaled pid if sudo pid died quickly (sudo forks)
+        if ! sudo -n kill -0 "$pid" 2>/dev/null && ! kill -0 "$pid" 2>/dev/null; then
+            # try pgrep for fallback pid
+            pid=$(pgrep -f "[t]ailscaled.*${TAILSCALE_SOCKET:-}" 2>/dev/null | head -1)
+            [ -n "${pid:-}" ] || pid=$(pgrep -f "[t]ailscaled" 2>/dev/null | head -1)
+        fi
+        if [ -n "${pid:-}" ]; then
+            # pidfile will be root-owned; use sudo to write if needed (6102925874 #4)
+            if ! echo "${pid}" > "${pid_file}" 2>/dev/null; then
+                sudo -n sh -c "echo ${pid} > ${pid_file}" 2>/dev/null || echo "${pid}" > "${pid_file}" 2>/dev/null || true
+            fi
+        fi
+    else
+        nohup setsid "${_tsd_bin}" "$@" >>"${log_file}" 2>&1 </dev/null &
+        pid=$!
+        echo "${pid}" > "${pid_file}"
+        sleep 0.5
+    fi
+    if [ -n "${pid:-}" ] && (kill -0 "${pid}" 2>/dev/null || sudo -n kill -0 "${pid}" 2>/dev/null 2>&1); then
+        echo "tailscaled started (pid ${pid}, mode=${_TS_MODE:-userspace})"
+        unset _tsd_bin pid existing_pid
+        return 0
+    else
+        echo "Failed to start tailscaled" >&2
+        rm -f "${pid_file}" 2>/dev/null; sudo -n rm -f "${pid_file}" 2>/dev/null || true
+        unset _tsd_bin pid existing_pid
+        return 1
+    fi
 }
 
 # Check if a service is running
@@ -102,7 +165,9 @@ is_service_running() {
         return 1
     fi
 
-    kill -0 "${pid}" 2>/dev/null
+    if kill -0 "${pid}" 2>/dev/null; then return 0; fi
+    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo -n kill -0 "${pid}" 2>/dev/null; then return 0; fi
+    return 1
 }
 
 # Wait for a port to become available

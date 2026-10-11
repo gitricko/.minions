@@ -102,7 +102,7 @@ F5() {
     pass "no .devcontainer refs"
   else
     echo "  WARN: .devcontainer references found (check if intentional):"
-    echo "$hits" | head -20
+    echo "$hits" | head -20 || true
     # Not a hard fail — some skills describe the upstream project intentionally
   fi
 }
@@ -178,7 +178,11 @@ if [ $# -eq 0 ] || [ "$1" = "all" ]; then
   run_all
 else
   for fn in "$@"; do
-    type -t "$fn" >/dev/null 2>&1 && "$fn" || { echo "Unknown function: $fn"; exit 1; }
+    if ! type -t "$fn" >/dev/null 2>&1; then
+      echo "Unknown function: $fn"
+      exit 1
+    fi
+    "$fn"
   done
 fi
 
