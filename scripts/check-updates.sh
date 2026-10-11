@@ -5,16 +5,17 @@
 # Never writes, never opens a PR.
 #
 # Usage: scripts/check-updates.sh [--json] [--offline]
-# Env overrides (for hermetic tests): VERSIONS_ENV, DEPS_YAML.
+#   Output is always JSON; --json is accepted for CLI compatibility and
+#   is a no-op. --offline skips upstream fetches (each "latest" => null).
+# Env override for hermetic tests: DEPS_YAML.
 
 set -u
 [ -z "${DEPS_YAML:-}" ] && DEPS_YAML="$(cd "$(dirname "$0")/../etc" && pwd)/deps.yaml"
 
-JSON=0
 OFFLINE=0
 for arg in "$@"; do
   case "$arg" in
-    --json) JSON=1 ;;
+    --json) ;; # output is always JSON; accepted for CLI compatibility
     --offline) OFFLINE=1 ;;
   esac
 done

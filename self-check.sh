@@ -100,9 +100,6 @@ echo " ════════════════════════�
 section "Services"
 
 if ! should_skip "services" && [ "$CI_MODE" = "false" ]; then
-  PORT_POLL_TIMEOUT=30
-  POLL_STARTED_AT=$(date +%s)
-
   for pair in "7352:9Router" "20128:OmniRoute"; do
     PORT="${pair%%:*}"
     NAME="${pair##*:}"

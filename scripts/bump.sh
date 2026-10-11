@@ -190,7 +190,6 @@ ORIGINAL_VERSIONS=""
 for b in "${BUMPS[@]}"; do
   dep="${b%%=*}"
   ver="${b##*=}"
-  upper=$(echo "$dep" | tr '[:lower:]' '[:upper:]')
 
   # Normalize: strip leading 'v' for release_tarball deps (NODE, UV) whose
   # URL templates and asset names already embed 'v'.

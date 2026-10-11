@@ -79,17 +79,17 @@ dependencies:
     sha_source: none
 
   - name: OLLAMA
-    version: "v0.40.2"
+    version: "v0.40.3"
     source_type: github_tag
     repo: ollama/ollama
     release_url: https://github.com/ollama/ollama/releases/download/{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "726bee78706c281b0eeef00746efe51a044d71c592c3f0b195820707f31fdf04"
-      linux_arm64: "92b3ef3d5e10f5849273bfa1345000f2a8ce8bc834e95061ff5b9df5d08e3c3f"
-      macos_x64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
-      macos_arm64: "e888b7637291ceb80b622c00ea067f62c86d9c50d419b3eb903032e4f1f8a4f6"
+      linux_x64: "ce6f8b671a699bf1ebafb28d60dbbabf4f37b30b499145fa308a8ba72de021d6"
+      linux_arm64: "5754700747a93ea14db88888f08072386d2da6fbf7dd75be19a684348b9f28b8"
+      macos_x64: "a2d1d906a2c8febd9cb18f5c183854d0a6db5dc522940d68b0c0ed048e8dfdea"
+      macos_arm64: "a2d1d906a2c8febd9cb18f5c183854d0a6db5dc522940d68b0c0ed048e8dfdea"
 
   - name: TAILSCALE
     version: "v1.104.1"
