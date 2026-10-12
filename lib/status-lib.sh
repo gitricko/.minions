@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# shellcheck disable=SC2034
 # lib/status-lib.sh — shared status probes for .minions (#66)
 # POSIX sh, no bashisms, no set -e inside. Sourced by status.sh / boot.sh.
 # Never calls exit; callers decide. Every probe is guarded so status_collect
@@ -216,7 +217,8 @@ STATUS_EXIT_CODE=0
 
 _status_probe_omniroute() {
     _spo_pid=""; _spo_pid=$(_status_pid_alive "omniroute" 2>/dev/null || true)
-    _spo_port_ok=1; _status_port_open "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 2>/dev/null && _spo_port_ok=0 || true
+    _spo_port_ok=1
+    if _status_port_open "${OMNIROUTE_HOST}" "${OMNIROUTE_PORT}" 2>/dev/null; then _spo_port_ok=0; fi
     _spo_ver=""; _spo_ver=$(_status_cli_version "omniroute" "OMNIROUTE_VERSION" 2>/dev/null || true)
     VERSION_OMNIROUTE="${_spo_ver}"
     if [ -n "${_spo_pid:-}" ] && [ "${_spo_port_ok}" -eq 0 ]; then
@@ -239,7 +241,8 @@ _status_probe_omniroute() {
 
 _status_probe_9router() {
     _sp9_pid=""; _sp9_pid=$(_status_pid_alive "9router" 2>/dev/null || true)
-    _sp9_port_ok=1; _status_port_open "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 2>/dev/null && _sp9_port_ok=0 || true
+    _sp9_port_ok=1
+    if _status_port_open "${NINEROUTER_HOST}" "${NINEROUTER_PORT}" 2>/dev/null; then _sp9_port_ok=0; fi
     _sp9_ver=""; _sp9_ver=$(_status_cli_version "9router" "NINEROUTER_VERSION" 2>/dev/null || true)
     VERSION_9ROUTER="${_sp9_ver}"
     if [ -n "${_sp9_pid:-}" ] && [ "${_sp9_port_ok}" -eq 0 ]; then
@@ -273,7 +276,8 @@ _status_probe_ollama() {
     esac
     # Binary present — check if API responds (port open) and pid
     _spo_pid=""; _spo_pid=$(_status_pid_alive "ollama" 2>/dev/null || true)
-    _spo_port_ok=1; _status_port_open "127.0.0.1" "11434" 2>/dev/null && _spo_port_ok=0 || true
+    _spo_port_ok=1
+    if _status_port_open "127.0.0.1" "11434" 2>/dev/null; then _spo_port_ok=0; fi
     # Also try HTTP probe if port open but pid missing (ollama may run outside pid file)
     if [ "${_spo_port_ok}" -eq 0 ]; then
         STATUS_OLLAMA="ok"
