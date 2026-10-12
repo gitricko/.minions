@@ -561,7 +561,7 @@ status_render_human() {
     _status_human_row "tailscale" "(opt-in)" "${STATUS_TAILSCALE}" "${DETAIL_TAILSCALE}"
     echo ""
     if [ "${STATUS_READY}" = "ok" ]; then
-        echo "  READY FOR FIRSTMATE DISPATCH ✅"
+        echo "  READY ✅"
     else
         echo "  NOT READY ❌"
     fi

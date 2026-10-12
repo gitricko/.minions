@@ -268,7 +268,7 @@ Human rendering (spec):
     hermes      CLI                        ✅ (v0.21.6+141.gd94b70f)
     mnemon      memory layer               ✅ (v0.2.10, db at ~/.mnemon)
     tailscale   (opt-in)                   ✅ (kernel, pid 12985, v1.104.1)
-    READY FOR FIRSTMATE DISPATCH           ✅
+    READY           ✅
 
   When down, same rows but single ❌ and detail, no early truncation:
 
@@ -429,7 +429,7 @@ Row spec (human):
   tailscale    (opt-in)                    ✅ (kernel, pid 12985, v1.104.1)
                                            -- not installed (install with install.sh --tailscale)  [when absent]
                                            ❌ (installed but not running — run: ts up)           [when down]
-  READY FOR FIRSTMATE DISPATCH             ✅ / ❌
+  READY             ✅ / ❌
 
 ----------------------------------------------------------------
 ## 8. Testing plan

@@ -508,7 +508,7 @@ else
     cleanup
     exit 1
 fi
-if "${DTS_SCRIPT}" exec "grep -q 'READY FOR FIRSTMATE DISPATCH\|stack is UP' /tmp/reinstall-boot.log"; then
+if "${DTS_SCRIPT}" exec "grep -q 'READY ✅\|stack is UP' /tmp/reinstall-boot.log"; then
     log_info "Reinstall boot reached READY/stack is UP"
 else
     log_error "Reinstall boot missing completion marker"
