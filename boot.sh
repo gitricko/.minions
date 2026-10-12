@@ -343,18 +343,37 @@ fi
 # Step 7: Readiness marker
 touch "${MINIONS_HOME}/var/run/ready"
 
-# Step 8: Print READY message
-echo ""
-echo "=============================================="
-echo "  .minions stack is UP"
-echo ""
-echo "  ✅ omniroute    http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
-echo "  ✅ 9router      http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
-echo "  ✅ pi-agent     CLI ready (invoked on demand)"
-echo "  ✅ hermes       CLI ready (preinstalled)"
-echo "  ✅ mnemon       memory layer ready"
-if [ -x "${MINIONS_HOME}/bin/ollama" ]; then
-    echo "  ✅ ollama       http://localhost:11434 (embeddings: nomic-embed-text)"
+# Step 8: Print READY message (truthful, via status-lib)
+# Uses the shared probes so boot footer and status.sh agree.
+# Guarded for set -e: status_collect always returns 0; signal is status_exit_code.
+if [ -f "${LIB_DIR}/status-lib.sh" ]; then
+    # shellcheck disable=SC1091
+    . "${LIB_DIR}/status-lib.sh"
+    set +e; status_collect; set -e
+    echo ""
+    echo "=============================================="
+    if [ "$(status_exit_code)" -eq 0 ]; then
+        echo "  .minions stack is UP"
+    else
+        echo "  .minions stack is DEGRADED (see below)"
+    fi
+    echo ""
+    status_render_human
+    echo "=============================================="
+else
+    # Fallback if lib missing (should not happen after install)
+    echo ""
+    echo "=============================================="
+    echo "  .minions stack is UP"
+    echo ""
+    echo "  ✅ omniroute    http://${OMNIROUTE_HOST}:${OMNIROUTE_PORT}/v1"
+    echo "  ✅ 9router      http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
+    echo "  ✅ pi-agent     CLI ready (invoked on demand)"
+    echo "  ✅ hermes       CLI ready (preinstalled)"
+    echo "  ✅ mnemon       memory layer ready"
+    if [ -x "${MINIONS_HOME}/bin/ollama" ]; then
+        echo "  ✅ ollama       http://localhost:11434 (embeddings: nomic-embed-text)"
+    fi
+    echo "=============================================="
 fi
-echo "=============================================="
 echo ""
