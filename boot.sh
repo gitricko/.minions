@@ -182,35 +182,12 @@ log_info "Pulling mnemon embedding model (nomic-embed-text)..."
 . "${LIB_DIR}/ollama.sh"
 pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
 
-# Mnemon default seed import (non-fatal, deduped, set +e safe)
-# Gate on --dry-run exit code; MODE-based seed path.
-if [ -x "${MINIONS_HOME}/bin/mnemon" ]; then
-    MNEMON_BIN="${MINIONS_HOME}/bin/mnemon"
-elif command -v mnemon >/dev/null 2>&1; then
-    MNEMON_BIN="$(command -v mnemon)"
-else
-    MNEMON_BIN=""
-fi
-if [ -n "${MNEMON_BIN:-}" ]; then
-    if [ "${MODE:-standalone}" = "dev" ] && [ -n "${MINIONS_REPO_ROOT:-}" ] && [ -f "${MINIONS_REPO_ROOT}/mnemon/seed.json" ]; then
-        _mn_seed="${MINIONS_REPO_ROOT}/mnemon/seed.json"
-    elif [ -f "${MINIONS_HOME}/mnemon/seed.json" ]; then
-        _mn_seed="${MINIONS_HOME}/mnemon/seed.json"
-    else
-        _mn_seed=""
-    fi
-    if [ -n "${_mn_seed:-}" ] && [ -f "${_mn_seed}" ]; then
-        set +e
-        if "${MNEMON_BIN}" import --dry-run "${_mn_seed}" >>"${boot_log}" 2>&1; then
-            log_info "Importing Mnemon seed (${_mn_seed})..."
-            "${MNEMON_BIN}" import "${_mn_seed}" >>"${boot_log}" 2>&1 || log_warn "Mnemon seed import failed (non-fatal)"
-            "${MNEMON_BIN}" embed --status 2>/dev/null | head -5 >>"${boot_log}" 2>&1 || true
-        else
-            log_warn "Mnemon seed dry-run failed, skipping import"
-        fi
-        set -e
-    fi
-fi
+# Mnemon default seed import — single source in lib/mnemon.sh (deduplicated per #74 review 6133588996 §2.2).
+# Non-fatal, deduped, MODE-based seed path, --dry-run gated, embed --status.
+# shellcheck disable=SC1091
+. "${LIB_DIR}/mnemon.sh"
+# Log to boot.log; keep boot non-fatal even if seed missing/invalid.
+setup_mnemon_all "${MINIONS_HOME:-${HOME}/.minions}" >>"${boot_log}" 2>&1 || log_warn "Mnemon seed import encountered issues (non-fatal, see ${boot_log})"
 
 # Step 3b: Tailscale (opt-in, presence-gated, non-fatal)
 # Gate ONLY on managed install (MINIONS_HOME/bin) -- not system tailscale (fixes #2)

@@ -356,10 +356,12 @@ test_global_json() {
 test_global_devcontainer() {
   local out
   out="$(bash "${REPO_ROOT}/scripts/verify-knowledge.sh" F5 2>&1)" || true
-  if echo "$out" | grep -q "F5:"; then
+  # F5 is advisory: passes with either "no .devcontainer refs" or "WARN: .devcontainer references"
+  # (some skills intentionally reference hermes-codespace .devcontainer/ paths)
+  if echo "$out" | grep -q "no .devcontainer refs\|WARN: .devcontainer references"; then
     pass "test_global_devcontainer"
   else
-    fail "test_global_devcontainer" "F5 .devcontainer ref check failed"
+    fail "test_global_devcontainer" "F5 check did not report no-refs or WARN (output: $(echo "$out" | head -1))"
   fi
 }
 
