@@ -291,7 +291,7 @@ tree is relocatable (e.g. for tests or multi-user).
      ✅ omniroute   http://localhost:20128/v1
      ✅ modelrelay  http://localhost:7352/v1
      ✅ hermes      (tui/gateway)
-     ✅ pi-agent    rpc-entry up — READY FOR FIRSTMATE DISPATCH
+     ✅ pi-agent    rpc-entry up — READY
 8. If run interactively (no args), `exec`/attach; if `--daemon`, return 0 and detach.
 ```
 
