@@ -27,6 +27,8 @@ This index maps all wiki articles in this directory. Each article is a reference
 | [repository-analysis.md](repository-analysis.md) | Repository deep dive | minions-architecture |
 | [selkies-package-discrepancy.md](selkies-package-discrepancy.md) | PyPI vs GitHub Actions gotcha | codespace-webtop |
 | [vscode-cli-codespaces.md](vscode-cli-codespaces.md) | VS Code CLI auto-discovery | codespace-vscode-open |
+| [ci-lint-check.md](ci-lint-check.md) | CI lint check skill (local pre-commit) | ci-lint-check |
+| [codespace-lavish.md](codespace-lavish.md) | Headed Lavish-AXI whiteboard over noVNC | codespace-lavish, codespace-port-visibility |
 
 ## How to Use
 

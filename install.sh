@@ -264,8 +264,7 @@ if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     log_info "Copied generated versions.env to ${MINIONS_HOME}/etc/"
 fi
 
-# Copy Mnemon seed templates to MINIONS_HOME/etc (available for user's own mnemon plugin; minions no longer imports them)
-cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
+# (Legacy etc/mnemon-seed-*.json removed in Phase A — canonical seed is mnemon/seed.json)
 
 # NOW source lib functions (from installed location)
 # shellcheck disable=SC1091
@@ -515,7 +514,7 @@ telemetry:
 YAMLEOF
 log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
-# (Mnemon seeds are not imported by minions — setup_mnemon_all is disabled per user request.)
+# Mnemon default seed is imported by setup_mnemon_all (mnemon/seed.json, deduped, non-fatal).
 
 # Step 6: Install pi-failover extension (CLI only, no proxy needed)
 log_info "Installing pi-failover extension..."
