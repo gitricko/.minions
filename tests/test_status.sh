@@ -207,17 +207,23 @@ test_exit_codes() {
 }
 
 # Test 6: Port probe dash fix — lib must use bash fallback, not broken /dev/tcp
+# H1: positional bash -c 'exec 3<>/dev/tcp/$1/$2' _ host port (not interpolating env)
 test_port_probe_lib() {
   if [ -f "${REPO_ROOT}/lib/status-lib.sh" ]; then
-    if grep -q 'bash -c "exec 3<>/dev/tcp' "${REPO_ROOT}/lib/status-lib.sh"; then
+    if grep -q "bash -c 'exec 3<>/dev/tcp/\$1" "${REPO_ROOT}/lib/status-lib.sh"; then
       ok "test_port_probe_uses_bash_fallback"
     else
-      bad "test_port_probe_uses_bash_fallback" "lib/status-lib.sh missing bash -c fallback"
+      bad "test_port_probe_uses_bash_fallback" "lib/status-lib.sh missing safe bash positional fallback"
     fi
-    if grep -q '(echo > "/dev/tcp' "${REPO_ROOT}/lib/status-lib.sh"; then
-      bad "test_port_probe_no_broken_fallback" "lib still contains broken (echo > /dev/tcp) under dash"
+    if grep -q 'bash -c "exec 3<>/dev/tcp/${' "${REPO_ROOT}/lib/status-lib.sh"; then
+      bad "test_port_probe_no_broken_fallback" "lib contains vulnerable interpolation"
     else
       ok "test_port_probe_no_broken_fallback"
+    fi
+    if grep -q '(echo > "/dev/tcp' "${REPO_ROOT}/lib/status-lib.sh"; then
+      bad "test_port_probe_no_broken_fallback2" "lib still contains broken (echo > /dev/tcp) under dash"
+    else
+      ok "test_port_probe_no_broken_fallback2"
     fi
   else
     bad "test_port_probe_lib_exists" "lib/status-lib.sh not found"

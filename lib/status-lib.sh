@@ -17,7 +17,7 @@
 #   READY marker        → critical (2) when missing (boot incomplete)
 # status_exit_code returns max severity (2 > 1 > 0).
 #
-# Version order: binary --version (timeout 2) → $MINIONS_HOME/etc/versions.env → unknown
+# Version order: binary --version (timeout 5, pi 2) → $MINIONS_HOME/etc/versions.env → unknown
 # Distinguish not installed (binary absent) vs unknown (probe failed).
 # Ordering is intentional: $MINIONS_HOME/etc/versions.env is the installed copy
 # (written by install.sh from repo etc/versions.env); it survives even when
@@ -44,7 +44,7 @@ _status_port_open() {
         unset _sph_host _sph_port
         return $_sph_rc
     elif command -v bash >/dev/null 2>&1; then
-        bash -c "exec 3<>/dev/tcp/${_sph_host}/${_sph_port}" 2>/dev/null
+        bash -c 'exec 3<>/dev/tcp/$1/$2' _ "${_sph_host}" "${_sph_port}" 2>/dev/null
         _sph_rc=$?
         unset _sph_host _sph_port
         return $_sph_rc
@@ -103,7 +103,7 @@ _status_version_from_versions_env() {
     return 1
 }
 
-# _status_normalize_version raw — strip common prefixes, first line only, 80 chars
+# _status_normalize_version raw — strip common prefixes, first line only
 _status_normalize_version() {
     _snv_raw=$1
     # First line only, strip leading/trailing whitespace
@@ -120,10 +120,8 @@ _status_normalize_version() {
     case "${_snv_raw}" in
         "tailscale version "*|"tailscale commit:"*) _snv_raw=$(printf '%s' "${_snv_raw}" | awk '{print $1}') ;;
     esac
-    # hermes: "Hermes Agent v0.21.5 (2026.9.24) · upstream …" -> keep first line, truncate to 80
-    if [ ${#_snv_raw} -gt 80 ]; then
-        _snv_raw=$(printf '%s' "${_snv_raw}" | cut -c1-80)
-    fi
+    # Do not truncate here — truncation is at render (_status_human_row) so
+    # hermes verbose line is cut once, locale-safe (M2).
     printf '%s' "${_snv_raw}"
     unset _snv_raw
 }
@@ -154,10 +152,13 @@ _status_cli_version() {
         unset _scv_bin _scv_var _scv_bin_path _scv_fallback
         return 1
     fi
-    # Probe with timeout 2 (pi bare version hangs; hermes multi-line)
+    # Probe with timeout 5 (pi bare version hangs; hermes Python cold start ~1s)
+    # Per-binary: pi 2s (known hang), others 5s to avoid flake on busy runners (M1)
     _scv_raw=""
+    _scv_timeout=5
+    case "${_scv_bin}" in pi) _scv_timeout=2 ;; esac
     if command -v timeout >/dev/null 2>&1; then
-        _scv_raw=$(timeout 2 "${_scv_bin_path}" --version 2>&1 | head -1 || true)
+        _scv_raw=$(timeout "${_scv_timeout}" "${_scv_bin_path}" --version 2>&1 | head -1 || true)
     else
         _scv_raw=$("${_scv_bin_path}" --version 2>&1 | head -1 || true)
     fi
@@ -189,7 +190,7 @@ _status_cli_version() {
 # can never abort boot.sh's set -e).
 # STATUS values: ok | warn | critical | not_installed
 
-# Globals initialized by status_collect
+# Globals initialized by status_collect — exported via source (SC2034)
 STATUS_OMNIROUTE=""
 STATUS_9ROUTER=""
 STATUS_OLLAMA=""
@@ -436,30 +437,21 @@ _status_probe_tailscale() {
         unset _spt_socket _spt_cli _spt_mode _spt_pid
         return 0
     fi
-    # Fallback: status probe guarded
+    # Fallback: status probe — single invocation per branch, Logged out. == reachable
     _spt_rc=1
     _spt_out=""
-    # Use set +e style: run status but don't abort
     if [ -n "${_spt_socket:-}" ] && [ -S "${_spt_socket}" ]; then
         _spt_sock_uid2=$(stat -c %u "${_spt_socket}" 2>/dev/null || stat -f %u "${_spt_socket}" 2>/dev/null || true)
         if [ -n "${_spt_sock_uid2:-}" ] && [ "${_spt_sock_uid2}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-            _spt_out=$(sudo -n "${_spt_cli}" --socket="${_spt_socket}" status 2>&1 || true)
-            # Logged out. == reachable
-            case "${_spt_out}" in *"Logged out."*) _spt_rc=0 ;; *) _spt_rc=1; if [ -n "${_spt_out}" ]; then _spt_rc=0; fi ;; esac
-            # need exit code, not just output — re-run to get rc guard
-            if [ "${_spt_rc}" != "0" ]; then
-                sudo -n "${_spt_cli}" --socket="${_spt_socket}" status >/dev/null 2>&1; _spt_rc=$?
-                case "${_spt_out}" in *"Logged out."*) _spt_rc=0 ;; esac
-            fi
+            _spt_out=$(sudo -n "${_spt_cli}" --socket="${_spt_socket}" status 2>&1 || true); _spt_rc=$?
+            case "${_spt_out}" in *"Logged out."*) _spt_rc=0 ;; esac
         else
-            "${_spt_cli}" --socket="${_spt_socket}" status >/dev/null 2>&1; _spt_rc=$?
-            _spt_out=$("${_spt_cli}" --socket="${_spt_socket}" status 2>&1 || true)
+            _spt_out=$("${_spt_cli}" --socket="${_spt_socket}" status 2>&1 || true); _spt_rc=$?
             case "${_spt_out}" in *"Logged out."*) _spt_rc=0 ;; esac
         fi
         unset _spt_sock_uid2
     else
-        "${_spt_cli}" status >/dev/null 2>&1; _spt_rc=$?
-        _spt_out=$("${_spt_cli}" status 2>&1 || true)
+        _spt_out=$("${_spt_cli}" status 2>&1 || true); _spt_rc=$?
         case "${_spt_out}" in *"Logged out."*) _spt_rc=0 ;; esac
     fi
     if [ "${_spt_rc:-1}" -eq 0 ]; then
@@ -505,22 +497,14 @@ status_collect() {
     _status_probe_mnemon || true
     _status_probe_tailscale || true
     _status_probe_ready || true
-    # Compute max severity: critical(2) > warn(1) > ok/not_installed(0)
+    # Max severity: critical(2) > warn(1) > ok/not_installed(0)
     STATUS_EXIT_CODE=0
-    for _sce_s in "${STATUS_OMNIROUTE}" "${STATUS_9ROUTER}" "${STATUS_READY}"; do
-        if [ "${_sce_s}" = "critical" ]; then STATUS_EXIT_CODE=2; break; fi
+    for _sce_s in "${STATUS_OMNIROUTE}" "${STATUS_9ROUTER}" "${STATUS_OLLAMA}" "${STATUS_PI}" "${STATUS_HERMES}" "${STATUS_MNEMON}" "${STATUS_TAILSCALE}" "${STATUS_READY}"; do
+        case "${_sce_s}" in
+            critical) STATUS_EXIT_CODE=2; break ;;
+            warn) STATUS_EXIT_CODE=1 ;;
+        esac
     done
-    if [ "${STATUS_EXIT_CODE}" -eq 0 ]; then
-        for _sce_s in "${STATUS_OMNIROUTE}" "${STATUS_9ROUTER}" "${STATUS_OLLAMA}" "${STATUS_PI}" "${STATUS_HERMES}" "${STATUS_MNEMON}" "${STATUS_TAILSCALE}" "${STATUS_READY}"; do
-            if [ "${_sce_s}" = "warn" ]; then STATUS_EXIT_CODE=1; break; fi
-            if [ "${_sce_s}" = "critical" ]; then STATUS_EXIT_CODE=2; break; fi
-        done
-        # Also treat warn from 9router/omniroute as critical if needed
-        if [ "${STATUS_OMNIROUTE}" = "warn" ] || [ "${STATUS_9ROUTER}" = "warn" ]; then
-            # Degraded proxy is at least warn; keep 1 unless already 2
-            if [ "${STATUS_EXIT_CODE}" -eq 0 ]; then STATUS_EXIT_CODE=1; fi
-        fi
-    fi
     unset _sce_s
     return 0
 }
@@ -549,9 +533,9 @@ _status_human_row() {
     _shr_status=$3
     _shr_detail=$4
     _shr_icon=$(_status_icon "${_shr_status}")
-    # Truncate detail to 80 for alignment when hermes verbose
+    # Single truncation point for alignment — locale-safe for hermes · (M2)
     if [ ${#_shr_detail} -gt 80 ]; then
-        _shr_detail=$(printf '%s' "${_shr_detail}" | cut -c1-80)
+        _shr_detail=$(LC_ALL=C.UTF-8 printf '%s' "${_shr_detail}" | cut -c1-80)
     fi
     # not_installed renders as — with detail, not ❌
     if [ "${_shr_status}" = "not_installed" ]; then

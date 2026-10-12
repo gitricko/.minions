@@ -346,9 +346,24 @@ touch "${MINIONS_HOME}/var/run/ready"
 # Step 8: Print READY message (truthful, via status-lib)
 # Uses the shared probes so boot footer and status.sh agree.
 # Guarded for set -e: status_collect always returns 0; signal is status_exit_code.
+# Try installed lib first, then repo lib (fresh clone without install), else hardcoded fallback (L1).
 if [ -f "${LIB_DIR}/status-lib.sh" ]; then
     # shellcheck disable=SC1091
     . "${LIB_DIR}/status-lib.sh"
+    set +e; status_collect; set -e
+    echo ""
+    echo "=============================================="
+    if [ "$(status_exit_code)" -eq 0 ]; then
+        echo "  .minions stack is UP"
+    else
+        echo "  .minions stack is DEGRADED (see below)"
+    fi
+    echo ""
+    status_render_human
+    echo "=============================================="
+elif [ -f "$(dirname "$0")/lib/status-lib.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$(dirname "$0")/lib/status-lib.sh"
     set +e; status_collect; set -e
     echo ""
     echo "=============================================="
