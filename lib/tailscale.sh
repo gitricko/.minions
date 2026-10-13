@@ -212,7 +212,7 @@ if [ ! -x "$TS_BIN" ]; then echo "ts: tailscale not found at $TS_BIN" >&2; exit 
 if [ -n "${MINIONS_HOME:-}" ]; then SOCK="$MINIONS_HOME/var/run/tailscaled.sock"; else _h="${HOME:-}"; [ -n "$_h" ] || _h="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)"; [ -n "$_h" ] || _h="$HOME"; SOCK="$_h/.minions/var/run/tailscaled.sock"; unset _h; fi
 # Root-owned socket (kernel mode): tailscaled creates it srw-rw-rw- root:root (world-writable!), so
 # writability test is wrong -- check ownership instead. (Pi-agent review 6102925874 #1)
-_TS_SOCK_UID=$(stat -c %u "$SOCK" 2>/dev/null || stat -f %u "$SOCK" 2>/dev/null)
+_TS_SOCK_UID=$(stat -c %u "$SOCK" 2>/dev/null || stat -f %u "$SOCK" 2>/dev/null || true)
 if [ -S "$SOCK" ] && [ -n "${_TS_SOCK_UID:-}" ] && [ "${_TS_SOCK_UID}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then exec sudo -n "$TS_BIN" --socket="$SOCK" "$@"; fi
 unset _TS_SOCK_UID
 exec "$TS_BIN" --socket="$SOCK" "$@"

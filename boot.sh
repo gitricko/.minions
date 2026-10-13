@@ -255,7 +255,7 @@ TSEOF
             fi
             _TS_STATUS=""
             _ts_attempt=0
-            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null)
+            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null || true)
             # Root-owned socket (kernel mode) is world-writable (srw-rw-rw- root:root) -- ownership, not writability (6102925874 #2)
             if [ -S "${TAILSCALE_SOCKET}" ] && [ -n "${_TS_SOCK_UID:-}" ] && [ "${_TS_SOCK_UID}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
                 _TS_SUDO_STATUS=1
