@@ -96,7 +96,7 @@ bash scripts/sync-readme-badges.sh       # bump.sh syncs versions.env + .node-ve
 bash scripts/check-updates.sh --json     # verify 0 outdated
 ```
 
-For release_tarball deps the pin omits the leading `v` (URL template already embeds it); github_tag deps keep it.
+For release_tarball deps the pin omits the leading `v` (URL template already embeds it); github_tag deps keep it. For `sha_source: none` deps (npm, github_tag) a plain `bump.sh DEP=VERSION` is correct — `--open-pr` only matters for tarball deps (`sha_source: shasums` / `release_assets`) that need SHA fetching; npm bumps never fetch SHAs.
 
 ## Common mistakes
 

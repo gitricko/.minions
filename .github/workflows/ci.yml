@@ -81,10 +81,11 @@ jobs:
       - name: Markdown lint (skills + wiki)
         run: bash skills/ci-lint-check/scripts/ci_lint_check.sh --markdown-only
 
-      - name: Knowledge layer checks (F1 shell syntax, F3 JSON, F5 no refs)
+      - name: Knowledge layer checks (F1 shell syntax, F3 JSON, F9 seed, F5 no refs)
         run: |
           bash scripts/verify-knowledge.sh F1
           bash scripts/verify-knowledge.sh F3
+          bash scripts/verify-knowledge.sh F9
           bash scripts/verify-knowledge.sh F5
 
   test:
@@ -149,6 +150,7 @@ jobs:
           set -e
           bash scripts/verify-knowledge.sh F1
           bash scripts/verify-knowledge.sh F3
+          bash scripts/verify-knowledge.sh F9
           bash scripts/verify-knowledge.sh F5
           # Phase 22: two-mode detection unit tests (dev + standalone + env override)
           bash tests/test_knowledge_mode.sh

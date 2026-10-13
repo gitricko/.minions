@@ -81,6 +81,9 @@ for p in sorted(glob.glob("wiki/*.md")):
     for m in re.findall(r'\]\(([^)#]+\.md)\)', open(p).read()):
         if m.startswith("http"):
             continue
+        # skill cross-links (../skills/...) are not wiki-internal — skip
+        if m.startswith("../"):
+            continue
         target = os.path.join("wiki", os.path.basename(m))
         if not os.path.exists(target):
             bad.append((p, m))
@@ -133,7 +136,7 @@ F7() {
   while IFS= read -r line; do
     local skill_file target
     skill_file=$(echo "$line" | cut -d: -f1)
-    target=$(echo "$line" | grep -oP '\.\./wiki/\K[^)"\s]+' || true)
+    target=$(echo "$line" | grep -oP '\.\./wiki/\K[^)"\s]+' | sed 's/[`.,;]*$//' || true)
     [ -n "$target" ] || continue
     checked=$((checked + 1))
     if [ -f "wiki/$target" ]; then
@@ -170,8 +173,28 @@ print(f'  OK: {len(insights)} insights, all use content field')
 " || fail "seed schema check"
 }
 
+# ─── F9: Seed validates via validate-seed.py (consolidates F3+F8 for seed) ─
+F9() {
+  echo "F9: Seed validation (validate-seed.py)"
+  local seed="mnemon/seed.json"
+  local validator="mnemon/validate-seed.py"
+  if [ ! -f "$seed" ]; then
+    fail "$seed not found"
+    return
+  fi
+  if [ ! -f "$validator" ]; then
+    fail "$validator not found"
+    return
+  fi
+  if python3 "$validator" "$seed" 2>&1; then
+    pass "seed validates"
+  else
+    fail "seed validation failed"
+  fi
+}
+
 # ─── Dispatch ────────────────────────────────────────────────────────
-run_all() { F1; F2; F3; F4; F5; F6; F7; F8; }
+run_all() { F1; F2; F3; F4; F5; F6; F7; F8; F9; }
 
 if [ $# -eq 0 ] || [ "$1" = "all" ]; then
   run_all

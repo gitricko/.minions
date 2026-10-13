@@ -264,8 +264,7 @@ if [ -f "${SCRIPT_DIR}/etc/versions.env" ]; then
     log_info "Copied generated versions.env to ${MINIONS_HOME}/etc/"
 fi
 
-# Copy Mnemon seed templates to MINIONS_HOME/etc (available for user's own mnemon plugin; minions no longer imports them)
-cp -f "${SCRIPT_DIR}"/etc/mnemon-seed-*.json "${MINIONS_HOME}/etc/" 2>/dev/null || true
+# (Legacy etc/mnemon-seed-*.json removed in Phase A — canonical seed is mnemon/seed.json)
 
 # NOW source lib functions (from installed location)
 # shellcheck disable=SC1091
@@ -308,9 +307,11 @@ ensure_node_v22
 
 # Step 4: Install components
 # Install Mnemon FIRST so it's available for Pi/Hermes plugin setup
+# NOTE: seeding (setup_mnemon_all) is deferred until after the standalone
+# knowledge copy (cp -r mnemon/.) — in fresh curl|bash MINIONS_HOME/mnemon/
+# doesn't exist yet at this point (bug #74 review 6133588996 §2.1).
 log_info "Setting up Mnemon (memory layer)..."
 ensure_mnemon "${MINIONS_HOME}"
-setup_mnemon_all "${MINIONS_HOME}"
 # HOME dot dirs for keep-config contract — DTS reinstall has no boot, so
 # install must ensure them (boot also creates them idempotently).
 mkdir -p "${HOME}/.mnemon" "${HOME}/.ollama" "${HOME}/.9router" 2>/dev/null || true
@@ -371,6 +372,14 @@ if [ "${MODE}" = "standalone" ]; then
     log_info "Knowledge assets copied (skills/wiki/mnemon; memories preserved)"
 else
     log_info "Knowledge mode: dev — assets live in repo, symlinked at boot"
+fi
+
+# Seed Mnemon AFTER knowledge assets are in place (must-fix #74 review 6133588996 §2).
+# Fresh standalone: MINIONS_HOME/mnemon/seed.json didn't exist at ensure_mnemon time
+# (312); it does now after the cp -r mnemon/. above. Dev: repo seed already
+# available. Non-fatal, deduped via import_mnemon_seed.
+if command -v setup_mnemon_all >/dev/null 2>&1; then
+    setup_mnemon_all "${MINIONS_HOME}" || log_warn "Mnemon seed import failed (non-fatal)"
 fi
 
 # Persist knowledge mode for boot.sh (it may run from ${MINIONS_HOME} with no .git)
@@ -515,7 +524,7 @@ telemetry:
 YAMLEOF
 log_info "Created ~/.hermes/config.yaml with ports omniroute=${OMNIROUTE_PORT}, 9router=${NINEROUTER_PORT}"
 
-# (Mnemon seeds are not imported by minions — setup_mnemon_all is disabled per user request.)
+# Mnemon default seed is imported by setup_mnemon_all (mnemon/seed.json, deduped, non-fatal).
 
 # Step 6: Install pi-failover extension (CLI only, no proxy needed)
 log_info "Installing pi-failover extension..."

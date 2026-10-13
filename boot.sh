@@ -182,6 +182,13 @@ log_info "Pulling mnemon embedding model (nomic-embed-text)..."
 . "${LIB_DIR}/ollama.sh"
 pull_ollama_model "nomic-embed-text" >> "${boot_log}" 2>&1 &
 
+# Mnemon default seed import — single source in lib/mnemon.sh (deduplicated per #74 review 6133588996 §2.2).
+# Non-fatal, deduped, MODE-based seed path, --dry-run gated, embed --status.
+# shellcheck disable=SC1091
+. "${LIB_DIR}/mnemon.sh"
+# Log to boot.log; keep boot non-fatal even if seed missing/invalid.
+setup_mnemon_all "${MINIONS_HOME:-${HOME}/.minions}" >>"${boot_log}" 2>&1 || log_warn "Mnemon seed import encountered issues (non-fatal, see ${boot_log})"
+
 # Step 3b: Tailscale (opt-in, presence-gated, non-fatal)
 # Gate ONLY on managed install (MINIONS_HOME/bin) -- not system tailscale (fixes #2)
 # Auto-detect kernel TUN when host allows it (sudo + /dev/net/tun) else fallback to userspace+proxy.
@@ -248,7 +255,7 @@ TSEOF
             fi
             _TS_STATUS=""
             _ts_attempt=0
-            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null)
+            _TS_SOCK_UID=$(stat -c %u "${TAILSCALE_SOCKET}" 2>/dev/null || stat -f %u "${TAILSCALE_SOCKET}" 2>/dev/null || true)
             # Root-owned socket (kernel mode) is world-writable (srw-rw-rw- root:root) -- ownership, not writability (6102925874 #2)
             if [ -S "${TAILSCALE_SOCKET}" ] && [ -n "${_TS_SOCK_UID:-}" ] && [ "${_TS_SOCK_UID}" != "$(id -u)" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
                 _TS_SUDO_STATUS=1

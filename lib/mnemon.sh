@@ -24,7 +24,6 @@ install_mnemon() {
     fi
 
     echo "Installing Mnemon..."
-    # Try to download prebuilt binary first (faster than cargo)
     platform=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
     case "${arch}" in
@@ -33,10 +32,8 @@ install_mnemon() {
     esac
 
     mnemon_version="${MNEMON_VERSION:-0.2.9}"
-    # Strip leading 'v' if present (versions.env stores v0.2.10)
     mnemon_version="${mnemon_version#v}"
 
-    # Try latest release download
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/latest/download/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
@@ -46,7 +43,6 @@ install_mnemon() {
         return 0
     fi
 
-    # Fallback: try specific version from releases (without v prefix in URL)
     mnemon_url="https://github.com/mnemon-dev/mnemon/releases/download/v${mnemon_version}/mnemon_${mnemon_version}_${platform}_${arch}.tar.gz"
     echo "Attempting to download Mnemon from ${mnemon_url}..."
     if curl -fsSL "${mnemon_url}" | tar -xz -C "${install_dir}" mnemon 2>/dev/null; then
@@ -56,7 +52,6 @@ install_mnemon() {
         return 0
     fi
 
-    # Fallback to cargo if available
     if command -v cargo >/dev/null 2>&1; then
         cargo install mnemon --root "${install_dir}/mnemon-cargo" 2>/dev/null || true
         if [ -x "${install_dir}/mnemon-cargo/bin/mnemon" ]; then
@@ -72,7 +67,6 @@ install_mnemon() {
     return 1
 }
 
-# Ensure Mnemon is available
 ensure_mnemon() {
     minions_home=$1
 
@@ -85,45 +79,63 @@ ensure_mnemon() {
     mkdir -p "${minions_home}/lib/mnemon"
     install_mnemon "${minions_home}/lib/mnemon"
 
-    # Create symlink in bin
     if [ -x "${minions_home}/lib/mnemon/mnemon" ]; then
         ln -sf "${minions_home}/lib/mnemon/mnemon" "${minions_home}/bin/mnemon"
     fi
 }
 
-# Import Mnemon seed for a target (hermes, pi, or both)
-# Usage: import_mnemon_seed <target> <seed_file> [store_name]
+# Import Mnemon seed — dry-run validates, real import is deduped + non-fatal
+# Usage: import_mnemon_seed <seed_file>
 import_mnemon_seed() {
-    target=$1
-    seed_file=$2
-    store_name=${3:-default}
-
+    seed_file=$1
     if [ ! -f "${seed_file}" ]; then
         echo "Seed file not found: ${seed_file}" >&2
         return 1
     fi
-
-    echo "Importing Mnemon seed for ${target} from ${seed_file}..."
-
-    # Try with --dry-run first to validate, then import
-    if mnemon import --help 2>&1 | grep -q "import"; then
-        if mnemon import "${seed_file}" --data-dir "${HOME}/.mnemon" --store "${store_name}" 2>/dev/null; then
-            echo "Mnemon seed imported for ${target}"
-        else
-            echo "WARNING: Mnemon seed import failed for ${target} (non-fatal)" >&2
-            return 0  # Non-fatal
-        fi
+    if [ -x "${MINIONS_HOME}/bin/mnemon" ]; then
+        MNEMON_BIN="${MINIONS_HOME}/bin/mnemon"
+    elif command -v mnemon >/dev/null 2>&1; then
+        MNEMON_BIN="$(command -v mnemon)"
     else
-        echo "WARNING: mnemon import command not available, skipping seed import" >&2
-        return 0  # Non-fatal
+        echo "mnemon not found, skipping seed import" >&2
+        return 0
     fi
+    echo "Validating Mnemon seed ${seed_file}..."
+    if ! "${MNEMON_BIN}" import --dry-run "${seed_file}" >/dev/null 2>&1; then
+        echo "WARNING: mnemon import --dry-run failed for ${seed_file} (skipping)" >&2
+        return 0
+    fi
+    echo "Importing Mnemon seed from ${seed_file}..."
+    if "${MNEMON_BIN}" import "${seed_file}" 2>&1 | head -20; then
+        echo "Mnemon seed imported"
+    else
+        echo "WARNING: mnemon seed import failed (non-fatal)" >&2
+    fi
+    # Surface embedding coverage (degraded mode is ok — Ollama may still be pulling)
+    "${MNEMON_BIN}" embed --status 2>/dev/null | head -5 || true
+    return 0
 }
 
-# Setup Mnemon for all targets (hermes, pi, etc.)
+# Setup Mnemon for all targets — now seeds default knowledge (non-fatal)
 # Usage: setup_mnemon_all <minions_home>
-# Note: mnemon setup is disabled — user has their own mnemon plugin.
-# This function is a no-op (kept for compatibility with install.sh).
 setup_mnemon_all() {
-    echo "Mnemon setup disabled (user has their own mnemon plugin)."
+    _minions_home="${1:-${MINIONS_HOME}}"
+    # Resolve seed via MODE (dev -> repo, standalone -> MINIONS_HOME)
+    # MODE is set by detect_knowledge_mode (sourced by install.sh/boot.sh)
+    if [ "${MODE:-standalone}" = "dev" ] && [ -n "${MINIONS_REPO_ROOT:-}" ] && [ -f "${MINIONS_REPO_ROOT}/mnemon/seed.json" ]; then
+        _seed="${MINIONS_REPO_ROOT}/mnemon/seed.json"
+    elif [ -f "${_minions_home}/mnemon/seed.json" ]; then
+        _seed="${_minions_home}/mnemon/seed.json"
+    elif [ -f "${MINIONS_HOME}/mnemon/seed.json" ]; then
+        _seed="${MINIONS_HOME}/mnemon/seed.json"
+    else
+        echo "No mnemon seed found, skipping import"
+        return 0
+    fi
+    # Never abort install/boot on seed failure
+    set +e
+    import_mnemon_seed "${_seed}"
+    _rc=$?
+    set -e
     return 0
 }
