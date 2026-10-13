@@ -680,6 +680,27 @@
         "~/.hermes/skills/software-development"
       ],
       "source": "agent"
+    },
+    {
+      "content": "Skill: minions-llm-proxy-ops - 9Router/OmniRoute proxy ops. opencode.ai free tier 403s unless 9Router gets header overrides (PUT /api/providers/opencode/overrides: UA opencode/1.18.31, x-opencode-client:cli + ses_ session id; implemented in lib/9router.sh, see decolua/9router#4781). 9Router fallback counts empty in_progress as success - lead combos with a known-good model (oc/mimo-v2.6-flash-free) and assert non-empty content at >=128 max_tokens. OmniRoute does NOT accept this fix (needs keyed credentials) - route free oc/ through 9Router.",
+      "category": "insight",
+      "importance": 4,
+      "tags": [
+        "9router",
+        "omniroute",
+        "opencode",
+        "free-tier",
+        "llm-proxy",
+        "skill"
+      ],
+      "entities": [
+        "minions-llm-proxy-ops",
+        "9Router",
+        "OmniRoute",
+        "opencode",
+        "lib/9router.sh"
+      ],
+      "source": "agent"
     }
   ]
 }
