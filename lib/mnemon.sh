@@ -28,7 +28,7 @@ install_mnemon() {
     arch=$(uname -m)
     case "${arch}" in
         x86_64) arch="amd64" ;;
-        aarch64|arm64) arch="aarch64" ;;
+        aarch64|arm64) arch="arm64" ;;
     esac
 
     mnemon_version="${MNEMON_VERSION:-0.2.9}"
