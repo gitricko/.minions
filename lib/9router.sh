@@ -71,6 +71,9 @@ ninerouter_preconfigure() {
     # Create auto-fastest combo with free oc/ models (OpenCode free tier).
     # Keep this list in sync with https://opencode.ai/zen/v1/models (*-free /
     # *-contributor-free ids only); stale ids just lose to fallback.
+    # All ids below verified working (200 + content @ max_tokens=256); note
+    # thinking models need >16 tokens or they return empty content.
+    # Excluded: oc/union-alpha (upstream 400 "Model is unavailable", 2026-10).
     if ! curl -fsS -b "$COOKIE_FILE" \
         -X POST "$BASE_URL/api/combos" \
         -H "Content-Type: application/json" \
@@ -79,7 +82,16 @@ ninerouter_preconfigure() {
             "models": [
               "oc/mimo-v2.6-flash-free",
               "oc/muse-spark-1.2-contributor-free",
-              "oc/muse-spark-1.3-contributor-free"
+              "oc/muse-spark-1.3-contributor-free",
+              "oc/beam-free",
+              "oc/big-pickle",
+              "oc/deepseek-v4.1-flash-free",
+              "oc/glm-5.3-flash-free",
+              "oc/ll-alpha-free",
+              "oc/longcat-2.5-preview-free",
+              "oc/nemotron-3.5-lightning-free",
+              "oc/nemotron-3.5-super-vl-free",
+              "oc/space-bunny-free"
             ]
         }' >/dev/null 2>&1; then
         log_warn "ninerouter_preconfigure: failed to create auto-fastest combo"

@@ -256,7 +256,7 @@ jobs:
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Cache Ollama binary
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/minions-dts/ollama-${{ steps.ollama_version.outputs.version }}-linux-${{ runner.arch }}
           key: ollama-${{ steps.ollama_version.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
