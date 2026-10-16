@@ -34,8 +34,10 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
   9Router's combo fallback counts an empty `finish_reason:"in_progress"` (or
   `finish_length` with 0 visible tokens) response as SUCCESS, so a combo whose
   first model is silently broken returns empty content forever without ever
-  falling back. Always check: non-empty `choices[0].message.content` AND
-  `finish_reason == "stop"`. A 2xx with empty content is a failure.
+  falling back. Pass signal = non-empty `choices[0].message.content`; empty
+  content is a failure regardless of `finish_reason` (free models sometimes
+  return correct content with `finish_reason:"length"`, so don't require
+  `stop`). A 2xx with empty content is a failure.
 - **Lead a combo with the known-good model.** Since fallback only fires on
   hard errors, put the model that actually produces content FIRST in the combo
   model list; put flaky/unverified models after.
@@ -65,11 +67,16 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 5. Test with a real prompt at >=128 max_tokens (small budgets get eaten by
    reasoning tokens and look like empty failures):
    `POST /v1/chat/completions {"model":"auto-fastest","messages":[...],"stream":false,"max_tokens":128}`
-   Assert non-empty content + `finish_reason=stop`. If a model errors, read
+   Assert non-empty content. To validate a combo's model list, test each
+   member individually the same way — bare ids route directly
+   (`model=oc/<id>`), so you can run them in parallel and prune dead ids
+   before recreating the combo. If a model errors, read
    `~/.minions/var/log/9router.log` — it logs the upstream URL, status, and
    provider-side error body.
-6. If config must survive reboots, edit `lib/9router.sh` to match — the boot
-   preconfig overwrites combos and overrides every boot.
+6. Any change must land in `lib/9router.sh` or it is lost: the boot
+   preconfig deletes and recreates combos (and re-puts overrides) every boot,
+   so live-only edits — dashboard or ad-hoc API — silently revert on next
+   boot. Edit the script, then let boot apply it, or apply + edit together.
 
 ## Pitfalls
 
@@ -80,7 +87,10 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
   response passes `-f`. Parse the JSON body.
 - Free-tier endpoints are flaky: a 429/"Endpoint is unavailable" on one model
   is usually transient per-model, not a config error — try the other combo
-  members before changing config.
+  members before changing config. The opposite case is a deterministic 400
+  `Upstream request failed: Model is unavailable` that reproduces across
+  retries and token budgets: that's a dead id — drop it from the combo and
+  sync `lib/9router.sh`.
 - Some model ids need a different protocol than openai chat completions and
   fail with `ModelProtocolUnsupported` — exclude them from the combo rather
   than trying to force them.
