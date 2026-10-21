@@ -549,7 +549,17 @@ export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
 # booted stack (real-install CI failure). setup --non-interactive creates the DB;
 # the UPDATE then flips the flag. Verified in DTS: requireLogin=false -> GET
 # /v1/models returns 200 keyless.
-"${MINIONS_HOME}/bin/omniroute" setup --non-interactive --password 'minions123' >/dev/null 2>&1 || true
+#
+# OmniRoute >= 3.8.52 honors XDG_CONFIG_HOME: with the dir absent it relocates
+# its config+DB to ${XDG_CONFIG_HOME:-$HOME/.config}/omniroute (GitHub runners set
+# XDG), so the DB above is never created, login stays on, and the CI keep-config
+# check for ~/.omniroute fails because nothing ever created it. OmniRoute prefers
+# ~/.omniroute whenever it already exists, so pre-creating it pins the location.
+mkdir -p "${HOME}/.omniroute"
+OR_SETUP_LOG="${MINIONS_HOME}/var/log/omniroute-setup.log"
+if ! "${MINIONS_HOME}/bin/omniroute" setup --non-interactive --password 'minions123' >"${OR_SETUP_LOG}" 2>&1; then
+    log_warn "OmniRoute setup failed (see ${OR_SETUP_LOG})"
+fi
 # Disable login by writing the flag directly to the storage DB (needs no server).
 OR_DB="${HOME}/.omniroute/storage.sqlite"
 if [ -f "${OR_DB}" ]; then
