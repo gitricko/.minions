@@ -43,8 +43,8 @@ install_tailscale() {
         fi
     fi
 
-    tailscale_version="${TAILSCALE_VERSION:-v1.104.1}"
-    # Strip leading 'v' for pkgs URL (pkgs uses bare 1.104.1, deps.yaml stores v1.104.1)
+    tailscale_version="${TAILSCALE_VERSION:-v1.104.2}"
+    # Strip leading 'v' for pkgs URL (pkgs uses bare 1.104.2; the pin may or may not carry 'v')
     tailscale_version="${tailscale_version#v}"
 
     os=$(uname -s)
