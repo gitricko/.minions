@@ -47,7 +47,7 @@ dependencies:
 
 
   - name: NODE
-~    version: "26.12.1"
+    version: "26.12.1"
     source_type: release_tarball
     repo: nodejs/node
     release_url: https://nodejs.org/dist/v{{VERSION}}/
