@@ -32,7 +32,7 @@ dependencies:
     sha_source: none
 
   - name: OMNIROUTE
-    version: "3.8.51"
+    version: "3.8.52"
     source_type: npm
     package: omniroute
     channel: latest
@@ -60,39 +60,39 @@ dependencies:
       macos_arm64: "a2e255e35347f727f29aa158c552a60140b17b6ba68719d5d6fc46c7d058aa75"
 
   - name: UV
-    version: "0.13.1"
+    version: "0.13.4"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
-      linux_arm64: "9041c73c99fdc5892cf128140beb354eca9231d502068cc36e6cb53a8e59ad14"
-      macos_x64: "bb7b805bdcf3d0bc8c74ceb94569e6b3e8aa35bd492acdbb9d46bf46d9d4ff6b"
-      macos_arm64: "cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2"
+      linux_x64: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+      linux_arm64: "1ae72b4718729e2ccc4f1ae2c6d1e531ca8467800e0546e9130b3886023a60ab"
+      macos_x64: "7be2dcd316122f4b3e5a0a7889f6248266c14425374e105ff7dc9779184603a6"
+      macos_arm64: "e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1"
 
   - name: MNEMON
-    version: "v0.2.10"
+    version: "v0.2.12"
     source_type: github_tag
     repo: mnemon-dev/mnemon
     sha_source: none
 
   - name: OLLAMA
-    version: "v0.40.5"
+    version: "v0.40.6"
     source_type: github_tag
     repo: ollama/ollama
     release_url: https://github.com/ollama/ollama/releases/download/{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "dc5eabc292f9949546c90a97c820f924b035e05243b0de13c7f366182562169c"
-      linux_arm64: "fbe71ebb1a10e59b8480c4d2839826b5f9dff1a6d5c142428b2e7db9b1a2c642"
-      macos_x64: "75f9907dafa2fd4c61b5967de2ebb81ccc17eb28da9172edbad0dbc717474dcf"
-      macos_arm64: "75f9907dafa2fd4c61b5967de2ebb81ccc17eb28da9172edbad0dbc717474dcf"
+      linux_x64: "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0"
+      linux_arm64: "0a279d9428ad17b06fdb7dddf3b059b2c148433585fa3b30676a102fc459bb9f"
+      macos_x64: "b2b55434865a668decb494110d7fd970eed3ecc8837be2872f672ccbb95df974"
+      macos_arm64: "b2b55434865a668decb494110d7fd970eed3ecc8837be2872f672ccbb95df974"
 
   - name: TAILSCALE
-    version: "v1.104.1"
+    version: "1.104.2"
     source_type: release_tarball
     repo: tailscale/tailscale
     release_url: https://pkgs.tailscale.com/stable/
@@ -101,7 +101,7 @@ dependencies:
     sha_source: none
     platforms: [linux_x64, linux_arm64]
     sha256:
-      linux_x64: "108d1d96ecf410d305571e173516f27038f870919a9b89c914a167c6d33a4528"
-      linux_arm64: "f60294374967f3dfd8cf57bbbd474d6cfce32d123e3a8ddeab82a87940daa806"
+      linux_x64: "512f613ed7d04fc7282f7dc5bd76aa105aae28168fbb9357eb749ebcbc29f0ae"
+      linux_arm64: "5776aaa901b5ef1916e66be5bb54b9f481cd399c9c28db123a8cab620efa237b"
 
 
