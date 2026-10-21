@@ -17,9 +17,9 @@
 [![PI Agent](https://img.shields.io/badge/PI%20Agent-1.3.0-brown?logo=github)](https://pi.dev)
 [![OmniRoute](https://img.shields.io/badge/OmniRoute-3.8.52-orange?logo=npm)](https://www.npmjs.com/package/omniroute)
 [![9Router](https://img.shields.io/badge/9Router-0.5.104-green?logo=npm)](https://www.npmjs.com/package/9router)
-[![Ollama](https://img.shields.io/badge/Ollama-0.40.6-yellow?logo=ollama)](https://github.com/ollama/ollama)
+[![Ollama](https://img.shields.io/badge/Ollama-0.40.7-yellow?logo=ollama)](https://github.com/ollama/ollama)
 [![Mnemon](https://img.shields.io/badge/Mnemon-0.2.12-pink?logo=github)](https://github.com/mnemon-dev/mnemon)
-[![Node.js](https://img.shields.io/badge/Node.js-26.12.0-brightgreen?logo=node.js)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-26.12.1-brightgreen?logo=node.js)](https://nodejs.org)
 [![uv](https://img.shields.io/badge/uv-0.13.4-blue?logo=astral)](https://github.com/astral-sh/uv)
 
 <a href="https://github.com/gitricko/.minions/actions/workflows/ci.yml">
