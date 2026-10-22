@@ -41,9 +41,12 @@ Always source them from `etc/9router-models.json`, the single source of truth fo
 |------|------|----------|
 | Dry-run | `--dry-run` | Fetch upstream, show what would change; exit 0 if file would differ |
 | Check | `--check` | Same as dry-run but exits non-zero if file would change (advisory CI gate) |
-| Probe | `--probe` | Probe each model in `models[]` against running 9Router. Gates on 7352 liveness first (exit 2 if down). | **Yes** |
-| Write | `--write` | Regenerates `etc/9router-models.json` from upstream free-tier models (no probe). | No |
-| Probe-write | `--probe-write` | Gate on 7352 alive → probe all upstream free candidates → keep 200/429, drop 400/410, record dropped in `excluded`, write JSON. Refuses to write an empty models list. | **Yes** |
+| Probe | `--probe` | Probe each model in `models[]` against running 9Router; gates on 7352 liveness first, exit 2 if down |
+| Write | `--write` | Regenerates `etc/9router-models.json` from upstream free-tier models (no probe) |
+| Probe-write | `--probe-write` | Gate on 7352 alive, probe all upstream free candidates, keep 200/429, drop 400/410 into `excluded`, write JSON; refuses an empty models list |
+
+Needs a live 9Router on :7352: `--probe` (Yes), `--probe-write` (Yes);
+`--dry-run`/`--check`/`--write` (No — upstream API only).
 
 ### Probe / probe-write classification
 
