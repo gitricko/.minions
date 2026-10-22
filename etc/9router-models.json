@@ -18,6 +18,10 @@
     {
       "id": "oc/union-alpha",
       "reason": "Upstream 400 Model is unavailable (2026-10)"
+    },
+    {
+      "id": "oc/minimax-m3.1-flash-free",
+      "reason": "Upstream 410 ModelDeprecated — use deepseek-v4.1-flash-free (already in models)"
     }
   ],
   "models": [
@@ -27,7 +31,6 @@
     "oc/nemotron-3.5-super-vl-free",
     "oc/nemotron-3.5-lightning-free",
     "oc/deepseek-v4.1-flash-free",
-    "oc/glm-5.3-flash-free",
-    "oc/minimax-m3.1-flash-free"
+    "oc/glm-5.3-flash-free"
   ]
 }
