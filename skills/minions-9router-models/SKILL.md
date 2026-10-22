@@ -42,19 +42,21 @@ Always source them from `etc/9router-models.json`, the single source of truth fo
 | Dry-run | `--dry-run` | Fetch upstream, show what would change; exit 0 if file would differ |
 | Check | `--check` | Same as dry-run but exits non-zero if file would change (advisory CI gate) |
 | Probe | `--probe` | Probe each model in `models[]` against running 9Router; gates on 7352 liveness first, exit 2 if down |
-| Write | `--write` | Regenerates `etc/9router-models.json` from upstream free-tier models (no probe) |
-| Probe-write | `--probe-write` | Gate on 7352 alive, probe all upstream free candidates, keep 200/429, drop 400/410 into `excluded`, write JSON; refuses an empty models list |
+| Write | `--write` | Regenerates `etc/9router-models.json` from upstream free-tier models (no probe); preserves custom non-upstream `models[]` entries; refuses an empty final list |
+| Probe-write | `--probe-write` | Gate on 7352 alive, probe all upstream free candidates, keep 200/429, drop 400/404/410 into `excluded`, write JSON; refuses an empty models list |
 
 Needs a live 9Router on :7352: `--probe` (Yes), `--probe-write` (Yes);
 `--dry-run`/`--check`/`--write` (No — upstream API only).
+
+Unknown flags (e.g. a `--writ` typo) print usage and exit 2 — they never fall through to `--write`.
 
 ### Probe / probe-write classification
 
 | HTTP | Class | Action |
 |------|-------|--------|
 | 200 | OK | keep |
-| 429 | RATED-LIMIT | keep (free-tier rate-limit, not broken) |
-| 400/410 | HARD-FAIL | drop (deterministic ModelProtocolUnsupported / gone) |
+| 429 | RATED-LIMIT | keep (free-tier rate-limit, not broken — deliberate, do not "fix") |
+| 400/404/410 | HARD-FAIL | drop (deterministic: ModelProtocolUnsupported / unknown upstream / gone) |
 | other | UNKNOWN | keep (fail-open, surfaced) |
 
 `--probe` and `--probe-write` retry 429/5xx up to 3× with backoff, then classify.
@@ -62,8 +64,8 @@ Needs a live 9Router on :7352: `--probe` (Yes), `--probe-write` (Yes);
 ### Exit codes (repo convention 0 ok / 1 warnings / 2 critical)
 
 - **0** — ok; no failures / clean write / no drift
-- **1** — some model HARD-FAILED (advisory, CI continues); `--check` drift detected
-- **2** — 9Router unreachable at 7352 (probe and probe-write both bail before touching the JSON); `--probe-write` refusing an empty write
+- **1** — some model HARD-FAILED (advisory, CI continues); `--check` drift detected; `--write`/`--probe-write` refused an empty final models list
+- **2** — 9Router unreachable at 7352 (probe and probe-write both bail before touching the JSON); unknown CLI flag (usage error)
 
 ## Advisory CI model validity (`.github/workflows/ci.yml`)
 
@@ -71,7 +73,7 @@ Needs a live 9Router on :7352: `--probe` (Yes), `--probe-write` (Yes);
 
 ## Probe mode detail
 
-Uses `POST /v1/chat/completions` with `model=<id>` and `max_tokens=16`. 4xx (400/410) are deterministic failures → drop the model. 429 is rate-limiting → keep. All probe code shares: `probe_gate(base_url)` (TCP connect with 3s timeout), `probe_one(base_url, model_id)` (retries transient errors), `classify(code)` (shared 200/400/410/other mapping).  `--probe-write` also records a newly-dropped model into the `excluded` array (idempotent by id) and preserves non-upstream custom models the user may have added.
+Uses `POST /v1/chat/completions` with `model=<id>` and `max_tokens=16`. 4xx (400/404/410) are deterministic failures → drop the model. 429 is rate-limiting → keep (deliberate: quota ≠ broken). All probe code shares: `probe_gate(base_url)` (TCP connect with 3s timeout), `probe_one(base_url, model_id)` (retries transient errors), `classify(code)` (shared 200/400/404/410/other mapping).  `--probe-write` also records a newly-dropped model into the `excluded` array (idempotent by id) and preserves non-upstream custom models the user may have added.
 
 ## Runtime integration in `lib/9router.sh`
 

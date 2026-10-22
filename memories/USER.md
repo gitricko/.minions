@@ -21,5 +21,3 @@
 - Shell scripts: `sh`/`bash` with `set -euo pipefail` where appropriate.
 - Exit-code discipline: 0 = ok, 1 = warnings, 2 = critical (self-check).
 - Knowledge: 15 hermes-codespace skills ported; wiki + mnemon seed are in-progress.
-§
-User prefers concise direct answers with no filler, no re-explaining, no tool-call narration. Values root-cause fixes over symptom patches. TDD discipline with verified real-output. Gets frustrated when work items show "still not done."

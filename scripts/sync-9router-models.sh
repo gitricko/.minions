@@ -12,7 +12,7 @@ set -euo pipefail
 #   bash scripts/sync-9router-models.sh --probe      # probe each model; no write
 #   bash scripts/sync-9router-models.sh --probe-write
 #       Fetch upstream -> probe all free-tier candidates against a running
-#       9Router -> keep 200 (OK) and 429 (RATED-LIMIT) -> drop 400/410
+#       9Router -> keep 200 (OK) and 429 (RATED-LIMIT) -> drop 400/404/410
 #       (HARD-FAIL) -> write the surviving models back into the JSON.
 #       Requires running 9Router at NINEROUTER_BASE_URL (default 127.0.0.1:7352).
 
@@ -66,14 +66,16 @@ new_models_list = ['oc/' + id_ for id_ in upstream_ids if not _excluded(id_)]
 # ---------------------------------------------------------------------------
 # Classification shared by --probe and --probe-write
 #   200     -> OK           (model serves cleanly; keep)
-#   429     -> RATED-LIMIT  (exists, free-quota only; keep)
-#   400/410 -> HARD-FAIL    (deterministic unsupported/gone; drop)
-#   other   -> UNKNOWN      (surfaced; keep - safer to fail open)
+#   429     -> RATED-LIMIT  (exists, free-quota only; keep — deliberately NOT a failure; rate-limit ≠ broken)
+#   400/404/410 -> HARD-FAIL (deterministic unsupported/gone/unknown; drop)
+#   other   -> UNKNOWN      (surfaced; keep — safer to fail open)
 # ---------------------------------------------------------------------------
 def classify(code):
     if code == 200:            return 'OK'
+    # 429 = free-tier quota. Deliberate: rate-limited means the model EXISTS.
+    # Do not "fix" this to drop — that discards every model during a burst.
     if code == 429:            return 'RATED-LIMIT'
-    if code in (400, 410):     return 'HARD-FAIL'
+    if code in (400, 404, 410): return 'HARD-FAIL'
     return 'UNKNOWN'
 
 # ---------------------------------------------------------------------------
@@ -95,7 +97,7 @@ def probe_one(base_url, model_id):
     """One LM request; returns (final_code, detail).
 
     Retries 429/5xx transient errors up to 3 times with backoff.
-    400/410 are deterministic - return immediately.
+    400/404/410 are deterministic - return immediately.
     """
     last_code, last_detail = -1, ''
     for attempt in range(3):
@@ -115,7 +117,7 @@ def probe_one(base_url, model_id):
         except urllib.error.HTTPError as e:
             body = e.read().decode()[:120]
             last_code, last_detail = e.code, body[:80]
-            if e.code in (400, 410):
+            if e.code in (400, 404, 410):
                 return (last_code, last_detail)
             if e.code == 429 or e.code >= 500:
                 time.sleep(1.5 * (attempt + 1))
@@ -196,7 +198,7 @@ elif mode == "probe":
     print()
     hard = counts.get('HARD-FAIL', 0)
     if hard:
-        print(f'{hard} model(s) hard-failed (400/410). Run --probe-write to drop them.')
+        print(f'{hard} model(s) hard-failed (400/404/410). Run --probe-write to drop them.')
         sys.exit(1)
     if counts.get('UNKNOWN'):
         print(f'{counts["UNKNOWN"]} model(s) unknown-status; kept. See lines above.')
@@ -314,7 +316,7 @@ case "${1:-check}" in
         echo "(Upstream fetch status: $FETCHED)"
         ;;
 
-    --write|*)
+    --write)
         echo "Writing etc/9router-models.json from upstream (no probe)..."
         python3 - "$JSON_FILE" "$TMPFILE" <<'PYEOF'
 import json, sys
@@ -338,19 +340,43 @@ def _excluded(bare_id):
 
 new_models_list = ['oc/' + id_ for id_ in upstream_ids if not _excluded(id_)]
 
+# Preserve any models already in the current file that are NOT in the
+# upstream free-tier set (e.g. a user-added custom model) — same semantics
+# as --probe-write, so hand-edited entries survive --write regeneration.
+existing  = current_data.get('models', [])
+upstreams = set(new_models_list)
+preserved = [m for m in existing if m not in upstreams]
+final_models = list(new_models_list) + preserved
+
+# Safety: refuse to write an empty models list (broken upstream shape /
+# all free models excluded) — see the identical guard in --probe-write.
+if not final_models:
+    print()
+    print('ERROR: final models list would be empty. Refusing to write.')
+    print('Either upstream returned nothing or every candidate is excluded.')
+    sys.exit(1)
+
 new_data = dict(current_data)
-new_data['models'] = new_models_list
+new_data['models'] = final_models
 
 with open(json_file, 'w') as f:
     json.dump(new_data, f, indent=2)
     f.write('\n')
 
 print(f'OK: {json_file} regenerated from upstream')
-print(f'  models: {len(new_data["models"])}')
+print(f'  models: {len(final_models)} (upstream={len(new_models_list)} + preserved={len(preserved)})')
 print(f'  combo:  {new_data.get("combo")}')
 print(f'  strategy: {new_data.get("strategy")}')
 for e in new_data.get('excluded', []):
     print(f'    excluded: {e["id"]} - {e.get("reason", "")}')
 PYEOF
+        ;;
+
+    *)
+        echo "ERROR: unknown argument: ${1}" >&2
+        echo "" >&2
+        echo "Usage: bash scripts/sync-9router-models.sh [--dry-run | --check | --write | --probe | --probe-write]" >&2
+        echo "  (no argument = --check)" >&2
+        exit 2
         ;;
 esac
