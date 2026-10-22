@@ -64,7 +64,7 @@ Always source them from `etc/9router-models.json`, the single source of truth fo
 
 ## Advisory CI model validity (`.github/workflows/ci.yml`)
 
-`9router-model-check` runs `bash scripts/sync-9router-models.sh --check` — single implementation, no inline reparse. `continue-on-error: true`, gated on infrastructure-changes. The offline `tests/test_9router_models.sh` runs in the blocking `test` job. Probe is NOT in CI (GitHub runners don't have 9Router running); run `--probe` / `--probe-write` manually or on a schedule.
+`router-model-check` (job ID; display name "9Router Model Validity (advisory)") runs `bash scripts/sync-9router-models.sh --check` — single implementation, no inline reparse. `continue-on-error: true`, gated on infrastructure-changes. The offline `tests/test_9router_models.sh` runs in the blocking `test` job. Probe is NOT in CI (GitHub runners don't have 9Router running); run `--probe` / `--probe-write` manually or on a schedule.
 
 ## Probe mode detail
 

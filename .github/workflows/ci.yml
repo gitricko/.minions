@@ -196,7 +196,7 @@ jobs:
   # remove). Logic lives in scripts/sync-9router-models.sh --check so this CI
   # job and the local script can never disagree. Never blocks the PR.
   # ─────────────────────────────────────────────────────────────────
-  9router-model-check:
+  router-model-check:
     name: 9Router Model Validity (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
