@@ -13,3 +13,9 @@ version-check:
 
 version-update:
 	./scripts/admin-update.sh
+
+sync-9router-models:
+	./scripts/sync-9router-models.sh
+
+check-9router-models:
+	./scripts/sync-9router-models.sh --probe
