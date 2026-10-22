@@ -141,6 +141,11 @@ jobs:
           set -e
           bash tests/test_uninstall.sh
 
+      - name: Run 9Router models JSON test (offline structural validation)
+        run: |
+          set -e
+          bash tests/test_9router_models.sh
+
       - name: Knowledge layer global checks (F1 shell syntax, F3 JSON, F5 no .devcontainer refs)
         run: |
           # These validate file integrity without needing services/install.
@@ -184,7 +189,33 @@ jobs:
           set -e
           bash scripts/sync-versions.sh --check
           bash scripts/sync-readme-badges.sh --check
-
+  # ─────────────────────────────────────────────────────────────────
+  # Advisory: 9Router model validity (not blocking)
+  # Drift-checks etc/9router-models.json against the live upstream free-tier
+  # list and NAMES any model that is no longer valid (that is the one to
+  # remove). Logic lives in scripts/sync-9router-models.sh --check so this CI
+  # job and the local script can never disagree. Never blocks the PR.
+  # ─────────────────────────────────────────────────────────────────
+  router-model-check:
+    name: 9Router Model Validity (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check 9Router model drift (advisory)
+        # --check fetches https://opencode.ai/zen/v1/models via curl, diffs the
+        # free-tier ids against our JSON (honoring the excluded list) and
+        # prints the specific dead / missing models. Exit 1 = drift; advisory,
+        # so CI continues.
+        run: |
+          set -e
+          bash scripts/sync-9router-models.sh --check
+          echo "---"
+          echo "Model drift check complete (advisory; CI continues on error)"
   # ─────────────────────────────────────────────────────────────────
   # Advisory: how far behind upstream are our pins? Never blocks a PR.
   # Pattern borrowed from gitricko/pi-failover#8, where CI, code and the

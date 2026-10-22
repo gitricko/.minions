@@ -69,31 +69,37 @@ ninerouter_preconfigure() {
     fi
 
     # Create auto-fastest combo with free oc/ models (OpenCode free tier).
-    # Keep this list in sync with https://opencode.ai/zen/v1/models (*-free /
-    # *-contributor-free ids only); stale ids just lose to fallback.
-    # All ids below verified working (200 + content @ max_tokens=256); note
-    # thinking models need >16 tokens or they return empty content.
-    # Excluded: oc/union-alpha (upstream 400 "Model is unavailable", 2026-10).
+    # Read the model list from etc/9router-models.json so it can be edited
+    # without touching this script. Resolve a stable absolute path: prefer
+    # $MINIONS_HOME (set by boot.sh); fall back to this script's own dir's
+    # ../etc (installed ~/.minions/lib -> ~/.minions/etc; repo lib -> repo etc);
+    # then plain CWD-relative as a last resort (dev run from repo root).
+    SH_DIR=$(cd "$(dirname "$0")" && pwd 2>/dev/null) || SH_DIR=""
+    if [ -n "${MINIONS_HOME:-}" ] && [ -f "${MINIONS_HOME}/etc/9router-models.json" ]; then
+        MODELS_FILE="${MINIONS_HOME}/etc/9router-models.json"
+    elif [ -n "$SH_DIR" ] && [ -f "${SH_DIR}/../etc/9router-models.json" ]; then
+        MODELS_FILE="${SH_DIR}/../etc/9router-models.json"
+    elif [ -f "etc/9router-models.json" ]; then
+        MODELS_FILE="etc/9router-models.json"
+    else
+        log_warn "ninerouter_preconfigure: etc/9router-models.json not found"
+        return 1
+    fi
+
+    MODELS_JSON=$(MODELS_FILE="$MODELS_FILE" python3 -c "
+import json, os
+with open(os.environ['MODELS_FILE']) as f:
+    data = json.load(f)
+print(json.dumps(data['models']))
+") || {
+        log_warn "ninerouter_preconfigure: could not read $MODELS_FILE"
+        return 1
+    }
+
     if ! curl -fsS -b "$COOKIE_FILE" \
         -X POST "$BASE_URL/api/combos" \
         -H "Content-Type: application/json" \
-        -d '{
-            "name": "auto-fastest",
-            "models": [
-              "oc/mimo-v2.6-flash-free",
-              "oc/muse-spark-1.2-contributor-free",
-              "oc/muse-spark-1.3-contributor-free",
-              "oc/beam-free",
-              "oc/big-pickle",
-              "oc/deepseek-v4.1-flash-free",
-              "oc/glm-5.3-flash-free",
-              "oc/ll-alpha-free",
-              "oc/longcat-2.5-preview-free",
-              "oc/nemotron-3.5-lightning-free",
-              "oc/nemotron-3.5-super-vl-free",
-              "oc/space-bunny-free"
-            ]
-        }' >/dev/null 2>&1; then
+        -d "{\"name\":\"auto-fastest\",\"models\":$MODELS_JSON}" >/dev/null 2>&1; then
         log_warn "ninerouter_preconfigure: failed to create auto-fastest combo"
         return 1
     fi

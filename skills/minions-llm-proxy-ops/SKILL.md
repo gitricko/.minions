@@ -48,6 +48,14 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 - **9Router dashboard login**: default password `123456`; cookie session via
   `POST /api/auth/login`. All admin APIs need the cookie (`-b "$COOKIE"`).
   `requireLogin`/`requireApiKey` are disabled by preconfig.
+- **9Router combo model list lives in `etc/9router-models.json` (single
+  source). 9Router only — `lib/omniroute.sh` is NOT wired to it.**
+  `lib/9router.sh` reads that file at boot — never duplicate the list inline
+  in a shell script. `tests/test_9router_models.sh` (blocking CI) is an OFFLINE
+  structural guard; `scripts/sync-9router-models.sh` owns upstream drift
+  (`--check`/`--write`) and live probing (`--probe`, `--probe-write` need a
+  running 9Router on :7352: keep 200/429, drop 400/410).
+
 - **Config lives in 9Router's own DB, keyed by canonical provider id.**
   `PUT /api/providers/<id>/overrides` REPLACES the whole header map for that
   provider (idempotent; send the full map each time). `POST /api/combos` +

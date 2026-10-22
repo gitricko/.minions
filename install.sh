@@ -331,6 +331,15 @@ if [ "${INSTALL_NINEROUTER}" -eq 1 ]; then
     ensure_9router
 fi
 
+# Ship the auto-fastest combo model list. 9Router-only (lib/9router.sh reads
+# it at boot); gated on INSTALL_NINEROUTER, NOT on INSTALL_PI — a --no-pi
+# install still runs 9Router and needs this file (review: INSTALL_PI gate).
+if [ "${INSTALL_NINEROUTER}" -eq 1 ] && [ -f "${SCRIPT_DIR}/etc/9router-models.json" ]; then
+    mkdir -p "${HOME}/.minions/etc"
+    cp -f "${SCRIPT_DIR}/etc/9router-models.json" "${HOME}/.minions/etc/9router-models.json"
+    log_info "Created ~/.minions/etc/9router-models.json"
+fi
+
 if [ "${INSTALL_HERMES}" -eq 1 ]; then
     log_info "Installing Hermes..."
     ensure_hermes
