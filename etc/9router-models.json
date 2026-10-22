@@ -1,0 +1,33 @@
+{
+  "combo": "auto-fastest",
+  "strategy": "auto",
+  "source": "https://opencode.ai/zen/v1/models",
+  "filter": [
+    "*-free",
+    "*-contributor-free"
+  ],
+  "excluded": [
+    {
+      "id": "oc/ll-alpha-free",
+      "reason": "Model is unavailable upstream (2026-10)"
+    },
+    {
+      "id": "oc/jev-1.13-free",
+      "reason": "ModelProtocolUnsupported over chat completions"
+    },
+    {
+      "id": "oc/union-alpha",
+      "reason": "Upstream 400 Model is unavailable (2026-10)"
+    }
+  ],
+  "models": [
+    "oc/beam-free",
+    "oc/flint-40b-free",
+    "oc/mimo-v2.6-flash-free",
+    "oc/nemotron-3.5-super-vl-free",
+    "oc/nemotron-3.5-lightning-free",
+    "oc/deepseek-v4.1-flash-free",
+    "oc/glm-5.3-flash-free",
+    "oc/minimax-m3.1-flash-free"
+  ]
+}

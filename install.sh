@@ -473,6 +473,12 @@ if [ "${INSTALL_PI}" -eq 1 ]; then
         log_info "Created ~/.pi/agent/models.json"
     fi
 
+    # Copy 9router-models.json (runtime data file for auto-fastest combo)
+    if [ -f "${SCRIPT_DIR}/etc/9router-models.json" ]; then
+        cp -f "${SCRIPT_DIR}/etc/9router-models.json" "${HOME}/.minions/etc/9router-models.json"
+        log_info "Created ~/.minions/etc/9router-models.json"
+    fi
+
     # Phase 24: Pi shared-skills wiring — point Pi at the SAME skills/ Hermes loads.
     # dev -> repo skills; standalone -> ~/.minions/skills (copied by install).
     # settings.json is NOT unused anymore: it now carries the "skills" array plus
