@@ -39,7 +39,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.104"
+    version: "0.5.109"
     source_type: npm
     package: 9router
     channel: latest
@@ -79,17 +79,17 @@ dependencies:
     sha_source: none
 
   - name: OLLAMA
-    version: "v0.40.8"
+    version: "v0.40.9"
     source_type: github_tag
     repo: ollama/ollama
     release_url: https://github.com/ollama/ollama/releases/download/{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "0bb17cc19e9c1339ddbe0cba55148bf068f8f19dec8ec5fd531461aaa207282a"
-      linux_arm64: "f2e512f67f86ac5c53847e4e586ca8a9d3f359faf7a71cd69e37f12dcc63ded0"
-      macos_x64: "29fce20c736f62aa8885b1e83552c5fd8dcc63edc5ffc1b47f2de591a06cde44"
-      macos_arm64: "29fce20c736f62aa8885b1e83552c5fd8dcc63edc5ffc1b47f2de591a06cde44"
+      linux_x64: "01f0d0ae50cad3295a79a165033a65cf324f8ae5f7be64679464d29ecf28d67c"
+      linux_arm64: "2a328795709135fcf0c011b9e2634431ab6f2fcab57ca11264725446cf4894b0"
+      macos_x64: "cdfaee591d3ba7753e1bb4ae28be228ef7488199f263b7f202e0eddc900c08f4"
+      macos_arm64: "cdfaee591d3ba7753e1bb4ae28be228ef7488199f263b7f202e0eddc900c08f4"
 
   - name: TAILSCALE
     version: "1.104.2"
