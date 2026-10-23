@@ -9,6 +9,17 @@ omniroute_preconfigure() {
     export PATH="${MINIONS_HOME}/lib/node/bin:${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules/.bin:${PATH}"
     export NODE_PATH="${MINIONS_HOME}/lib/omniroute/npm/lib/node_modules"
 
+    # Enable prompt compression (master toggle) + CCR & headroom engines +
+    # Caveman LLM-output compression. Idempotent PUT; safe on every boot.
+    OMNI_BASE="http://${OMNIROUTE_HOST:-127.0.0.1}:${OMNIROUTE_PORT:-20128}"
+    if curl -fsS -X PUT "${OMNI_BASE}/api/settings/compression" \
+        -H "Content-Type: application/json" \
+        -d '{"enabled":true,"engines":{"ccr":{"enabled":true},"headroom":{"enabled":true}},"cavemanOutputMode":{"enabled":true,"intensity":"full","autoClarity":true}}' >/dev/null 2>&1; then
+        echo "OmniRoute preconfig: compression (CCR+headroom+caveman) enabled"
+    else
+        echo "WARNING: omniroute compression settings failed" >&2
+    fi
+
     echo "OmniRoute preconfig: checking auto-fastest combo..."
     # Check if combo already exists (avoids "already exists" error on retry)
     if "${omniroute_bin}" combo list --json 2>/dev/null | grep -q '"name": "auto-fastest"'; then
