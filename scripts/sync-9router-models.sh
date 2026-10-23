@@ -291,7 +291,9 @@ elif mode == "probe-write":
 PYEOF
 }
 
-case "${1:-check}" in
+# Default to --check when invoked with no argument (Makefile target does this).
+# ${1:---check} = "$1" if set, else the literal "--check".
+case "${1:---check}" in
     --dry-run)
         echo "=== Dry run: showing what would change ==="
         read_json_and_check "etc/9router-models.json" "$TMPFILE" "dry-run"
@@ -373,7 +375,7 @@ PYEOF
         ;;
 
     *)
-        echo "ERROR: unknown argument: ${1}" >&2
+        echo "ERROR: unknown argument: ${1:-}" >&2
         echo "" >&2
         echo "Usage: bash scripts/sync-9router-models.sh [--dry-run | --check | --write | --probe | --probe-write]" >&2
         echo "  (no argument = --check)" >&2

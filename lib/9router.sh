@@ -38,12 +38,13 @@ ninerouter_preconfigure() {
         return 1
     fi
 
-    # Disable dashboard login and API-key enforcement
+    # Disable dashboard login and API key enforcement (also enables the
+    # token-saver toggles: Compress LLM output / Caveman, Lazy senior dev / Ponytail)
     if ! curl -fsS -b "$COOKIE_FILE" \
         -X PATCH "$BASE_URL/api/settings" \
         -H "Content-Type: application/json" \
-        -d '{"requireLogin":false,"requireApiKey":false}' >/dev/null 2>&1; then
-        log_warn "ninerouter_preconfigure: failed to disable login/api-key"
+        -d '{"requireLogin":false,"requireApiKey":false,"cavemanEnabled":true,"ponytailEnabled":true}' >/dev/null 2>&1; then
+        log_warn "ninerouter_preconfigure: failed to disable login/api-key or set saver toggles"
         return 1
     fi
 
