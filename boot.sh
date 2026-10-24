@@ -143,6 +143,14 @@ log_info "Starting OmniRoute (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})..."
 # --no-open suppresses the browser. NO --daemon: start_service backgrounds via
 # setsid and tracks the PID; --daemon would fork a detached child the pid files
 # can't track (verified working invocation is `nohup omniroute serve --no-open`).
+# Fix for 504 "Fetch timeout after 110000ms": OMNIROUTE_FETCH_START_TIMEOUT_CAP_MS
+# is the streaming response-header wait (default 110000ms, open-sse
+# fetchStartTimeoutPolicy) — it fired on the slow 100.79.117.84:11434 provider.
+# NOT OMNIROUTE_DIRECT_HEADERS_TIMEOUT_MS: that's the pooled direct-socket
+# response-start window (zombie-keepalive detection, default 30s). Left at 30s —
+# public upstreams keep fast dead-socket retries; local/LAN targets (incl. Tailscale
+# 100.x, ollama) already get the built-in 300s local floor (LOCAL_DIRECT default).
+export OMNIROUTE_FETCH_START_TIMEOUT_CAP_MS=300000
 start_service "omniroute" \
     "${MINIONS_HOME}/bin/omniroute" \
     serve --port "${OMNIROUTE_PORT}" --no-open \

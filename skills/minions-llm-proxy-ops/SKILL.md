@@ -86,6 +86,65 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
    so live-only edits — dashboard or ad-hoc API — silently revert on next
    boot. Edit the script, then let boot apply it, or apply + edit together.
 
+## Add an OpenAI-compatible provider (OmniRoute :20128), wire a model into `auto-fastest`
+
+`scripts/add-tailscale-provider.sh <host[:port]>` — lives in the skill's
+`scripts/` dir (this repo: `skills/minions-llm-proxy-ops/scripts/`; standalone
+install: `~/.minions/skills/minions-llm-proxy-ops/scripts/`). Idempotent,
+`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
+`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`.
+The five REST steps below are the verified sequence (OmniRoute 3.8.53) and how
+the script works — use them as the manual/API reference for any new upstream
+that only needs a base URL:
+
+1. **Create the NODE** — `POST /api/provider-nodes` with
+   `{name, type:"openai-compatible", baseUrl:"http://<host:port>/v1",
+   prefix:name, apiType:"chat"}`. `baseUrl` MUST end in `/v1` (the base for the
+   OpenAI-compatible endpoints) and OMIT `chatPath`/`modelsPath` entirely —
+   the server stores them `null` (its own default), which is the correct shape.
+   The **server generates** the concrete id `openai-compatible-chat-<uuid>` —
+   that uuid IS the provider id used by `/api/providers` and combos. **Pitfalls
+   (verified against OmniRoute 3.8.53):** explicit `null` → `400 Invalid input`
+   (so omit the keys, don't null them); non-null strings like
+   `"/v1/chat/completions"` → `201` but **wrong** — they double the `/v1`
+   `baseUrl` already carries, producing `.../v1/v1/...`. If you ever DO set
+   them, use bare `"/chat/completions"` or `"/models"` (no `/v1`).
+2. **Create the CONNECTION** — `POST /api/providers` with
+   `{provider:"<node-id>", name, apiKey:"<any non-empty string>", priority,
+   providerSpecificData:{prefix, apiType:"chat", baseUrl, nodeName:name}}`.
+   **Pitfall:** a keyless connection is rejected (`"API key is required"` /
+   `"does not allow a connection without a credential"`). The key value is
+   ignored by the upstream; a dummy credential is fine. `omniroute providers
+   add openai-compatible …` fails with `Invalid provider` because the CLI will
+   not accept the abstract type — the node must exist first and the concrete
+   id must be passed.
+3. **Activate** — `PUT /api/providers/<cid> {"isActive":true}`. The connection
+   is created `isActive:false`; activation returns `testStatus:"active"`
+   immediately when the upstream is reachable.
+4. **Import the model** — `POST /api/provider-models {provider:"<node-id>",
+   modelId}`. The alternate `validate-and-add` endpoint requires a real
+   `Authorization` header on this deployment and 401s — use the plain one.
+5. **Append to `auto-fastest`** — `GET /api/combos`, find `auto-fastest`, add
+   `{id:"<combo>-model-<name>-<model>", kind:"model", model:"<name>/<model>",
+   providerId:"<node-id>", weight:0}` to `models[]`, then `PUT /api/combos/<id>`
+   with the FULL body `{name, strategy, enabled, config, models}`. **Pitfall:**
+   `PUT` rejects a body that has only `models` (`COMBO_001 Invalid JSON body`).
+   `POST /api/combos` upserts by name, so it works for both create and re-list.
+
+**Teardown (safe):** `omniroute providers remove <name> --yes` does an exact
+name match (no substrings) — verified in `resolveRemoteConnection` →
+`findConnectionFromResponse`. `DELETE /api/provider-nodes/<node-id>` removes
+the node. To strip a line from a combo: `PUT /api/combos/<id>` with the
+filtered `models` (don't send `id`/`sortOrder`/`isHidden` in the body).
+
+**Watch for server-side side effects:** the OmniRoute `ModelSync` job runs on a
+timer and has been observed removing an existing duplicate connection on the
+same provider node during an unrelated create/delete window (2026-10-23,
+`main-2` on the `ollama` node vanished while adding/removing a *different*
+node). Always snapshot `GET /api/providers` plus the `provider_nodes` /
+`provider_connections` rows before and after, so collateral damage is caught
+and reported, not hidden.
+
 ## Pitfalls
 
 - Don't test with tiny max_tokens (16–32): free models spend the budget on
