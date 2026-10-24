@@ -7,7 +7,8 @@ set -euo pipefail
 # What it does (mirrors the OmniRoute "Add OpenAI Compatible" flow, verified
 # against the live server):
 #   1. Create (find-or-create) the provider NODE named `tailscale`,
-#      type openai-compatible, base URL        http://<IP>/v1
+#      type openai-compatible, base URL        http://<host:port>/v1
+#      chatPath/modelsPath left to the server's defaults (NOT set),
 #      → POST /api/provider-nodes
 #   2. Add a CONNECTION on that node. No real key is needed, so a dummy
 #      credential is stored (OmniRoute rejects keyless OpenAI-compatible
@@ -29,7 +30,8 @@ set -euo pipefail
 #       ./scripts/add-tailscale-provider.sh 100.79.117.84
 #
 # Environment:
-#   TSC_IP              (alt to the positional arg) IP of the Tailscale peer
+#   TSC_IP              (alt to the positional arg) IP or host[:port] of the peer
+#   TSC_PORT            port for a bare-host arg (default: 11434)
 #   MODEL_NAME          model id to import + combo-ify (default: qwen3.8:27b)
 #   PROVIDER_NAME       provider/node/connection name (default: tailscale)
 #   OMNIROUTE_BASE_URL  OmniRoute server (default: http://127.0.0.1:20128)
@@ -62,6 +64,7 @@ if ((${#ARGS[@]} >= 1)); then
     TSC_IP="${TSC_IP:-${ARGS[0]}}"
 fi
 TSC_IP="${TSC_IP:-}"
+TSC_PORT="${TSC_PORT:-11434}"
 
 MODEL_NAME="${MODEL_NAME:-qwen3.8:27b}"
 PROVIDER_NAME="${PROVIDER_NAME:-tailscale}"
@@ -73,14 +76,20 @@ if [[ -z "$TSC_IP" ]]; then
     echo "ERROR: no IP address given. Usage: $0 <ip-address>" >&2
     exit 2
 fi
-# Validate the token looks like an IP or hostname (no spaces / no : that's a base-url).
+# Validate the token looks like a host or host:port (no spaces / no scheme).
 if [[ "$TSC_IP" =~ [[:space:]] || "$TSC_IP" == *://* ]]; then
-    echo "ERROR: '$TSC_IP' looks like a URL, not a bare IP/host." >&2
-    echo "Hint: pass just the host (e.g. 100.79.117.84), the script appends ':11434/v1'." >&2
+    echo "ERROR: '$TSC_IP' looks like a URL, not a bare host or host:port." >&2
+    echo "Hint: pass the host (e.g. 100.XX.XXX.XX or 100.XX.XXX.XX:11434)." >&2
     exit 2
 fi
-# Allow bare IP or IP:PORT; build the OpenAI-compatible base URL.
-TSC_BASE="http://${TSC_IP}/v1"
+# Accept host or host:port; default the port when a bare host is given,
+# then build the OpenAI-compatible base URL (baseUrl ends in /v1).
+if [[ "$TSC_IP" == *:* ]]; then
+    TSC_HOSTPORT="$TSC_IP"
+else
+    TSC_HOSTPORT="${TSC_IP}:${TSC_PORT}"
+fi
+TSC_BASE="http://${TSC_HOSTPORT}/v1"
 
 if [[ "${TSC_DRY_VERBOSE:-0}" == "1" ]]; then
     echo "provider  = ${PROVIDER_NAME}"
@@ -155,8 +164,9 @@ node_body = {
     "baseUrl": TSC_BASE,
     "prefix": NAME,
     "apiType": "chat",
-    "chatPath": "/v1/chat/completions",
-    "modelsPath": "/v1/models",
+    # chatPath/modelsPath intentionally omitted -> OmniRoute uses its own
+    # defaults (setting them to null is a 400, and non-null /v1 strings
+    # double the /v1 that baseUrl already carries).
 }
 
 # In dry-run we don't create, so give a readable placeholder for the display.

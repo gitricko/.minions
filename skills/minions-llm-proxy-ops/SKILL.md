@@ -88,18 +88,25 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 
 ## Add an OpenAI-compatible provider (OmniRoute :20128), wire a model into `auto-fastest`
 
-`scripts/add-tailscale-provider.sh <ip>` does this idempotently (`--dry-run`
-supported; `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`).
+`scripts/add-tailscale-provider.sh <host[:port]>` does this idempotently
+(`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
+`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`).
 The five REST steps below are the verified sequence (OmniRoute 3.8.53) and how
 the script works — use them as the manual/API reference for any new upstream
 that only needs a base URL:
 
 1. **Create the NODE** — `POST /api/provider-nodes` with
-   `{name, type:"openai-compatible", baseUrl:"http://<ip>/v1", prefix:name,
-   apiType:"chat", chatPath:"/v1/chat/completions", modelsPath:"/v1/models"}`.
+   `{name, type:"openai-compatible", baseUrl:"http://<host:port>/v1",
+   prefix:name, apiType:"chat"}`. `baseUrl` MUST end in `/v1` (the base for the
+   OpenAI-compatible endpoints) and OMIT `chatPath`/`modelsPath` entirely —
+   the server stores them `null` (its own default), which is the correct shape.
    The **server generates** the concrete id `openai-compatible-chat-<uuid>` —
-   that uuid IS the provider id used by `/api/providers` and combos. **Pitfall:**
-   `chatPath`/`modelsPath` must be non-null strings; `null` → `400 Invalid input`.
+   that uuid IS the provider id used by `/api/providers` and combos. **Pitfalls
+   (verified against OmniRoute 3.8.53):** explicit `null` → `400 Invalid input`
+   (so omit the keys, don't null them); non-null strings like
+   `"/v1/chat/completions"` → `201` but **wrong** — they double the `/v1`
+   `baseUrl` already carries, producing `.../v1/v1/...`. If you ever DO set
+   them, use bare `"/chat/completions"` or `"/models"` (no `/v1`).
 2. **Create the CONNECTION** — `POST /api/providers` with
    `{provider:"<node-id>", name, apiKey:"<any non-empty string>", priority,
    providerSpecificData:{prefix, apiType:"chat", baseUrl, nodeName:name}}`.
