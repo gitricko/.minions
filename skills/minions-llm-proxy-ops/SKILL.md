@@ -88,9 +88,11 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 
 ## Add an OpenAI-compatible provider (OmniRoute :20128), wire a model into `auto-fastest`
 
-`scripts/add-tailscale-provider.sh <host[:port]>` does this idempotently
-(`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
-`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`).
+`scripts/add-tailscale-provider.sh <host[:port]>` — lives in the skill's
+`scripts/` dir (this repo: `skills/minions-llm-proxy-ops/scripts/`; standalone
+install: `~/.minions/skills/minions-llm-proxy-ops/scripts/`). Idempotent,
+`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
+`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`.
 The five REST steps below are the verified sequence (OmniRoute 3.8.53) and how
 the script works — use them as the manual/API reference for any new upstream
 that only needs a base URL:

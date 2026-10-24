@@ -24,10 +24,10 @@ set -euo pipefail
 #
 # Every step is idempotent: re-running with the same IP is a no-op / update.
 #
-# Usage:
-#   ./scripts/add-tailscale-provider.sh <ip-address>
+# Usage (from repo root or from the skill's scripts/ dir):
+#   skills/minions-llm-proxy-ops/scripts/add-tailscale-provider.sh <ip-address>
 #   PROVIDER_NAME=tailscale MODEL_NAME=qwen3.8:27b \
-#       ./scripts/add-tailscale-provider.sh 100.79.117.84
+#       skills/minions-llm-proxy-ops/scripts/add-tailscale-provider.sh 100.79.117.84
 #
 # Environment:
 #   TSC_IP              (alt to the positional arg) IP or host[:port] of the peer
@@ -45,8 +45,11 @@ set -euo pipefail
 # Exit codes: 0 = ok, 1 = error (server / network / validation), 2 = usage.
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT_DIR="$SCRIPT_DIR/.."
-cd "$ROOT_DIR"
+SCRIPT_NAME=$(basename "$0")
+# (Legacy note: the script used to `cd` to the repo root so that
+# `--help`'s `sed -n ... "$0"` worked when invoked via a relative path.
+# That broke for symlinked copies under ~/.hermes/skills, so --help now
+# uses $SCRIPT_DIR/$SCRIPT_NAME directly and no cd is needed.)
 
 DRY_RUN=0
 ARGS=()
@@ -54,7 +57,9 @@ for a in "$@"; do
     case "$a" in
         --dry-run|-n) DRY_RUN=1 ;;
         --help|-h)
-            sed -n '4,44p' "$0" | sed -e 's/^# //' -e 's/^#//'
+            # Line-number-fragile `sed -n '4,44p'` replaced by range matching:
+            # print from the title comment to the end of the leading # block.
+            sed -n '/^# add-tailscale-provider\.sh /,/^# Exit codes/{s/^# //;s/^#//;p}' "$SCRIPT_DIR/$SCRIPT_NAME"
             exit 0 ;;
         -*) echo "ERROR: unknown flag: $a" >&2; exit 2 ;;
         *) ARGS+=("$a") ;;
