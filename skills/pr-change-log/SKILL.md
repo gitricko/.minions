@@ -84,7 +84,14 @@ maintainers read — make it the distilled story, not the raw transcript.
   Distill to the ~8 that matter.
 - **Stale description** — if the branch evolved after the body was written
   (new failures fixed, old fixes reverted), the body must be updated before
-  merge, not left as the first draft.
+  merge, not left as the first draft. This includes commits added *after* the
+  body was first written: re-run `git log --oneline main..<branch>` and
+  reconcile every commit against the body's claimed change list before merging.
+  A body that names only the first 2 of 4 commits is a stale description.
+- **Body written from memory, not from the commit list** — never trust your
+  recollection of what the branch contains. Diff the body's claimed changes
+  against `git log --oneline main..<branch>`; any commit not accounted for is
+  a gap, and any claimed change with no matching commit is fiction.
 - **Overselling** — don't say "all WARNs gone" when benign warnings remain.
   List them with reasons; it builds reviewer trust.
 

@@ -181,9 +181,12 @@ env:
 - **Missing error handling**: Unchecked return values
 - **Style**: Inconsistent formatting, missing documentation
 
-## Pitfalls
-
-1. **Don't auto-apply all suggestions** — CodeQL can have false positives
+**Pitfall — Copilot quota gate:** The Copilot reviewer may decline to review with
+"insufficient remaining quota" — this is an account-level limit, not a PR-level
+problem. Do not wait on it or retry; treat it as "no Copilot review available"
+and proceed with CodeQL + manual review. The review comment still appears in
+the reviews list as `COMMENTED` with the quota message, so filter by author
+and body before treating a review as substantive.
 2. **Don't fix style issues in functional code changes** — keep PRs focused
 3. **Don't ignore security findings** — even if you reject, document why
 4. **Don't reply to bot comments unless meaningful** — bots don't read replies
