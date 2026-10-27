@@ -119,6 +119,22 @@ ensure_9router() {
     mkdir -p "${MINIONS_HOME}/lib/9router"
     install_npm_package "9router" "${NINEROUTER_VERSION}" "${MINIONS_HOME}/lib/9router" "9router" "cli.js"
 
+    # 9router lazy-loads wreq-js (OpenCode free tier) and playwright-core
+    # (Grok/ChatGPT browser) at runtime via createRequire. They are not in
+    # 9router's package.json deps, so npm install --no-optional (used above)
+    # does not pull them. Install here WITHOUT --no-optional so the
+    # platform-specific native bindings (e.g. @wreq-js/binding-linux-x64-gnu)
+    # are fetched. See https://github.com/decolua/9router/issues/5245
+    export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    "${system_npm}" install "wreq-js@^3.2.0" "playwright-core@^1.62.1" \
+        --prefix "${MINIONS_HOME}/lib/9router" \
+        --no-audit \
+        --no-fund \
+        --loglevel error \
+        --no-save \
+        --legacy-peer-deps \
+        --prefer-offline
+
     # Create symlink in bin
     ln -sf "${MINIONS_HOME}/lib/9router/9router" "${MINIONS_HOME}/bin/9router"
 }
