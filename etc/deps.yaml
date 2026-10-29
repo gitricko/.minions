@@ -39,7 +39,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.111"
+    version: "0.5.112"
     source_type: npm
     package: 9router
     channel: latest
@@ -47,17 +47,17 @@ dependencies:
 
 
   - name: NODE
-    version: "26.12.1"
+    version: "26.13.0"
     source_type: release_tarball
     repo: nodejs/node
     release_url: https://nodejs.org/dist/v{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "6170b2d474e1c626f43cff3adc118df9fe3b573258a4fc3d850c8dbc6b079bbd"
-      linux_arm64: "42aa04922591ee5d4dbc7740d452621acf28508239daa512f5ee8c47ee224fdb"
-      macos_x64: "69316aaafb4dfcb25ac7b9a460f5c60928a37580284fde410144d0e6c8672d0f"
-      macos_arm64: "18830bf448fe187c650dc28c98aa8c968ed1d40b6dd032c081e70a384a1bf660"
+      linux_x64: "d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997"
+      linux_arm64: "406fe3fbde1c054adff8b297c16fdb5af6659db327c1ac8acd46b56ef1af9a92"
+      macos_x64: "8bd636bc981a92e1ab930c02340eece2076eb1aaf94d14e421cdeeddc1292298"
+      macos_arm64: "6f5b3187d9df9fc007e881167905bc7d69ad26450ddc377c83d63256a2495b6e"
 
   - name: UV
     version: "0.13.6"
@@ -79,20 +79,20 @@ dependencies:
     sha_source: none
 
   - name: OLLAMA
-    version: "v0.40.11"
+    version: "v0.40.13"
     source_type: github_tag
     repo: ollama/ollama
     release_url: https://github.com/ollama/ollama/releases/download/{{VERSION}}/
     sha_source: shasums
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "7bedab90dd122661be78798e9f0edf37fccf0cccf2699d2c58ea1a3afdc04b6d"
-      linux_arm64: "77b278837b9e62c172f77d703675be4c52c8054e9075639031a9a6d5a53f1924"
-      macos_x64: "aea7d3f2e32371b7644a6e2ec8d4f26820a0e3965918cce8a46cef3e947f6291"
-      macos_arm64: "aea7d3f2e32371b7644a6e2ec8d4f26820a0e3965918cce8a46cef3e947f6291"
+      linux_x64: "f8adcb7e08d272283a4bd3abc18cf581afe37e64b2aee04fda4f407f215485ba"
+      linux_arm64: "eab411c311611fe0fcddf5ba73c68ea94a9571007b520d8708112348b87c0bd6"
+      macos_x64: "1d1b4c2cf40d2a239f9b08a77384830800a8542c744a55f47247f9baf85b55d2"
+      macos_arm64: "1d1b4c2cf40d2a239f9b08a77384830800a8542c744a55f47247f9baf85b55d2"
 
   - name: TAILSCALE
-    version: "1.104.2"
+    version: "1.104.4"
     source_type: release_tarball
     repo: tailscale/tailscale
     release_url: https://pkgs.tailscale.com/stable/
