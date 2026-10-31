@@ -701,6 +701,26 @@
         "lib/9router.sh"
       ],
       "source": "agent"
+    },
+    {
+      "content": "GitHub Copilot Codespace provider: `add-ghcodespace-provider.sh` discovers all LLM models at https://api.individual.githubcopilot.com (OpenAI-compatible: /models for roster, /chat/completions for real completions), auth via `ghu_` token from codespace-gh-auth skill. Only chat models (no text-embedding-*, no copilot-search-*) that return 200-with-content or 429 (rate-limited = usable) are wired into the `ghcodespace` provider and added to the `auto-fastest` combo. Dry-run via DRY_RUN=1. Full walkthrough: wiki/codespace-copilot-llm.md, skill minions-llm-proxy-ops. Endpoint discovery method itself: skill codespace-service-discovery.",
+      "category": "decision",
+      "importance": 4,
+      "tags": [
+        "github-copilot",
+        "codespace",
+        "omniroute",
+        "ghcodespace",
+        "auto-fastest",
+        "llm-provider"
+      ],
+      "entities": [
+        "add-ghcodespace-provider.sh",
+        "OmniRoute",
+        "auto-fastest",
+        "ghcodespace"
+      ],
+      "source": "agent"
     }
   ]
 }
