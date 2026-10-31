@@ -96,7 +96,7 @@ Two prepared helpers in `scripts/` (this repo:
 | Upstream shape | Script | Key env |
 |---|---|---|
 | Local keyless OpenAI-compatible peer (Ollama etc.), single known model | `add-tailscale-provider.sh <host[:port]>` | `TSC_PORT`, `MODEL_NAME`, `PROVIDER_NAME` (defaults: `11434`, `qwen3.8:27b`, `tailscale`) |
-| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, probe + wire all keepers | `add-ghcodespace-provider.sh` | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`) |
+| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, context-window filter (≥128k), probe + wire all keepers | `add-ghcodespace-provider.sh` | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`), `MIN_CONTEXT_K` (default `128`; `0` = off) |
 
 **Choosing the baseUrl shape — the most common mistake**: check the upstream
 first, not a template. `baseUrl` is appended with the chat/models path. Tailscale
@@ -128,15 +128,18 @@ fallback) to obtain the `ghu_` token and redacts it in human-visible output
 (`ghu_****(len=N)`); pass `GITHUB_TOKEN=…` to skip extraction.
 
 **Model auto-discovery + probe** (`add-ghcodespace-provider.sh`):
-- `GET <base>/models` with Bearer → ordered list of candidate ids (fallback
-  roster if 404 / no parsable ids).
+- `GET <base>/models` with Bearer → ids plus each model's
+  `capabilities.limits.max_context_window_tokens`. **Context-window floor**:
+  `MIN_CONTEXT_K` (default `128`) drops models below the floor *before*
+  probing (embeddings report no context → dropped with a positive floor;
+  set `MIN_CONTEXT_K=0` to accept everything). Fallback roster if no
+  parsable ids above the floor.
 - For each candidate, one real completion (`max_tokens=8`, polite delay).
   Classification (mirrors `lib/9router.sh` + the `minions-9router-models`
   pass/fail rule): `200 + non-empty content` or `429` → keep;
   `400/404/410/403/401` → drop; `5xx` → retry ×3 with backoff then drop.
-- **Exclude non-chat auxiliaries before the probe**: hosted `/models`
-  endpoints routinely list `text-embedding-*`, `copilot-search-*`, and
-  `*-inference` entries that *respond* to a ping but aren't chat LLMs —
+- **Exclude non-chat auxiliaries before the probe**: `text-embedding-*`
+  and `copilot-search-*` entries respond to a ping but aren't chat LLMs —
   including them in a chat-completions combo pollutes routing.
 - Import the keepers and append to the existing `auto-fastest` combo (never
   duplicated, existing entry shapes preserved verbatim).

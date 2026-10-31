@@ -131,7 +131,7 @@ preinstalled standalone Copilot CLI.
 
 Automates finding/verifying all usable LLM models at `https://api.individual.githubcopilot.com`:
 
-- **Discovers models:** GET `/models` with `ghu_` Bearer token, parses IDs
+- **Discovers models:** GET `/models` with `ghu_` Bearer token, parses ids + `max_context_window_tokens`; `MIN_CONTEXT_K=128` (default) floors the set before probing
 - **Probes models:** 1 real `/chat/completions` call/model (polite delay), keeping `200+content` + transient `429`
 - **Wires models:** Creates the `ghcodespace` node (bare host, no `/v1`), connection with `AuthorizationType: Bearer` + the `ghu_` token as `apiKey`, imports the surviving models → appends all to `auto-fastest` (dedup on id, idempotent).
 

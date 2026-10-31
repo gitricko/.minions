@@ -703,7 +703,7 @@
       "source": "agent"
     },
     {
-      "content": "GitHub Copilot Codespace provider: `add-ghcodespace-provider.sh` discovers all LLM models at https://api.individual.githubcopilot.com (OpenAI-compatible: /models for roster, /chat/completions for real completions), auth via `ghu_` token from codespace-gh-auth skill. Only chat models (no text-embedding-*, no copilot-search-*) that return 200-with-content or 429 (rate-limited = usable) are wired into the `ghcodespace` provider and added to the `auto-fastest` combo. Dry-run via DRY_RUN=1. Full walkthrough: wiki/codespace-copilot-llm.md, skill minions-llm-proxy-ops. Endpoint discovery method itself: skill codespace-service-discovery.",
+      "content": "GitHub Copilot Codespace provider: `add-ghcodespace-provider.sh` discovers all LLM models at https://api.individual.githubcopilot.com (OpenAI-compatible: /models for roster + per-model max_context_window_tokens, /chat/completions for real completions), auth via the ghu_ token from the codespace-gh-auth skill. MIN_CONTEXT_K (default 128) floors the set before probing — embeddings carry no context window so they are dropped automatically. Survivors: 200-with-content or 429 (rate-limited = usable); text-embedding-* / copilot-search-* excluded as non-chat. Wired into the `ghcodespace` provider and appended to the `auto-fastest` combo. DRY_RUN=1 for preview. Walkthrough: wiki/codespace-copilot-llm.md, skill minions-llm-proxy-ops; endpoint discovery method: skill codespace-service-discovery.",
       "category": "decision",
       "importance": 4,
       "tags": [

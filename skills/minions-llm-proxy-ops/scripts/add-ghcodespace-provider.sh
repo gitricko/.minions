@@ -18,14 +18,16 @@ set -euo pipefail
 #
 # What it does:
 #   [0] OmniRoute liveness.
-#   [1] Discover the model roster: GET <base>/models (Bearer ghu_).
+#   [1] Discover the model roster: GET <base>/models (Bearer ghu_). Each model
+#       carries capabilities.limits.max_context_window_tokens — models below
+#       MIN_CONTEXT_K are filtered out here (not probed, not wired).
 #   [2] Probe every model with a real completion POST <base>/chat/completions.
 #       Classification (mirrors lib/9router.sh + the 9router-models skill):
 #         200 + non-empty content  -> KEEP
 #         429 (rate limit)         -> KEEP (not broken; free-tier throttle)
 #         400 / 404 / 410          -> DROP (model_not_supported / wrong shape)
 #         5xx                      -> retry xN, then DROP if it never recovers
-#   [3] Create provider NODE `gh-pilot` -> bare domain.   POST /api/provider-nodes
+#   [3] Create provider NODE `ghcodespace` -> bare domain.   POST /api/provider-nodes
 #   [4] Add CONNECTION on the node with the REAL ghu_ credential. POST /api/providers
 #   [5] Activate the connection (created inactive).          PUT /api/providers/<id>
 #   [6] Import each KEEP model.                             POST /api/provider-models
@@ -42,10 +44,14 @@ set -euo pipefail
 #
 # Environment (all optional):
 #   GHPILOT_BASEURL      endpoint (default https://api.individual.githubcopilot.com)
-#   PROVIDER_NAME        node/conn/model prefix (default gh-pilot)
+#   PROVIDER_NAME        node/conn/model prefix (default ghcodespace)
 #   GITHUB_TOKEN         pre-existing token; if unset, extracted via codespace-gh-auth
 #   OMNIROUTE_BASE_URL   OmniRoute server (default http://127.0.0.1:20128)
 #   OMNIROUTE_API_KEY    OmniRoute auth (omit for the open local server)
+#   MIN_CONTEXT_K        minimum context window, kTokens (default 128). Uses the
+#                       per-model max_context_window_tokens from /models; models
+#                       below the floor (or with unknowns when floor > 0) are
+#                       excluded before probing. Set 0 to accept everything.
 #   PROBE_MAX_TOKENS     completion budget per probe (default 8)
 #   PROBE_TIMEOUT        per-probe timeout, s (default 25)
 #   PROBE_RETRY          retries for 429/5xx (default 3)
@@ -93,7 +99,7 @@ fi
 _TL=${#GITHUB_TOKEN}
 _TOK_REDACTED="${GITHUB_TOKEN:0:4}****(len=${_TL})"
 
-PROVIDER_NAME="${PROVIDER_NAME:-gh-pilot}"
+PROVIDER_NAME="${PROVIDER_NAME:-ghcodespace}"
 OMNIROUTE_BASE_URL="${OMNIROUTE_BASE_URL:-http://127.0.0.1:20128}"
 GHPILOT_BASEURL="${GHPILOT_BASEURL:-https://api.individual.githubcopilot.com}"
 
@@ -112,6 +118,7 @@ fi
 GHPILOT_TOKEN="${GITHUB_TOKEN}" GHPILOT_BASEURL="${GHPILOT_BASEURL}" \
 PROVIDER_NAME="${PROVIDER_NAME}" OMNIROUTE_BASE_URL="${OMNIROUTE_BASE_URL}" \
 DRY_RUN="${DRY_RUN}" OMNIROUTE_API_KEY="${OMNIROUTE_API_KEY:-}" \
+MIN_CONTEXT_K="${MIN_CONTEXT_K:-128}" \
 PROBE_MAX_TOKENS="${PROBE_MAX_TOKENS:-8}" PROBE_TIMEOUT="${PROBE_TIMEOUT:-25}" \
 PROBE_RETRY="${PROBE_RETRY:-3}" PROBE_DELAY_S="${PROBE_DELAY_S:-0.4}" \
 python3 - <<'PYEOF'
@@ -120,9 +127,10 @@ import json, os, sys, time, urllib.request, urllib.error
 DRY        = (os.environ.get("DRY_RUN") == "1")
 TOKEN      = os.environ["GHPILOT_TOKEN"]
 API_BASE   = os.environ["GHPILOT_BASEURL"].rstrip("/")
-NAME       = os.environ.get("PROVIDER_NAME") or "gh-pilot"
+NAME       = os.environ.get("PROVIDER_NAME") or "ghcodespace"
 OMNI       = (os.environ.get("OMNIROUTE_BASE_URL") or "http://127.0.0.1:20128").rstrip("/")
 OMNI_KEY   = os.environ.get("OMNIROUTE_API_KEY") or ""
+MIN_CTX_K  = int(os.environ.get("MIN_CONTEXT_K") or 128)
 MAX_TOKENS = int(os.environ.get("PROBE_MAX_TOKENS") or 8)
 TIMEOUT    = int(os.environ.get("PROBE_TIMEOUT") or 25)
 RETRY      = int(os.environ.get("PROBE_RETRY") or 3)
@@ -202,30 +210,50 @@ print(f"OmniRoute reachable: {OMNI}")
 step(1, f"discover models: GET {API_BASE}/models",
      f"token={TOKEN[:4]}****(len={len(TOKEN)})")
 mdata, mcode, mraw = http(API_BASE, "/models", auth_token=TOKEN)
-ids = []
-def _ids_from(obj):
+def _models_from(obj):
+    """Yield (id, context_tokens|None) from a /models payload of any shape."""
     out = []
+    def find_ctx(o):
+        if isinstance(o, dict):
+            if "max_context_window_tokens" in o and isinstance(o["max_context_window_tokens"], int):
+                return o["max_context_window_tokens"]
+            for v in o.values():
+                c = find_ctx(v)
+                if c: return c
+        return None
     if isinstance(obj, list):
-        for it in obj:
-            if isinstance(it, str): out.append(it)
-            elif isinstance(it, dict):
-                v = it.get("id") or it.get("model") or it.get("name")
-                if v: out.append(v)
+        items = obj
     elif isinstance(obj, dict):
-        for k in ("data", "models", "items"):
-            if k in obj and obj[k] is not None:
-                got = _ids_from(obj[k])
-                if got: return got
-        if obj.get("object") == "list" and isinstance(obj.get("data"), list):
-            out = _ids_from(obj["data"])
+        items = next((obj[k] for k in ("data", "models", "items")
+                      if isinstance(obj.get(k), list)), [])
+    else:
+        items = []
+    for it in items:
+        if isinstance(it, str):
+            out.append((it, None))
+        elif isinstance(it, dict):
+            v = it.get("id") or it.get("model") or it.get("name")
+            if v: out.append((v, find_ctx(it)))
     return out
-ids = sorted(_ids_from(mdata) or [])
-if mcode != 200 or not ids:
-    print(f"  WARNING: /models returned {mcode} or no parsable ids; "
-          f"falling back to known-good free-tier roster.")
-    ids = ["gpt-4o-mini-2024-07-18", "gpt-4o-2024-11-20", "gpt-4o-2024-08-06",
-           "gpt-4.1-2025-04-14", "text-embedding-3-small"]
-for i in ids: print(f"    {i}")
+models_list = sorted(_models_from(mdata) or [], key=lambda p: p[0])
+kept, dropped_ctx = [], []
+for mid, ctx in models_list:
+    if MIN_CTX_K > 0 and (ctx is None or ctx < MIN_CTX_K * 1000):
+        cs = f"{ctx//1000}k" if ctx else "unknown"
+        dropped_ctx.append((mid, cs))
+    else:
+        kept.append((mid, ctx))
+ctx_note = (f"{len(dropped_ctx)} dropped below {MIN_CTX_K}k floor"
+            + (f": " + ", ".join(f"{m} ({c})" for m, c in dropped_ctx) if dropped_ctx else ""))
+print(f"{len(kept)} model(s) at/above the {MIN_CTX_K if MIN_CTX_K else 0}k context floor; {ctx_note}.")
+if mcode != 200 or not kept:
+    print("  WARNING: /models returned no parsable ids above the floor; "
+          "falling back to known-good free-tier roster (ctx unknown, floor ignored).")
+    kept = [("gpt-4o-mini-2024-07-18", None), ("gpt-4o-2024-11-20", None),
+            ("gpt-4o-2024-08-06", None), ("gpt-4.1-2025-04-14", None),
+            ("text-embedding-3-small", None)]
+ids = [m for m, _ in kept]
+for mid, ctx in kept: print(f"    {mid}" + (f"  ({ctx//1000}k ctx)" if ctx else ""))
 
 # -----------------------------------------------------------------------------
 # 2. Probe every model with a real completion; classify keep vs drop
