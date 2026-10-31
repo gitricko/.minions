@@ -16,7 +16,7 @@ and the rest of the `.minions` stack.
 | What protocol | **Anthropic** (`/v1/messages`, `/v1/models`, `/v1/responses`) + OpenAI-style (`wireApi:"responses"`, `"completions"`) |
 | What uplinks it | `https://api.github.com/copilot_internal/…` (entitlement-token mint path; actual LLM target gated behind internal SSO) |
 | What auth does the proxy require | `Authorization: Bearer <nonce>` where the nonce is a **per-session value** generated in-process by the Copilot SDK (`crypto.getRandomValues(16 bytes)`) and distributed to SDK clients over the JSON-RPC channel — **not** the shell's `GITHUB_TOKEN` |
-| Is the `GITHUB_TOKEN` (`ghu_…`) a reusable LLM credential? | **YES — directly** (corrected 2026-10-31). It authenticates `GET /copilot_internal/user` *and* the real LLM endpoint `https://api.individual.githubcopilot.com/chat/completions` with plain `Authorization: Bearer *** — no SDK, no nonce, no extra headers. The earlier "401/404 on every LLM surface" was testing the **wrong surfaces** (local proxy + `api.github.com` REST), which are not the panel's real backend. |
+| Is the `GITHUB_TOKEN` (`ghu_…`) a reusable LLM credential? | **YES — directly** (corrected 2026-10-31). It authenticates `GET /copilot_internal/user` *and* the real LLM endpoint `https://api.individual.githubcopilot.com/chat/completions` with plain `Authorization: Bearer *** — no SDK, no nonce, no extra headers. The earlier "401/404 on every LLM surface" was testing the **wrong surfaces** (the local proxy and the github REST endpoints on api.github.com), which are not the panel's real backend. |
 | Can we attach OmniRoute to :42049? | Not needed. :42049 is an internal hop for in-IDE consumers. The real upstream is a public OpenAI-compatible REST API (see below) — register it as a provider directly. |
 | Tier / cap | `access_type_sku: free_limited_copilot`, `copilot_plan: individual` — **free limited tier**; expect bounded models and rate limits even in the working case. |
 | Active model family (observed) | `gpt-5.6-luna` (from `COPILOT_EXP_COPILOT_CLI_EXECUTION_SUBAGENT_MODEL`); Anthropic providers register on the proxy but the free tier may only allow a subset. |
@@ -39,7 +39,7 @@ and the rest of the `.minions` stack.
 - **Liveness (VERIFIED):** `GET /` → `ok`
 - **Routes seen in bundle:** `/v1/messages`, `/v1/models`, `/v1/messages/count_tokens`, `/v1/responses`, `/v1/chat/completions`
 - **Provider set (VERIFIED-source):** the proxy registers provider type `"anthropic"` for Claude, and also handles `"openai"` wire APIs `responses` and `completions`.
-- **Auth check (VERIFIED-source):** the handler builds `l = \`Bearer ${n.nonce}\`` and returns `401 authentication_error / "Invalid authentication"` unless `e.headers.authorization === l`. `nonce` originates from `crypto.getRandomValues(16 bytes)` in a per-session object returned alongside `baseUrl` to the client via the JSON-RPC channel.
+- **Auth check (VERIFIED-source):** the handler builds `` `Bearer ${n.nonce}` `` and returns `401 authentication_error / "Invalid authentication"` unless `e.headers.authorization === l`. `nonce` originates from `crypto.getRandomValues(16 bytes)` in a per-session object returned alongside `baseUrl` to the client via the JSON-RPC channel.
 
 The nonce is a **session-bound opaque bearer**, not a persistent token. It is minted when the Copilot-SDK client (the panel host) initializes its proxy session and handed out over stdio. No shell environment variable holds it; it does not persist on disk in a form we can grep.
 
@@ -87,8 +87,8 @@ The `Eq()` validator (session-key path) similarly checks `authorization === \`Be
 |---|---|---|
 | Extract a portable API key to hand to OmniRoute | "No — nonce non-extractable" | ✅ **YES** — the real upstream is `https://api.individual.githubcopilot.com` accepting the `ghu_` token directly; found via SDK `getEndpoint` RPC (skill step 8) |
 | Point OmniRoute at `http://127.0.0.1:42049` | "Only with a valid nonce" | Unnecessary — the local proxy was an internal hop, not the endpoint |
-| Use the panel/Claude-Codex extension as the client | **Yes** (that is how it works today); cap: free tier. |
-| Bypass via a fresh OAuth user token (`gho_…`/`ghp_…`) scoped to `copilot` | Untested — possible if the account has a personal token with the `copilot_api` scope; would give the same free-tier model access and would be portable |
+| Use the panel/Claude-Codex extension as the client | **Yes** — that is how it works today | cap: free tier (`free_limited_copilot`) |
+| Bypass via a fresh OAuth user token (`gho_…`/`ghp_…`) scoped to `copilot` | Untested | possible if the account has a personal token with the `copilot_api` scope; same free-tier access, portable |
 
 ## Live capture (2026-10-31) — what we actually saw on the wire
 
