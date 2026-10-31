@@ -88,13 +88,61 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 
 ## Add an OpenAI-compatible provider (OmniRoute :20128), wire a model into `auto-fastest`
 
-`scripts/add-tailscale-provider.sh <host[:port]>` — lives in the skill's
-`scripts/` dir (this repo: `skills/minions-llm-proxy-ops/scripts/`; standalone
-install: `~/.minions/skills/minions-llm-proxy-ops/scripts/`). Idempotent,
-`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
-`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`.
+Two prepared helpers in `scripts/` (this repo:
+`skills/minions-llm-proxy-ops/scripts/`; standalone install:
+`~/.minions/skills/minions-llm-proxy-ops/scripts/`). Both idempotent, both
+`--dry-run` capable, same 5 REST steps. Pick by the upstream's shape:
+
+| Upstream shape | Script | Key env |
+|---|---|---|
+| Local keyless OpenAI-compatible peer (Ollama etc.), single known model | `add-tailscale-provider.sh <host[:port]>` | `TSC_PORT`, `MODEL_NAME`, `PROVIDER_NAME` (defaults: `11434`, `qwen3.8:27b`, `tailscale`) |
+| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, probe + wire all keepers | `add-ghcodespace-provider.sh` | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`) |
+
+**Choosing the baseUrl shape — the most common mistake**: check the upstream
+first, not a template. `baseUrl` is appended with the chat/models path. Tailscale
+peer uses `/v1/chat/completions`; a hosted endpoint like
+`https://api.individual.githubcopilot.com` uses `/chat/completions` (bare, no
+`/v1`). Register the wrong one and every completion 404s *through* the proxy
+with no local trace. Verify both shapes with a 2-line curl before writing the
+node body:
+
+```
+curl -sI $BASE/chat/completions        # expect 405 (method) or 401, NOT 404
+curl -sI $BASE/v1/chat/completions     # the other one
+```
+
+Whichever is the real one sets `baseUrl` shape. `add-tailscale-provider.sh`
+forces `…/v1`; `add-ghcodespace-provider.sh` uses the bare domain. For a new
+upstream with a *different* path shape, override the base URL by env and set
+`chatPath` on the node to the bare path (e.g. `"/chat/completions"`) — never
+a string starting with `/v1/`. The server generates the concrete id
+`openai-compatible-chat-<uuid>`; that uuid is the provider id stored on the
+combo entries.
+
+**Dummy vs real credential**: the tailscale helper stores a dummy `apiKey` —
+OK because the local peer ignores auth. For an endpoint that enforces Bearer
+(like `api.individual.githubcopilot.com`), the connection `apiKey` must be the
+**real** token — a dummy still registers but every completion 401s.
+`add-ghcodespace-provider.sh` sources `codespace-gh-auth` skill (or an inline
+fallback) to obtain the `ghu_` token and redacts it in human-visible output
+(`ghu_****(len=N)`); pass `GITHUB_TOKEN=…` to skip extraction.
+
+**Model auto-discovery + probe** (`add-ghcodespace-provider.sh`):
+- `GET <base>/models` with Bearer → ordered list of candidate ids (fallback
+  roster if 404 / no parsable ids).
+- For each candidate, one real completion (`max_tokens=8`, polite delay).
+  Classification (mirrors `lib/9router.sh` + the `minions-9router-models`
+  pass/fail rule): `200 + non-empty content` or `429` → keep;
+  `400/404/410/403/401` → drop; `5xx` → retry ×3 with backoff then drop.
+- **Exclude non-chat auxiliaries before the probe**: hosted `/models`
+  endpoints routinely list `text-embedding-*`, `copilot-search-*`, and
+  `*-inference` entries that *respond* to a ping but aren't chat LLMs —
+  including them in a chat-completions combo pollutes routing.
+- Import the keepers and append to the existing `auto-fastest` combo (never
+  duplicated, existing entry shapes preserved verbatim).
+
 The five REST steps below are the verified sequence (OmniRoute 3.8.53) and how
-the script works — use them as the manual/API reference for any new upstream
+the scripts work — use them as the manual/API reference for any new upstream
 that only needs a base URL:
 
 1. **Create the NODE** — `POST /api/provider-nodes` with
