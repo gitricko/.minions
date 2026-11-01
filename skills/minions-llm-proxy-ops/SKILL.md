@@ -96,7 +96,7 @@ Two prepared helpers in `scripts/` (this repo:
 | Upstream shape | Script | Key env |
 |---|---|---|
 | Local keyless OpenAI-compatible peer (Ollama etc.), single known model | `add-tailscale-provider.sh <host[:port]>` | `TSC_PORT`, `MODEL_NAME`, `PROVIDER_NAME` (defaults: `11434`, `qwen3.8:27b`, `tailscale`) |
-| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, context-window filter (≥128k), probe + wire all keepers | `add-ghcodespace-provider.sh` | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`), `MIN_CONTEXT_K` (default `128`; `0` = off) |
+| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, context-window filter (≥128k), probe + wire all keepers | `add-ghcodespace-provider.sh` (or `--renew` to just rotate the token) | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`), `MIN_CONTEXT_K` (default `128`; `0` = off) |
 
 **Choosing the baseUrl shape — the most common mistake**: check the upstream
 first, not a template. `baseUrl` is appended with the chat/models path. Tailscale
@@ -126,6 +126,31 @@ OK because the local peer ignores auth. For an endpoint that enforces Bearer
 `add-ghcodespace-provider.sh` sources `codespace-gh-auth` skill (or an inline
 fallback) to obtain the `ghu_` token and redacts it in human-visible output
 (`ghu_****(len=N)`); pass `GITHUB_TOKEN=…` to skip extraction.
+
+**Token rotation (`--renew`) — the Codespace reboot case.** The OmniRoute
+config (node, connection, imported models, `auto-fastest` combo) **survives a
+Codespace reboot**, but the `ghu_` PAT is **re-issued on every restart** — so
+the existing `ghcodespace` connection holds a *stale (dead) token* after a
+reboot, and requests 401. `--renew` handles exactly this case (2026-11-01,
+live-verified):
+
+```bash
+skills/minions-llm-proxy-ops/scripts/add-ghcodespace-provider.sh --renew
+```
+
+- Finds the existing `ghcodespace` node/connection, then **`DELETE /api/providers/<cid>`**
+  then **`POST /api/providers`** with the freshly-extracted `ghu_`
+  then **`PUT isActive`**. Node / imported models / `auto-fastest` combo are **left
+  untouched** — no re-discovery, no re-probing. Idempotent: safe to run after
+  every restart.
+- The fresh PAT is re-extracted via the same `codespace-gh-auth` skill path; if
+  no node or connection is found, it falls through to the full wire.
+- The "auth expired" latch (401 "All credentials authentication expired") is
+  the classic symptom: updating the key in-place does **not** clear it — a
+  real completion test must pass first. Recreate + activate + a live `/models`
+  gate (the last step of `--renew`) clears the latch as a side effect.
+- Dry-run: `DRY_RUN=1 … --renew` prints the planned delete + recreate without
+  touching OmniRoute.
 
 **Model auto-discovery + probe** (`add-ghcodespace-provider.sh`):
 - `GET <base>/models` with Bearer → ids plus each model's
@@ -229,7 +254,13 @@ and reported, not hidden.
   process env, not a file — restart = new PID = new token). The OmniRoute
   connection holds the *old* one and latches into `authentication_error` /
   "All credentials expired" — that state persists even after `PUT /api/
-  providers/<id>` with a fresh apiKey. Repair is two steps, both required:
+  providers/<id>` with a fresh apiKey.
+  **Canonical fix (2026-11-01):**
+  `skills/minions-llm-proxy-ops/scripts/add-ghcodespace-provider.sh --renew`
+  — finds the existing connection, `DELETE` + re-`POST` it with the freshly
+  extracted `ghu_`, then runs a `/models` gate that clears the latch.
+  Node / models / combo untouched. Idempotent — safe to run after every restart.
+  Manual fallback if the script path fails:
   (1) extract from the live process (`/proc/$(pgrep -f server-main.js | head -1)/
   environ`, `GITHUB_TOKEN=` line), PUT it to the ghcodespace connection's
   `apiKey`; (2) run `bin/omniroute test <node> <any-served-model>` — a single
