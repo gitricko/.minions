@@ -138,9 +138,22 @@ fallback) to obtain the `ghu_` token and redacts it in human-visible output
   Classification (mirrors `lib/9router.sh` + the `minions-9router-models`
   pass/fail rule): `200 + non-empty content` or `429` → keep;
   `400/404/410/403/401` → drop; `5xx` → retry ×3 with backoff then drop.
+  GitHub Copilot 400 codes all mean drop — `model_not_supported` and
+  `no model endpoints available given user constraints` are server-side
+  entitlement gates, not misconfigurations (2026-11-01: all 4 `mai-*`
+  ids return these from every lane; the GPT-4o family is the kept set).
+  **Catalog `policy.state=enabled` is not entitlement** — the dispatch
+  table decides per credential; an `enabled` id can still 400.
 - **Exclude non-chat auxiliaries before the probe**: `text-embedding-*`
   and `copilot-search-*` entries respond to a ping but aren't chat LLMs —
   including them in a chat-completions combo pollutes routing.
+- **Never register a router alias (e.g. `auto`) as a model.** `auto` is not
+  in the `/models` roster — it's a server-resolved alias. On the free-tier
+  Codespace PAT it resolves to MAI (A/B bucket `autov2_mai_prod`), which then
+  400s (2026-11-01: 81/81 `auto` probes across 3 lanes × 27 integration ids
+  were `model_not_supported`). Registering `auto` would add a 100%-fail
+  entry that rots `auto-fastest` fallbacks. Register only real model ids the
+  credential actually serves — here, the GPT-4o family.
 - Import the keepers and append to the existing `auto-fastest` combo (never
   duplicated, existing entry shapes preserved verbatim).
 
@@ -240,3 +253,13 @@ OmniRoute 3.8.51 — do not waste time re-attempting it:
 - OmniRoute's combo also rots: `opencode-zen/mimo-v2.5-free` → 410 deprecated.
 - If the OpenCode free tier must be used, route through 9Router (:7352) —
   it already has the working fix.
+
+## See also
+
+- `wiki/codespace-copilot-llm.md` — how the Codespace Copilot panel reaches
+  GitHub's LLM backend; endpoint-shape discovery.
+- `wiki/codespace-copilot-mitm-handoff.md` — capture findings:
+  `auto`→MAI-Prod verdict, MAI-variant 400 dictionary, MITM restart/revert
+  playbook.
+- `skills/codespace-service-discovery/` — the generic "find the backend of X"
+  method this stack's wiring started from.
