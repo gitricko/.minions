@@ -36,8 +36,22 @@ set -euo pipefail
 # Every REST step is idempotent: re-running is a no-op/update. The model *probe*
 # does no writes.
 #
+# Token rotation (--renew):
+#   The OmniRoute config (node, connection, models, combo) SURVIVES a codespace
+#   reboot, but the ghu_ PAT is re-issued on every codespace restart — so the
+#   EXISTING connection holds a stale (dead) token after a reboot. `--renew`
+#   handles exactly that: it finds the existing `ghcodespace` connection,
+#   DELETES it, and RECREATES it with the freshly-extracted live PAT. The node,
+#   the imported models, and the auto-fastest combo are left untouched (no
+#   re-discovery, no re-probing). Idempotent: safe to run after every restart.
+#
 # Usage:
 #   skills/minions-llm-proxy-ops/scripts/add-ghcodespace-provider.sh
+#                                                   #   full wire (first boot: default)
+#   .../add-ghcodespace-provider.sh --renew
+#                                                   #   token rotation ONLY: delete the
+#                                                   #   existing connection + recreate with
+#                                                   #   the fresh ghu_ (no re-discovery)
 #   DRY_RUN=1  .../add-ghcodespace-provider.sh        # discover+probe, print plan,
 #                                                   #   write nothing
 #   PROBE_DRY_VERBOSE=1  .../add-ghcodespace-provider.sh --dry-run
@@ -105,19 +119,21 @@ GHPILOT_BASEURL="${GHPILOT_BASEURL:-https://api.individual.githubcopilot.com}"
 
 DRY_RUN="${DRY_RUN:-0}"
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+RENEW=0
+[[ "${1:-}" == "--renew" ]] && RENEW=1
 
 if [[ "${PROBE_DRY_VERBOSE:-0}" == "1" || "${DRY_RUN}" == "1" ]]; then
     echo "provider  = ${PROVIDER_NAME}"
     echo "endpoint  = ${GHPILOT_BASEURL}   (no /v1; /chat/completions, /models)"
     echo "token     = ${_TOK_REDACTED}"
     echo "omni base = ${OMNIROUTE_BASE_URL}"
-    echo "mode      = ${DRY_RUN:0:1} (dry-run=no writes)"
+    echo "mode      = ${DRY_RUN:0:1} (dry-run=no writes)  renew=${RENEW}"
 fi
 
 # Token travels in the environment, not argv (avoids ps exposure).
 GHPILOT_TOKEN="${GITHUB_TOKEN}" GHPILOT_BASEURL="${GHPILOT_BASEURL}" \
 PROVIDER_NAME="${PROVIDER_NAME}" OMNIROUTE_BASE_URL="${OMNIROUTE_BASE_URL}" \
-DRY_RUN="${DRY_RUN}" OMNIROUTE_API_KEY="${OMNIROUTE_API_KEY:-}" \
+DRY_RUN="${DRY_RUN}" RENEW="${RENEW}" OMNIROUTE_API_KEY="${OMNIROUTE_API_KEY:-}" \
 MIN_CONTEXT_K="${MIN_CONTEXT_K:-128}" \
 PROBE_MAX_TOKENS="${PROBE_MAX_TOKENS:-8}" PROBE_TIMEOUT="${PROBE_TIMEOUT:-25}" \
 PROBE_RETRY="${PROBE_RETRY:-3}" PROBE_DELAY_S="${PROBE_DELAY_S:-0.4}" \
@@ -125,6 +141,7 @@ python3 - <<'PYEOF'
 import json, os, sys, time, urllib.request, urllib.error
 
 DRY        = (os.environ.get("DRY_RUN") == "1")
+RENEW      = (os.environ.get("RENEW") == "1")
 TOKEN      = os.environ["GHPILOT_TOKEN"]
 API_BASE   = os.environ["GHPILOT_BASEURL"].rstrip("/")
 NAME       = os.environ.get("PROVIDER_NAME") or "ghcodespace"
@@ -203,6 +220,57 @@ _, code, raw = http(OMNI, "/api/health")
 if code not in (200, 404):
     print(f"FAIL: OmniRoute not reachable at {OMNI} (HTTP {code}): {raw[:200]}"); sys.exit(1)
 print(f"OmniRoute reachable: {OMNI}")
+
+# -----------------------------------------------------------------------------
+# 0b. Token rotation (--renew): find existing conn, delete + recreate with
+#     the freshly-extracted live PAT. Node / models / combo untouched.
+# -----------------------------------------------------------------------------
+if RENEW:
+    _nodes, _ncode, _ = req_auth("GET", "/api/provider-nodes")
+    _node_id = None
+    if _ncode == 200 and isinstance(_nodes, dict):
+        for _nd in _nodes.get("nodes", []):
+            if _nd.get("name") == NAME:
+                _node_id = _nd.get("id")
+    if _node_id is None:
+        step(0, "renew: no existing node — falling through to full wire")
+    else:
+        _conns, _ccode, _ = req_auth("GET", "/api/providers")
+        _stale = None
+        if _ccode == 200 and isinstance(_conns, dict):
+            for _c in (_conns.get("connections") or _conns.get("providers") or []):
+                if _c.get("name") == NAME and _c.get("provider") == _node_id:
+                    _stale = _c.get("id")
+        if _stale is None:
+            step(0, "renew: no existing connection — falling through to full wire")
+        else:
+            step(0, f"renew {NAME} on {_node_id}",
+                 "delete stale conn + recreate with fresh ghu_")
+            if DRY:
+                print(f"[dry-run] would DELETE /api/providers/{_stale} and recreate it w/ fresh token")
+                sys.exit(0)
+            _res, _code, _raw = req_auth("DELETE", f"/api/providers/{_stale}")
+            if _code not in (200, 204):
+                print(f"FAIL delete stale conn (HTTP {_code}): {_raw[:400]}"); sys.exit(1)
+            _psd = {"prefix": NAME, "apiType": "chat", "baseUrl": API_BASE, "nodeName": NAME}
+            _body = {"provider": _node_id, "name": NAME, "apiKey": TOKEN,
+                     "priority": 1, "isActive": True, "providerSpecificData": _psd}
+            _res, _code, _raw = req_auth("POST", "/api/providers", _body)
+            if _code not in (200, 201):
+                print(f"FAIL recreate (HTTP {_code}): {_raw[:400]}"); sys.exit(1)
+            _new_id = None
+            if isinstance(_res, dict):
+                _conn = _res.get("connection", _res) if isinstance(_res.get("connection"), dict) else _res
+                _new_id = _conn.get("id")
+            if _new_id:
+                req_auth("PUT", f"/api/providers/{_new_id}", {"isActive": True})
+            # Gate: fresh PAT must answer /models.
+            _ok, _rcode, _rhint = http_ep("/models", "GET")
+            if _rcode != 200:
+                print(f"FAIL gate: /models after renew (http {_rcode}): {_rhint[:200]}"); sys.exit(1)
+            step(0, f"RENEW DONE: {NAME} -> fresh ghu_ on {_node_id}",
+                 f"new conn id={_new_id or '?'} /models 200")
+            sys.exit(0)
 
 # -----------------------------------------------------------------------------
 # 1. Discover the model roster from the real endpoint
