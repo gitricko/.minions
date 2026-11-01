@@ -212,6 +212,16 @@ and reported, not hidden.
 - Some model ids need a different protocol than openai chat completions and
   fail with `ModelProtocolUnsupported` — exclude them from the combo rather
   than trying to force them.
+- **Codespace restarts rotate the `ghu_` token** (it lives in the vscode-server
+  process env, not a file — restart = new PID = new token). The OmniRoute
+  connection holds the *old* one and latches into `authentication_error` /
+  "All credentials expired" — that state persists even after `PUT /api/
+  providers/<id>` with a fresh apiKey. Repair is two steps, both required:
+  (1) extract from the live process (`/proc/$(pgrep -f server-main.js | head -1)/
+  environ`, `GITHUB_TOKEN=` line), PUT it to the ghcodespace connection's
+  `apiKey`; (2) run `bin/omniroute test <node> <any-served-model>` — a single
+  successful check clears the latch. Until (2), real completions still
+  401 with the stale-key error even though the stored key is fresh.
 
 ## OmniRoute (:20128) does NOT accept this fix
 
