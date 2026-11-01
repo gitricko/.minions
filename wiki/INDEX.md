@@ -30,6 +30,8 @@ This index maps all wiki articles in this directory. Each article is a reference
 | [vscode-cli-codespaces.md](vscode-cli-codespaces.md) | VS Code CLI auto-discovery | codespace-vscode-open |
 | [ci-lint-check.md](ci-lint-check.md) | CI lint check skill (local pre-commit) | ci-lint-check |
 | [codespace-lavish.md](codespace-lavish.md) | Headed Lavish-AXI whiteboard over noVNC | codespace-lavish, codespace-port-visibility |
+| [codespace-copilot-mitm-handoff.md](codespace-copilot-mitm-handoff.md) | MITM capture findings: `auto`→MAI, MAI variants 8/8-400, restart/revert playbook, error-code dictionary | codespace-copilot-llm, codespace-gh-auth |
+| [codespace-copilot-sidebar-mitm-plan.md](codespace-copilot-sidebar-mitm-plan.md) | Original MITM capture plan (superseded by the handoff article above) | codespace-copilot-mitm-handoff |
 
 ## How to Use
 
