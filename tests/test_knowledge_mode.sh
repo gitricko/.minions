@@ -96,7 +96,14 @@ test_minions_home_override() {
     tmp="$(mktemp -d)"
     (
         cd "$tmp" || exit 1
-        MINIONS_HOME="/tmp/custom-minions" detect_knowledge_mode >/dev/null 2>&1
+        unset MINIONS_HOME
+        # Export + plain call: the `VAR=val func` prefix form does NOT reliably
+        # leave VAR set after the function returns (bash >=5.3 leaves it unset),
+        # so reading it under `set -u` aborts the subshell. Set it as a real
+        # exported variable (what the env-override contract actually is), then
+        # call the function plainly.
+        export MINIONS_HOME="/tmp/custom-minions"
+        detect_knowledge_mode >/dev/null 2>&1
         [ "${MINIONS_HOME}" = "/tmp/custom-minions" ] || { echo "home=${MINIONS_HOME}"; exit 1; }
     )
     local rc=$?

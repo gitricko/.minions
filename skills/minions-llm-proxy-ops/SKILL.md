@@ -88,13 +88,102 @@ survives restarts, and use its API calls as the reference for ad-hoc changes.
 
 ## Add an OpenAI-compatible provider (OmniRoute :20128), wire a model into `auto-fastest`
 
-`scripts/add-tailscale-provider.sh <host[:port]>` — lives in the skill's
-`scripts/` dir (this repo: `skills/minions-llm-proxy-ops/scripts/`; standalone
-install: `~/.minions/skills/minions-llm-proxy-ops/scripts/`). Idempotent,
-`--dry-run` supported; `TSC_PORT` sets the port for a bare host (default
-`11434`); `MODEL_NAME`/`PROVIDER_NAME` env, model defaults to `qwen3.8:27b`.
+Two prepared helpers in `scripts/` (this repo:
+`skills/minions-llm-proxy-ops/scripts/`; standalone install:
+`~/.minions/skills/minions-llm-proxy-ops/scripts/`). Both idempotent, both
+`--dry-run` capable, same 5 REST steps. Pick by the upstream's shape:
+
+| Upstream shape | Script | Key env |
+|---|---|---|
+| Local keyless OpenAI-compatible peer (Ollama etc.), single known model | `add-tailscale-provider.sh <host[:port]>` | `TSC_PORT`, `MODEL_NAME`, `PROVIDER_NAME` (defaults: `11434`, `qwen3.8:27b`, `tailscale`) |
+| Auth'd hosted OpenAI-compatible API (GitHub Copilot), discover models, context-window filter (≥128k), probe + wire all keepers | `add-ghcodespace-provider.sh` (or `--renew` to just rotate the token) | `GHPILOT_BASEURL`, `GITHUB_TOKEN` (auto via `codespace-gh-auth`), `PROVIDER_NAME` (default `ghcodespace`), `MIN_CONTEXT_K` (default `128`; `0` = off) |
+
+**Choosing the baseUrl shape — the most common mistake**: check the upstream
+first, not a template. `baseUrl` is appended with the chat/models path. Tailscale
+peer uses `/v1/chat/completions`; a hosted endpoint like
+`https://api.individual.githubcopilot.com` uses `/chat/completions` (bare, no
+`/v1`). Register the wrong one and every completion 404s *through* the proxy
+with no local trace. Verify both shapes with a 2-line curl before writing the
+node body:
+
+```
+curl -sI $BASE/chat/completions        # expect 405 (method) or 401, NOT 404
+curl -sI $BASE/v1/chat/completions     # the other one
+```
+
+Whichever is the real one sets `baseUrl` shape. `add-tailscale-provider.sh`
+forces `…/v1`; `add-ghcodespace-provider.sh` uses the bare domain. For a new
+upstream with a *different* path shape, override the base URL by env and set
+`chatPath` on the node to the bare path (e.g. `"/chat/completions"`) — never
+a string starting with `/v1/`. The server generates the concrete id
+`openai-compatible-chat-<uuid>`; that uuid is the provider id stored on the
+combo entries.
+
+**Dummy vs real credential**: the tailscale helper stores a dummy `apiKey` —
+OK because the local peer ignores auth. For an endpoint that enforces Bearer
+(like `api.individual.githubcopilot.com`), the connection `apiKey` must be the
+**real** token — a dummy still registers but every completion 401s.
+`add-ghcodespace-provider.sh` sources `codespace-gh-auth` skill (or an inline
+fallback) to obtain the `ghu_` token and redacts it in human-visible output
+(`ghu_****(len=N)`); pass `GITHUB_TOKEN=…` to skip extraction.
+
+**Token rotation (`--renew`) — the Codespace reboot case.** The OmniRoute
+config (node, connection, imported models, `auto-fastest` combo) **survives a
+Codespace reboot**, but the `ghu_` PAT is **re-issued on every restart** — so
+the existing `ghcodespace` connection holds a *stale (dead) token* after a
+reboot, and requests 401. `--renew` handles exactly this case (2026-11-01,
+live-verified):
+
+```bash
+skills/minions-llm-proxy-ops/scripts/add-ghcodespace-provider.sh --renew
+```
+
+- Finds the existing `ghcodespace` node/connection, then **`DELETE /api/providers/<cid>`**
+  then **`POST /api/providers`** with the freshly-extracted `ghu_`
+  then **`PUT isActive`**. Node / imported models / `auto-fastest` combo are **left
+  untouched** — no re-discovery, no re-probing. Idempotent: safe to run after
+  every restart.
+- The fresh PAT is re-extracted via the same `codespace-gh-auth` skill path; if
+  no node or connection is found, it falls through to the full wire.
+- The "auth expired" latch (401 "All credentials authentication expired") is
+  the classic symptom: updating the key in-place does **not** clear it — a
+  real completion test must pass first. Recreate + activate + a live `/models`
+  gate (the last step of `--renew`) clears the latch as a side effect.
+- Dry-run: `DRY_RUN=1 … --renew` prints the planned delete + recreate without
+  touching OmniRoute.
+
+**Model auto-discovery + probe** (`add-ghcodespace-provider.sh`):
+- `GET <base>/models` with Bearer → ids plus each model's
+  `capabilities.limits.max_context_window_tokens`. **Context-window floor**:
+  `MIN_CONTEXT_K` (default `128`) drops models below the floor *before*
+  probing (embeddings report no context → dropped with a positive floor;
+  set `MIN_CONTEXT_K=0` to accept everything). Fallback roster if no
+  parsable ids above the floor.
+- For each candidate, one real completion (`max_tokens=8`, polite delay).
+  Classification (mirrors `lib/9router.sh` + the `minions-9router-models`
+  pass/fail rule): `200 + non-empty content` or `429` → keep;
+  `400/404/410/403/401` → drop; `5xx` → retry ×3 with backoff then drop.
+  GitHub Copilot 400 codes all mean drop — `model_not_supported` and
+  `no model endpoints available given user constraints` are server-side
+  entitlement gates, not misconfigurations (2026-11-01: all 4 `mai-*`
+  ids return these from every lane; the GPT-4o family is the kept set).
+  **Catalog `policy.state=enabled` is not entitlement** — the dispatch
+  table decides per credential; an `enabled` id can still 400.
+- **Exclude non-chat auxiliaries before the probe**: `text-embedding-*`
+  and `copilot-search-*` entries respond to a ping but aren't chat LLMs —
+  including them in a chat-completions combo pollutes routing.
+- **Never register a router alias (e.g. `auto`) as a model.** `auto` is not
+  in the `/models` roster — it's a server-resolved alias. On the free-tier
+  Codespace PAT it resolves to MAI (A/B bucket `autov2_mai_prod`), which then
+  400s (2026-11-01: 81/81 `auto` probes across 3 lanes × 27 integration ids
+  were `model_not_supported`). Registering `auto` would add a 100%-fail
+  entry that rots `auto-fastest` fallbacks. Register only real model ids the
+  credential actually serves — here, the GPT-4o family.
+- Import the keepers and append to the existing `auto-fastest` combo (never
+  duplicated, existing entry shapes preserved verbatim).
+
 The five REST steps below are the verified sequence (OmniRoute 3.8.53) and how
-the script works — use them as the manual/API reference for any new upstream
+the scripts work — use them as the manual/API reference for any new upstream
 that only needs a base URL:
 
 1. **Create the NODE** — `POST /api/provider-nodes` with
@@ -161,6 +250,22 @@ and reported, not hidden.
 - Some model ids need a different protocol than openai chat completions and
   fail with `ModelProtocolUnsupported` — exclude them from the combo rather
   than trying to force them.
+- **Codespace restarts rotate the `ghu_` token** (it lives in the vscode-server
+  process env, not a file — restart = new PID = new token). The OmniRoute
+  connection holds the *old* one and latches into `authentication_error` /
+  "All credentials expired" — that state persists even after `PUT /api/
+  providers/<id>` with a fresh apiKey.
+  **Canonical fix (2026-11-01):**
+  `skills/minions-llm-proxy-ops/scripts/add-ghcodespace-provider.sh --renew`
+  — finds the existing connection, `DELETE` + re-`POST` it with the freshly
+  extracted `ghu_`, then runs a `/models` gate that clears the latch.
+  Node / models / combo untouched. Idempotent — safe to run after every restart.
+  Manual fallback if the script path fails:
+  (1) extract from the live process (`/proc/$(pgrep -f server-main.js | head -1)/
+  environ`, `GITHUB_TOKEN=` line), PUT it to the ghcodespace connection's
+  `apiKey`; (2) run `bin/omniroute test <node> <any-served-model>` — a single
+  successful check clears the latch. Until (2), real completions still
+  401 with the stale-key error even though the stored key is fresh.
 
 ## OmniRoute (:20128) does NOT accept this fix
 
@@ -179,3 +284,13 @@ OmniRoute 3.8.51 — do not waste time re-attempting it:
 - OmniRoute's combo also rots: `opencode-zen/mimo-v2.5-free` → 410 deprecated.
 - If the OpenCode free tier must be used, route through 9Router (:7352) —
   it already has the working fix.
+
+## See also
+
+- `wiki/codespace-copilot-llm.md` — how the Codespace Copilot panel reaches
+  GitHub's LLM backend; endpoint-shape discovery.
+- `wiki/codespace-copilot-mitm-handoff.md` — capture findings:
+  `auto`→MAI-Prod verdict, MAI-variant 400 dictionary, MITM restart/revert
+  playbook.
+- `skills/codespace-service-discovery/` — the generic "find the backend of X"
+  method this stack's wiring started from.

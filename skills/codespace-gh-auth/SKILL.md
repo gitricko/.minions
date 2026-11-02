@@ -37,6 +37,26 @@ VSCODE_PID=$(pgrep -f "server-main.js" | head -1)
 GITHUB_TOKEN=$(cat /proc/$VSCODE_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^GITHUB_TOKEN=" | cut -d= -f2-)
 ```
 
+### Push gotcha (verified 2026-10-31)
+
+`git push` from a non-interactive bash tool HANGS (many minutes) unless
+`GITHUB_TOKEN` is exported in the push command's own shell: the Codespace
+credential helper `/.codespaces/bin/gitcredential_github.sh` returns nothing
+when its env has no `GITHUB_TOKEN`, and with zero credentials git just
+stalls (no error). Do NOT embed the token in the remote URL —
+`https://user:token@…` fails with `No anonymous write access` for the
+`ghu_` App token. Working pattern (single command):
+
+```bash
+PID=$(pgrep -f "server-main.js" | head -1)
+export GITHUB_TOKEN=$(cat /proc/$PID/environ | tr '\0' '\n' | grep "^GITHUB_TOKEN=" | cut -d= -f2-)
+git push -u origin <branch>
+```
+
+Also: `source codespace-gh-auth.sh` under a non-bash shell chokes on
+bashisms and can leave a 3-char garbage token — prefer inline extraction
+over sourcing in tool contexts.
+
 ### Step 2: Use it for API calls
 
 ```bash
