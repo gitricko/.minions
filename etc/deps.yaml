@@ -96,12 +96,11 @@ dependencies:
     source_type: release_tarball
     repo: tailscale/tailscale
     release_url: https://pkgs.tailscale.com/stable/
-    # sha_source none: pkgs host has no shasums manifest; shas pinned manually
-    # via verified download (see lib/tailscale.sh). bump.sh will not auto-fetch.
-    sha_source: none
+    # pkgs host serves per-asset digests: {asset}.sha256 (whole file = digest)
+    sha_source: release_assets
     platforms: [linux_x64, linux_arm64]
     sha256:
-      linux_x64: "624ea093d47d62cf56f17b8332d74b8decda4a1faa610ebc60a1de334b2b3dc9"
-      linux_arm64: "a1c249ce6bdebef62e1ae3b997595555bce2ae4709bf95a718e9ca7a129dad7e"
+      linux_x64: "82a85429f733e52fd1a95dedb2c8dd8cd46d6603504e566a56b1779c9a7a4809"
+      linux_arm64: "d0e4f297da3c428d02162c6235b9948e4ddc245c64502b7b05647da9b96a0971"
 
 

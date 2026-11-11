@@ -50,7 +50,7 @@ BUMPS=()
 #
 # sha_source behaviour:
 #   shasums        -> NODE: parse SHASUMS256.txt for node-v{V}-{os}-{arch}.tar.xz
-#   release_assets -> UV: read `{asset}.sha256` (whole file is the digest)
+#   release_assets -> UV/TAILSCALE: read `{asset}.sha256` (whole file is the digest)
 #   none           -> no fetch
 populate_shas() {
   local dep="$1" sha_source base
@@ -123,10 +123,15 @@ for plat in platforms:
                     continue
                 result[plat] = m.group(1)
         elif sha_source == 'release_assets':
-            target = UV_TARGET.get(plat)
-            if not target:
-                continue
-            asset = f"uv-{target}.tar.gz"
+            if dep == 'TAILSCALE':
+                # pkgs asset: tailscale_<ver>_<amd64|arm64>.tgz (see lib/tailscale.sh)
+                arch_map = {'x64': 'amd64', 'arm64': 'arm64'}
+                asset = f"tailscale_{ver}_{arch_map.get(arch, arch)}.tgz"
+            else:
+                target = UV_TARGET.get(plat)
+                if not target:
+                    continue
+                asset = f"uv-{target}.tar.gz"
             text = load(asset + '.sha256')
             m = re.match(r'^([0-9a-f]{64})', text)
             if not m:
