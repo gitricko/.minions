@@ -56,7 +56,7 @@ def latest_github_tag(repo, selector=None):
         return None
     names = [t.get('name','') for t in tags if isinstance(t, dict)]
     if selector:
-        # Simple glob: convert 'v20*' to regex 'v20.*'
+        # Simple glob: convert 'v0*' to regex 'v0.*'
         pattern = selector.replace('*', '.*').replace('?', '.')
         names = [n for n in names if re.fullmatch(pattern, n)]
     # Sort by semver tuple, take newest

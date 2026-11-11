@@ -7,7 +7,7 @@ install_hermes() {
     version=$1
     install_dir=$2
 
-    # Pin to exact version tag (e.g. v2026.8.13)
+    # Pin to exact version tag (e.g. v0.23.1)
     hermes_install_uri="https://raw.githubusercontent.com/NousResearch/hermes-agent/${version}/scripts/install.sh"
     hermes_fallback_uri="https://hermes-agent.nousresearch.com/install.sh"
 
@@ -19,8 +19,8 @@ install_hermes() {
     # it unpinned to avoid PM breakage.
     #
     # The tagged installer's --commit rollback guard triggers when the commit is
-    # an ancestor of HEAD but not equal. In full history, the v2026.9.24 tag
-    # commit (f97608f) IS an ancestor of main (ahead 9943). However, the installer
+    # an ancestor of HEAD but not equal. In full history, the v0.23.1 tag
+    # commit (3b42157) IS an ancestor of main. However, the installer
     # uses --depth 1 shallow clones, where merge-base cannot prove ancestry even
     # after fetching the tag commit. So the guard currently takes the else branch
     # and pins normally. We pass --force-commit as a safety net: it works today
@@ -40,10 +40,10 @@ install_hermes() {
                 return 1
             }
         else
-            # git ls-remote unavailable/offline — hardcode known SHA for v2026.9.24
+            # git ls-remote unavailable/offline — hardcode known SHA for v0.23.1
             # to avoid --branch which breaks update/repair path (no origin/tag ref).
-            if [ "${version}" = "v2026.9.24" ]; then
-                hermes_commit="f97608f178d1ffeca59860195ab7da295f7c8e5f"
+            if [ "${version}" = "v0.23.1" ]; then
+                hermes_commit="3b421578588243f920886e6fe79a6faa87ea026e"
                 bash "${tmp_script}" --skip-setup --commit "${hermes_commit}" --force-commit || {
                     echo "ERROR: Hermes install script failed" >&2
                     rm -f "${tmp_script}"

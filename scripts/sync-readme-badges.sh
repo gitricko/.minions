@@ -8,7 +8,7 @@
 #
 # Deps with no matching badge are left untouched (e.g. MINIONS, which has no
 # pill of its own). Versions render without a leading "v" (deps.yaml may pin
-# "v2026.9.24").
+# "v0.23.1").
 
 set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -130,7 +130,7 @@ def is_outdated(current, latest):
 assert is_outdated('1.0.0', '1.0.1') == True
 assert is_outdated('1.0.1', '1.0.0') == False
 assert is_outdated('1.0.0', '1.0.0') == False
-assert is_outdated('v2026.9.11', 'v2026.9.14') == True
+assert is_outdated('v0.21.5', 'v0.21.6') == True
 assert is_outdated('22.22.2', 'v26.8.2') == True
 assert is_outdated('0.6.14', '0.12.15') == True
 assert is_outdated('1.0.0', None) == None
@@ -303,17 +303,17 @@ _fixture_strip_v() { # tmpenv tmpdeps tmpnode
 test_bump_strips_v() { with_temp_env _fixture_strip_v; }
 
 # ─── Test 16: bump.sh keeps v prefix for github_tag deps ──
-# HERMES pins carry the v (v2026.9.21, selector v20*) — the strip in Test 15
+# HERMES pins carry the v (v0.21.6, selector v0*) — the strip in Test 15
 # must be scoped to release_tarball only and must not touch these.
 _fixture_keep_v() { # tmpenv tmpdeps tmpnode
   local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
   if ! VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
-      bash "${REPO_ROOT}/scripts/bump.sh" HERMES=v2026.9.22 >/dev/null 2>&1; then
+      bash "${REPO_ROOT}/scripts/bump.sh" HERMES=v0.21.6 >/dev/null 2>&1; then
     bad "keep-v bump" "non-zero exit"; return 1
   fi
-  grep -q 'version: "v2026.9.22"' "$tmpdeps" \
+  grep -q 'version: "v0.21.6"' "$tmpdeps" \
     || { bad "keep-v bump" "deps.yaml lost v prefix"; return 1; }
-  ok "bump.sh keeps v prefix for github_tag deps (HERMES=v2026.9.22)"
+  ok "bump.sh keeps v prefix for github_tag deps (HERMES=v0.21.6)"
 }
 test_bump_keeps_v() { with_temp_env _fixture_keep_v; }
 

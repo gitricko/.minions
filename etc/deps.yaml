@@ -18,10 +18,10 @@ dependencies:
     drift_check: false
 
   - name: HERMES
-    version: "v2026.9.24"
+    version: "v0.23.1"
     source_type: github_tag
     repo: NousResearch/hermes-agent
-    selector: "v20*"
+    selector: "v0*"
     sha_source: none
 
   - name: PI
