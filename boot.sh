@@ -344,6 +344,12 @@ if [ -x "${HERMES_BIN}" ]; then
         "${HERMES_BIN}" config set providers.omniroute.api_key "no-key-needed"
         "${HERMES_BIN}" config set providers.9router.base_url "http://${NINEROUTER_HOST}:${NINEROUTER_PORT}/v1"
         "${HERMES_BIN}" config set providers.9router.api_key "no-key-needed"
+        # Auxiliary vision route: image analysis goes to OmniRoute, falls back to 9Router.
+        # --force: fallback_chain is read by agent/auxiliary_client but not declared in
+        # DEFAULT_CONFIG, so `config set` prints an unknown-key notice (still writes).
+        "${HERMES_BIN}" config set --force auxiliary.vision.provider omniroute
+        "${HERMES_BIN}" config set --force auxiliary.vision.model auto-fastest
+        "${HERMES_BIN}" config set --force auxiliary.vision.fallback_chain '[{provider: 9router, model: auto-fastest}]'
         "${HERMES_BIN}" config set telemetry.shared_metrics.enabled false
         "${HERMES_BIN}" config set telemetry.shared_metrics.send false
         "${HERMES_BIN}" config set telemetry.shared_metrics.offer_version 2
