@@ -18,14 +18,11 @@ install_hermes() {
     # fallback URI serves the main installer (PM, needs pm/lock.json) — keep
     # it unpinned to avoid PM breakage.
     #
-    # The tagged installer's --commit rollback guard triggers when the commit is
-    # an ancestor of HEAD but not equal. In full history, the v0.23.1 tag
-    # commit (3b42157) IS an ancestor of main. However, the installer
-    # uses --depth 1 shallow clones, where merge-base cannot prove ancestry even
-    # after fetching the tag commit. So the guard currently takes the else branch
-    # and pins normally. We pass --force-commit as a safety net: it works today
-    # (no-op when guard is false) and protects against future installer changes
-    # (deeper clones, git fixes) that would make the ancestry check succeed.
+    # The installer's --commit pin requires the SHA to be an ancestor of the
+    # installed branch (merge-base --is-ancestor, else "commit not on branch").
+    # Its clone is blobless full history (no --depth), so ancestry resolves for
+    # tag commits on main. Do NOT add flags beyond --skip-setup/--commit: the
+    # parser exits 1 on any unknown option.
     tmp_script=$(mktemp)
     if curl -fsSL "${hermes_install_uri}" -o "${tmp_script}" 2>/dev/null; then
         hermes_commit=""
@@ -34,7 +31,7 @@ install_hermes() {
             [ -z "${hermes_commit}" ] && hermes_commit=$(git ls-remote https://github.com/NousResearch/hermes-agent.git "refs/tags/${version}" 2>/dev/null | cut -f1)
         fi
         if [ -n "${hermes_commit}" ]; then
-            bash "${tmp_script}" --skip-setup --commit "${hermes_commit}" --force-commit || {
+            bash "${tmp_script}" --skip-setup --commit "${hermes_commit}" || {
                 echo "ERROR: Hermes install script failed" >&2
                 rm -f "${tmp_script}"
                 return 1
@@ -44,7 +41,7 @@ install_hermes() {
             # to avoid --branch which breaks update/repair path (no origin/tag ref).
             if [ "${version}" = "v0.23.1" ]; then
                 hermes_commit="3b421578588243f920886e6fe79a6faa87ea026e"
-                bash "${tmp_script}" --skip-setup --commit "${hermes_commit}" --force-commit || {
+                bash "${tmp_script}" --skip-setup --commit "${hermes_commit}" || {
                     echo "ERROR: Hermes install script failed" >&2
                     rm -f "${tmp_script}"
                     return 1
