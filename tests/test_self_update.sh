@@ -130,7 +130,7 @@ def is_outdated(current, latest):
 assert is_outdated('1.0.0', '1.0.1') == True
 assert is_outdated('1.0.1', '1.0.0') == False
 assert is_outdated('1.0.0', '1.0.0') == False
-assert is_outdated('v2026.9.11', 'v2026.9.14') == True
+assert is_outdated('v0.21.5', 'v0.21.6') == True
 assert is_outdated('22.22.2', 'v26.8.2') == True
 assert is_outdated('0.6.14', '0.12.15') == True
 assert is_outdated('1.0.0', None) == None
@@ -259,10 +259,27 @@ _fixture_sha_fetch() { # tmpenv tmpdeps tmpnode
     || { bad "sha-fetch UV" "linux_x64 sha wrong"; return 1; }
   grep -q 'macos_arm64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"' "$tmpdeps" \
     || { bad "sha-fetch UV" "darwin-arm64 sha wrong"; return 1; }
+  # TAILSCALE (sha_source: release_assets -> pkgs host {asset}.sha256; asset name embeds version,
+  # so build the fixture from the pinned version instead of shipping a versioned file)
+  local tsver tsfix
+  tsver=$(python3 -c "import yaml; print(next(d['version'] for d in yaml.safe_load(open('$tmpdeps'))['dependencies'] if d['name']=='TAILSCALE'))")
+  tsfix="$(dirname "$tmpenv")/sha"
+  mkdir -p "$tsfix"
+  printf '%s' "eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000" > "$tsfix/tailscale_${tsver}_amd64.tgz.sha256"
+  printf '%s' "ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999" > "$tsfix/tailscale_${tsver}_arm64.tgz.sha256"
+  if ! SHA_FETCH_BASE="$tsfix" \
+      VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
+      bash "${REPO_ROOT}/scripts/bump.sh" --open-pr "TAILSCALE=$tsver" >/dev/null 2>&1; then
+    bad "sha-fetch TAILSCALE" "non-zero exit"; return 1
+  fi
+  grep -q 'linux_x64: "eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000eeee0000"' "$tmpdeps" \
+    || { bad "sha-fetch TAILSCALE" "linux_x64 sha wrong"; return 1; }
+  grep -q 'linux_arm64: "ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999ffff9999"' "$tmpdeps" \
+    || { bad "sha-fetch TAILSCALE" "linux_arm64 sha wrong"; return 1; }
   # sync-versions must have propagated one fetched digest into versions.env
   grep -q 'NODE_SHA256_LINUX_X64="dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444"' "$tmpenv" \
     || { bad "sha-fetch NODE" "versions.env not regenerated"; return 1; }
-  ok "bump.sh --open-pr fetches real SHAs for NODE/UV (fixture, D8)"
+  ok "bump.sh --open-pr fetches real SHAs for NODE/UV/TAILSCALE (fixture, D8)"
 }
 test_sha_fetch() { with_temp_env _fixture_sha_fetch; }
 
@@ -303,17 +320,17 @@ _fixture_strip_v() { # tmpenv tmpdeps tmpnode
 test_bump_strips_v() { with_temp_env _fixture_strip_v; }
 
 # ─── Test 16: bump.sh keeps v prefix for github_tag deps ──
-# HERMES pins carry the v (v2026.9.21, selector v20*) — the strip in Test 15
+# HERMES pins carry the v (v0.21.6, selector v0*) — the strip in Test 15
 # must be scoped to release_tarball only and must not touch these.
 _fixture_keep_v() { # tmpenv tmpdeps tmpnode
   local tmpenv="$1" tmpdeps="$2" tmpnode="$3"
   if ! VERSIONS_ENV="$tmpenv" DEPS_YAML="$tmpdeps" NODE_VERSION_FILE="$tmpnode" \
-      bash "${REPO_ROOT}/scripts/bump.sh" HERMES=v2026.9.22 >/dev/null 2>&1; then
+      bash "${REPO_ROOT}/scripts/bump.sh" HERMES=v0.21.6 >/dev/null 2>&1; then
     bad "keep-v bump" "non-zero exit"; return 1
   fi
-  grep -q 'version: "v2026.9.22"' "$tmpdeps" \
+  grep -q 'version: "v0.21.6"' "$tmpdeps" \
     || { bad "keep-v bump" "deps.yaml lost v prefix"; return 1; }
-  ok "bump.sh keeps v prefix for github_tag deps (HERMES=v2026.9.22)"
+  ok "bump.sh keeps v prefix for github_tag deps (HERMES=v0.21.6)"
 }
 test_bump_keeps_v() { with_temp_env _fixture_keep_v; }
 

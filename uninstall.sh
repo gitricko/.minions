@@ -359,6 +359,45 @@ if [ "$DO_DELETE" = "1" ]; then
     for svc in omniroute 9router ollama tailscaled; do _stop_one "$svc"; done
   fi
   unset -f _stop_one
+  # Kill leftover processes running FROM the trees we are about to delete.
+  # `hermes chat`/`skills` auto-spawns a detached gateway
+  # (`python -m hermes_cli.main ... gateway run --quiet --idle-exit`, PPID 1) with
+  # no pidfile under var/run, so stop.sh never stops it; it outlives rm -rf and
+  # recreates ~/.hermes during do_verify -> false LEFT. Path-scoped match on
+  # exe/cwd/cmdline (never process-name based, Finding 3).
+  _leftover_pids=""
+  for _proc in /proc/[0-9]*; do
+    _pid=${_proc#/proc/}
+    case "${_pid}" in ""|*[!0-9]*) continue ;; esac
+    [ "${_pid}" = "$$" ] && continue
+    _cmd=$(tr '\0' ' ' < "${_proc}/cmdline" 2>/dev/null || true)
+    case "${_cmd}" in *uninstall.sh*) continue ;; esac
+    _exe=$(readlink "${_proc}/exe" 2>/dev/null || true)
+    _cwd=$(readlink "${_proc}/cwd" 2>/dev/null || true)
+    _hit=0
+    for _pfx in "${MINIONS_HOME}" "${DATA_DIRS[@]}"; do
+      case "${_exe} ${_cwd} ${_cmd}" in
+        *"${_pfx}/"*|*"${_pfx} "*) _hit=1; break ;;
+      esac
+    done
+    if [ "${_hit}" = "1" ]; then
+      log_info "stopping leftover process ${_pid}: $(printf '%.120s' "${_cmd}")"
+      kill "${_pid}" 2>/dev/null || true
+      _leftover_pids="${_leftover_pids} ${_pid}"
+    fi
+  done
+  unset _proc _pid _cmd _exe _cwd _hit _pfx
+  if [ -n "${_leftover_pids}" ]; then
+    sleep 1
+    for _pid in ${_leftover_pids}; do
+      if kill -0 "${_pid}" 2>/dev/null; then
+        log_warn "force killing leftover process ${_pid}"
+        kill -9 "${_pid}" 2>/dev/null || true
+      fi
+    done
+    unset _pid
+  fi
+  unset _leftover_pids
   # Kill only pidfile-recorded PIDs -- never blanket pkill -f ollama/omniroute/9router (Finding 3)
   for _pidf in "${MINIONS_HOME}/var/run/"*.pid; do
     [ -f "$_pidf" ] || continue

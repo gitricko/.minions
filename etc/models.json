@@ -12,7 +12,7 @@
           "provider": "omniroute",
           "baseUrl": "http://127.0.0.1:{{OMNIROUTE_PORT}}/v1",
           "reasoning": true,
-          "input": ["text"],
+          "input": ["text", "image"],
           "cost": {
             "input": 0,
             "output": 0,
@@ -42,7 +42,7 @@
           "provider": "9router",
           "baseUrl": "http://127.0.0.1:{{NINEROUTER_PORT}}/v1",
           "reasoning": true,
-          "input": ["text"],
+          "input": ["text", "image"],
           "cost": {
             "input": 0,
             "output": 0,

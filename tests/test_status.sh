@@ -56,7 +56,7 @@ test_no_truncation_when_down() {
   # Keep tailscale absent so it doesn't dominate
   local fakebin="$tmp/fakebin"; mkdir -p "$fakebin"
   make_fake_bin "$fakebin" "pi" "1.1.0"
-  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.21.5 (2026.9.24) · upstream 7770e397"
+  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.23.1 (2026.9.24) · upstream 3b421578"
   PATH="$fakebin:$PATH" MINIONS_HOME="$mh" bash "${REPO_ROOT}/status.sh" >"$tmp/out" 2>&1; rc=$?
   local out; out=$(cat "$tmp/out")
   # Must contain 9router, pi-agent, hermes, READY even though omniroute down
@@ -88,7 +88,7 @@ test_single_icon_per_service() {
   # Probe via status.sh env override: point omniroute to our test listener
   local fakebin="$tmp/fakebin"; mkdir -p "$fakebin"
   make_fake_bin "$fakebin" "pi" "1.1.0"
-  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.21.5 (2026.9.24) · upstream 7770e397"
+  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.23.1 (2026.9.24) · upstream 3b421578"
   PATH="$fakebin:$PATH" MINIONS_HOME="$mh" OMNIROUTE_PORT="$test_port" NINEROUTER_PORT="$test_port" bash "${REPO_ROOT}/status.sh" >"$tmp/out" 2>&1 || true
   local out; out=$(cat "$tmp/out")
   kill_listener
@@ -128,7 +128,7 @@ test_ollama_mnemon_rows() {
   echo "$$" > "$mh/var/run/9router.pid"
   local fakebin="$tmp/fakebin"; mkdir -p "$fakebin"
   make_fake_bin "$fakebin" "pi" "1.1.0"
-  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.21.5 (2026.9.24) · upstream 7770e397"
+  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.23.1 (2026.9.24) · upstream 3b421578"
   # Provide ollama + mnemon bins
   make_fake_bin "$fakebin" "ollama" "ollama version is 0.40.3"
   make_fake_bin "$fakebin" "mnemon" "mnemon version 0.2.10"
@@ -159,7 +159,7 @@ test_versions_omniroute_9router() {
   make_fake_bin "$fakebin" "omniroute" "3.8.51"
   make_fake_bin "$fakebin" "9router" "0.5.99"
   make_fake_bin "$fakebin" "pi" "1.1.0"
-  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.21.5 (2026.9.24) · upstream 7770e397"
+  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.23.1 (2026.9.24) · upstream 3b421578"
   ln -sf "$fakebin/omniroute" "$mh/bin/omniroute"
   ln -sf "$fakebin/9router" "$mh/bin/9router"
   # Provide versions.env fallback too
@@ -188,7 +188,7 @@ test_exit_codes() {
   local mh="$tmp/.minions"; mkdir -p "$mh/var/run" "$mh/etc" "$mh/bin"
   local fakebin="$tmp/fakebin"; mkdir -p "$fakebin"
   make_fake_bin "$fakebin" "pi" "1.1.0"
-  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.21.5 (2026.9.24) · upstream 7770e397"
+  make_fake_bin "$fakebin" "hermes" "Hermes Agent v0.23.1 (2026.9.24) · upstream 3b421578"
   # Healthy: both pids alive, use live ports or fake them
   echo "$$" > "$mh/var/run/omniroute.pid"
   echo "$$" > "$mh/var/run/9router.pid"
