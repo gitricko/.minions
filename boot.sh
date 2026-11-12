@@ -150,7 +150,12 @@ log_info "Starting OmniRoute (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})..."
 # response-start window (zombie-keepalive detection, default 30s). Left at 30s —
 # public upstreams keep fast dead-socket retries; local/LAN targets (incl. Tailscale
 # 100.x, ollama) already get the built-in 300s local floor (LOCAL_DIRECT default).
-export OMNIROUTE_FETCH_START_TIMEOUT_CAP_MS=300000
+# https://github.com/cheaper-inference/OmniRoute/blob/main/.env.example
+export OMNIROUTE_FETCH_START_TIMEOUT_CAP_MS=0
+export OMNIROUTE_DIRECT_HEADERS_TIMEOUT_MS=300000
+export OMNIROUTE_DEFAULT_FETCH_TIMEOUT_MS=300000
+export OMNIROUTE_HTTP_TIMEOUT_MS=300000
+export FETCH_CONNECT_TIMEOUT_MS=300000
 start_service "omniroute" \
     "${MINIONS_HOME}/bin/omniroute" \
     serve --port "${OMNIROUTE_PORT}" --no-open \

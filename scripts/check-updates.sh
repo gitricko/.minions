@@ -48,6 +48,17 @@ def fetch_json(url):
     except (URLError, HTTPError, json.JSONDecodeError, Exception):
         return None
 
+def fetch_text(url):
+    """Fetch a text URL via urllib. Returns None on failure."""
+    if offline:
+        return None
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'minions-self-update/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read().decode()
+    except (URLError, HTTPError, UnicodeDecodeError, Exception):
+        return None
+
 def latest_github_tag(repo, selector=None):
     """Query GitHub API tags for repo. Filter by selector (glob). Return latest version string."""
     url = f"https://api.github.com/repos/{repo}/tags?per_page=100"
@@ -77,6 +88,15 @@ def latest_release_tarball(repo, selector=None):
     When selector is None/empty, consider all tags (no filter)."""
     return latest_github_tag(repo, selector)
 
+def latest_package_index(url, asset_pattern):
+    """Return the newest semver embedded in a vendor package index."""
+    text = fetch_text(url)
+    if not text:
+        return None
+    versions = re.findall(asset_pattern, text)
+    parsed = [(semver_tuple(v), v) for v in versions if semver_tuple(v) is not None]
+    return max(parsed, key=lambda x: x[0])[1] if parsed else None
+
 def is_outdated(current, latest):
     """Compare current vs latest version strings. Return True if latest > current."""
     if not latest or not current:
@@ -102,7 +122,11 @@ for dep in data['dependencies']:
         elif source_type == 'npm':
             latest = latest_npm(dep['package'], dep.get('channel', 'latest'))
         elif source_type == 'release_tarball':
-            latest = latest_release_tarball(dep['repo'], dep.get('selector'))
+            if dep.get('latest_source') == 'package_index':
+                latest = latest_package_index(
+                    dep['latest_url'], dep['latest_asset_pattern'])
+            else:
+                latest = latest_release_tarball(dep['repo'], dep.get('selector'))
     except Exception as e:
         latest = None
 
