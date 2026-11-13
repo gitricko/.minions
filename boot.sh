@@ -152,7 +152,6 @@ log_info "Starting OmniRoute (${OMNIROUTE_HOST}:${OMNIROUTE_PORT})..."
 # 100.x, ollama) already get the built-in 300s local floor (LOCAL_DIRECT default).
 # https://github.com/cheaper-inference/OmniRoute/blob/main/.env.example
 export OMNIROUTE_FETCH_START_TIMEOUT_CAP_MS=0
-export OMNIROUTE_DIRECT_HEADERS_TIMEOUT_MS=300000
 export OMNIROUTE_DEFAULT_FETCH_TIMEOUT_MS=300000
 export OMNIROUTE_HTTP_TIMEOUT_MS=300000
 export FETCH_CONNECT_TIMEOUT_MS=300000

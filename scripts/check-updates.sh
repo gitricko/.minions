@@ -64,7 +64,7 @@ def fetch_text(url):
         req = urllib.request.Request(url, headers={'User-Agent': 'minions-self-update/1.0'})
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.read().decode()
-    except (URLError, HTTPError, UnicodeDecodeError, Exception):
+    except Exception:
         return None
 
 def latest_github_tag(repo, selector=None):
@@ -166,22 +166,19 @@ if report_mode:
         print('\nThis job is advisory. To apply them: scripts/admin-update.sh')
     else:
         print('\nAll dependencies are current.')
+    # Gating from the same computation as the table, not a grep of its text.
+    sys.exit(1 if stale else 0)
 else:
     print(json.dumps({'catalog': deps_yaml, 'outdated': report}, indent=2))
 PY
 }
 
 if [ "${REPORT}" -eq 1 ]; then
-  # One pass: same core in report mode; the table and its gating state
-  # come from the identical computation, so reporting and exit code
-  # cannot disagree. The shell owns the exit code, as before.
-  table="$(run_core report)" || exit 1
-  printf '%s\n' "${table}"
-  stale=$(printf '%s\n' "${table}" | grep -cw 'OUTDATED') || true
-  if [ "${stale:-0}" -gt 0 ]; then
-    exit 1
-  fi
-  exit 0
+  # One pass: python renders the table AND sets the exit code from the same
+  # computation, so reporting and gating cannot disagree. Output streams
+  # straight through — a traceback still reaches the CI log.
+  run_core report
+  exit $?
 fi
 
 run_core

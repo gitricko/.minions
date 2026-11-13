@@ -3,6 +3,32 @@
 #
 # Install Hermes using their official install script (git-based, mirrors hermes-codespace)
 # Usage: install_hermes <version> <install_dir>
+
+# Canonical absolute path. macOS BSD readlink has no -f, so fall back to a
+# bounded symlink walk (repo pattern: uninstall.sh guards readlink -m).
+canonical_path() {
+    _cp_r=$(readlink -f "$1" 2>/dev/null || true)
+    if [ -z "${_cp_r}" ] && command -v realpath >/dev/null 2>&1; then
+        _cp_r=$(realpath "$1" 2>/dev/null || true)
+    fi
+    if [ -n "${_cp_r}" ]; then
+        printf '%s\n' "${_cp_r}"
+        return 0
+    fi
+    _cp=$1
+    _cp_n=0
+    while [ -L "${_cp}" ] && [ "${_cp_n}" -lt 32 ]; do
+        _cp_t=$(readlink "${_cp}" 2>/dev/null || true)
+        [ -z "${_cp_t}" ] && break
+        case "${_cp_t}" in
+            /*) _cp=${_cp_t} ;;
+            *) _cp=$(dirname "${_cp}")/${_cp_t} ;;
+        esac
+        _cp_n=$((_cp_n + 1))
+    done
+    printf '%s/%s\n' "$(cd "$(dirname "${_cp}")" 2>/dev/null && pwd -P)" "$(basename "${_cp}")"
+}
+
 install_hermes() {
     version=$1
     install_dir=$2
@@ -110,10 +136,22 @@ write_hermes_wrapper() {
     hermes_src_bin=$1
     hermes_dest=$2
 
+    # Never wrap a src that resolves back to dest: after ``rm dest`` + wrapper
+    # write, the wrapper would exec a path pointing at the wrapper itself ->
+    # infinite loop. Hit when venv/bin/hermes is missing (PM layout variant)
+    # and ``command -v hermes`` resolves to our own bin/hermes symlink.
+    if [ -L "${hermes_src_bin}" ] \
+        && [ -n "$(canonical_path "${hermes_src_bin}")" ] \
+        && [ "$(canonical_path "${hermes_src_bin}")" = "$(canonical_path "${hermes_dest}")" ]; then
+        return 0
+    fi
+
     # If ``dest`` is a *regular file* physically at the very entrypoint we
     # would exec, writing a self-executing wrapper there would loop. (A
     # symlink pointing to src is fine to replace with a wrapper file.)
-    if [ -e "${hermes_dest}" ] && [ ! -L "${hermes_dest}" ]        && [ "$(readlink -f "${hermes_dest}")" = "$(readlink -f "${hermes_src_bin}" 2>/dev/null)" ]; then
+    if [ -e "${hermes_dest}" ] && [ ! -L "${hermes_dest}" ] \
+        && [ -n "$(canonical_path "${hermes_dest}")" ] \
+        && [ "$(canonical_path "${hermes_dest}")" = "$(canonical_path "${hermes_src_bin}")" ]; then
         return 0
     fi
 
@@ -166,7 +204,7 @@ ensure_hermes() {
     if [ -L "${hermes_local}" ]; then
         # Existing plain symlink (pre-wrapper or PM-installed): heal into a
         # locales-aware wrapper if this build is missing its bundled locales/.
-        hermes_target=$(readlink -f "${hermes_local}")
+        hermes_target=$(canonical_path "${hermes_local}")
         hermes_ws=$(cd "$(dirname "$(dirname "$(dirname "${hermes_target}")")")" 2>/dev/null && pwd)
         hermes_install_dir=$(dirname "${hermes_ws}")
         if [ -n "${hermes_ws}" ] && [ -n "${hermes_install_dir}" ] && [ -d "${hermes_ws}/venv" ]; then
