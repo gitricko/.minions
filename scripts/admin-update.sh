@@ -81,7 +81,10 @@ fi
 
 # Run the bump
 echo "Bumping: $DEPS"
-scripts/bump.sh --open-pr $DEPS
+if ! scripts/bump.sh --open-pr $DEPS; then
+    echo "admin-update.sh: dependency bump failed; stopping without syncing generated files." >&2
+    exit 1
+fi
 
 # Regenerate versions.env from the updated deps.yaml (keep both in sync).
 # bump.sh already does this, but we do it here too so admin-update.sh is

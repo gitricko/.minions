@@ -39,7 +39,7 @@ dependencies:
     sha_source: none
 
   - name: NINEROUTER
-    version: "0.5.116"
+    version: "0.5.119"
     source_type: npm
     package: 9router
     channel: latest
@@ -60,17 +60,17 @@ dependencies:
       macos_arm64: "af6202f5370a3a5209e85dc543758dfd9f44c8726626a236730cd603a67a8559"
 
   - name: UV
-    version: "0.13.7"
+    version: "0.13.8"
     source_type: release_tarball
     repo: astral-sh/uv
     release_url: https://github.com/astral-sh/uv/releases/download/{{VERSION}}/
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64, macos_x64, macos_arm64]
     sha256:
-      linux_x64: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
-      linux_arm64: "71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc"
-      macos_x64: "20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7"
-      macos_arm64: "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"
+      linux_x64: "5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91"
+      linux_arm64: "74f2f5c6024d397481db228db8fc25eed420db192243f88438c118e7e013e585"
+      macos_x64: "a04c2ffeac28b2003a2c13caf538ab425fcd7def3e4a41571f4a8fb370a66af3"
+      macos_arm64: "6b71028a6b904f2ae3340ef52e595512de807d06c0a20eaef2f692581b246558"
 
   - name: MNEMON
     version: "v0.2.13"
@@ -92,15 +92,18 @@ dependencies:
       macos_arm64: "a743717494315da7cd352982b805f6b992d4b4452ca117fd5fbf86c4ee46fca0"
 
   - name: TAILSCALE
-    version: "1.104.6"
+    version: "1.104.7"
     source_type: release_tarball
     repo: tailscale/tailscale
     release_url: https://pkgs.tailscale.com/stable/
+    latest_source: package_index
+    latest_url: https://pkgs.tailscale.com/stable/
+    latest_asset_pattern: 'tailscale_([0-9]+\.[0-9]+\.[0-9]+)_amd64\.tgz'
     # pkgs host serves per-asset digests: {asset}.sha256 (whole file = digest)
     sha_source: release_assets
     platforms: [linux_x64, linux_arm64]
     sha256:
-      linux_x64: "82a85429f733e52fd1a95dedb2c8dd8cd46d6603504e566a56b1779c9a7a4809"
-      linux_arm64: "d0e4f297da3c428d02162c6235b9948e4ddc245c64502b7b05647da9b96a0971"
+      linux_x64: "e56693ff74a64f2591b7e819c280635a100aae1ddfb0ef058fcd052b7cd8d16c"
+      linux_arm64: "d6bed2720310b328b861f943d7b4016c5358a9bad60575eb51e8143b79068484"
 
 

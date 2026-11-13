@@ -188,6 +188,28 @@ done
 
 [ -f "${DEPS_YAML}" ] || { echo "missing ${DEPS_YAML}" >&2; exit 1; }
 
+# Keep a failed multi-dependency bump from leaving a version and its old
+# checksum out of sync. The backup is removed only after the whole operation
+# succeeds.
+BACKUP_DIR="$(mktemp -d)"
+BACKUP_DEPS="${BACKUP_DIR}/deps.yaml"
+BACKUP_VERSIONS="${BACKUP_DIR}/versions.env"
+BACKUP_NODE="${BACKUP_DIR}/.node-version"
+cp "${DEPS_YAML}" "${BACKUP_DEPS}"
+[ ! -f "${VERSIONS_ENV}" ] || cp "${VERSIONS_ENV}" "${BACKUP_VERSIONS}"
+[ ! -f "${NODE_VERSION_FILE}" ] || cp "${NODE_VERSION_FILE}" "${BACKUP_NODE}"
+restore_on_failure() {
+  status=$?
+  if [ "${status}" -ne 0 ]; then
+    cp "${BACKUP_DEPS}" "${DEPS_YAML}"
+    if [ -f "${BACKUP_VERSIONS}" ]; then cp "${BACKUP_VERSIONS}" "${VERSIONS_ENV}"; fi
+    if [ -f "${BACKUP_NODE}" ]; then cp "${BACKUP_NODE}" "${NODE_VERSION_FILE}"; fi
+  fi
+  rm -rf "${BACKUP_DIR}"
+  exit "${status}"
+}
+trap restore_on_failure EXIT
+
 # Preserve versions.env content so dry-run can verify non-mutation.
 ORIGINAL_VERSIONS=""
 [ "${DRY_RUN}" -eq 1 ] && ORIGINAL_VERSIONS="$(cat "${VERSIONS_ENV:-$(dirname "$DEPS_YAML")/versions.env}" 2>/dev/null || true)"
@@ -275,4 +297,6 @@ if [ "${OPEN_PR}" -eq 1 ]; then
 fi
 
 echo "bump.sh complete."
+trap - EXIT
+rm -rf "${BACKUP_DIR}"
 exit 0
