@@ -84,8 +84,13 @@ install_hermes() {
         return 1
     fi
 
-    # Create direct symlink (no wrapper - config is at ~/.hermes/config.yaml)
-    ln -sf "${hermes_bin}" "${install_dir}/hermes"
+    # The PM installer can drop the bundled ``locales/`` dir from ``installs/…/workspace``,
+    # which makes every i18n key fall back to the bare key (``cli.tip_line`` instead of
+    # ``"✦ Tip: …"``). ``agent.i18n`` honors HERMES_BUNDLED_LOCALES when it points at a
+    # dir containing the catalogs, so wrap the launcher: resolve a locales dir (preferred
+    # the git checkout, plus a find-based fallback) and export the override, then exec.
+    write_hermes_wrapper "${hermes_bin}" "${install_dir}/hermes"
+
 
     # Fix macOS quarantine
     fix_macos_quarantine "${install_dir}"
@@ -98,10 +103,83 @@ install_hermes() {
     fi
 }
 
+# Resolve a dir that ships the bundled locale catalogs (locales/en.yaml) and write an
+# env-setting wrapper around hermes_bin at dest. No suitable dir found -> plain symlink
+# (behavior unchanged). Idempotent: re-runnable after hermes updates.
+write_hermes_wrapper() {
+    hermes_src_bin=$1
+    hermes_dest=$2
+
+    # If ``dest`` is a *regular file* physically at the very entrypoint we
+    # would exec, writing a self-executing wrapper there would loop. (A
+    # symlink pointing to src is fine to replace with a wrapper file.)
+    if [ -e "${hermes_dest}" ] && [ ! -L "${hermes_dest}" ]        && [ "$(readlink -f "${hermes_dest}")" = "$(readlink -f "${hermes_src_bin}" 2>/dev/null)" ]; then
+        return 0
+    fi
+
+    # Prefer the PM install's own workspace locale directory (version-matched), then
+    # the git checkout, and finally a bounded find fallback in ~/.hermes.
+    hermes_ws=$(cd "$(dirname "$(dirname "$(dirname "${hermes_src_bin}")")")" 2>/dev/null && pwd)
+    locales_dir=""
+    for cand in "${hermes_ws}/workspace/locales" "${hermes_ws}/locales" "${HOME}/.hermes/hermes-agent/locales"; do
+        if [ -f "${cand}/en.yaml" ]; then
+            locales_dir="${cand}"
+            break
+        fi
+    done
+    if [ -z "${locales_dir}" ]; then
+        locales_dir=$(find "${HOME}/.hermes" -maxdepth 5 -type f -path "*/locales/en.yaml" 2>/dev/null | head -1)
+        [ -n "${locales_dir}" ] && locales_dir=$(dirname "${locales_dir}")
+    fi
+    if [ -z "${locales_dir}" ] || [ ! -f "${locales_dir}/en.yaml" ]; then
+        # No usable bundled locale source: keep a direct symlink so a later repair
+        # can swap the wrapper in. Warn so the raw-key symptom isn't a mystery.
+        ln -sf "${hermes_src_bin}" "${hermes_dest}"
+        echo "WARNING: no hermes bundled locales/ found; i18n will show raw keys (see write_hermes_wrapper in lib/hermes.sh)" >&2
+        return 0
+    fi
+
+    # ``cat > dest`` writes THROUGH a symlink, clobbering the real entrypoint
+    # e.g. venv/bin/hermes; drop the link first so the wrapper is standalone.
+    if [ -L "${hermes_dest}" ]; then
+        rm -f "${hermes_dest}"
+    fi
+
+    cat > "${hermes_dest}" <<EOF
+#!/bin/sh
+# .minions wrapper: force a bundled locales/ catalog (PM installer can drop it).
+HERMES_BUNDLED_LOCALES="${locales_dir}"
+export HERMES_BUNDLED_LOCALES
+exec "${hermes_src_bin}" "\$@"
+EOF
+    chmod +x "${hermes_dest}"
+}
+
 # Ensure Hermes is available
 ensure_hermes() {
-    if [ -x "${MINIONS_HOME}/lib/hermes/hermes" ]; then
-        echo "Hermes found at ${MINIONS_HOME}/lib/hermes/hermes"
+    hermes_entry="${MINIONS_HOME}/bin/hermes"
+    hermes_local="${MINIONS_HOME}/lib/hermes/hermes"
+    if [ ! -e "${hermes_local}" ]; then
+        hermes_local="${hermes_entry}"
+    fi
+
+    if [ -L "${hermes_local}" ]; then
+        # Existing plain symlink (pre-wrapper or PM-installed): heal into a
+        # locales-aware wrapper if this build is missing its bundled locales/.
+        hermes_target=$(readlink -f "${hermes_local}")
+        hermes_ws=$(cd "$(dirname "$(dirname "$(dirname "${hermes_target}")")")" 2>/dev/null && pwd)
+        hermes_install_dir=$(dirname "${hermes_ws}")
+        if [ -n "${hermes_ws}" ] && [ -n "${hermes_install_dir}" ] && [ -d "${hermes_ws}/venv" ]; then
+            if [ ! -f "${hermes_ws}/workspace/locales/en.yaml" ] && [ -f "${HOME}/.hermes/hermes-agent/locales/en.yaml" ]; then
+                echo "Hermes locales/ missing from ${hermes_ws}; healing wrapper at ${hermes_local}"
+                write_hermes_wrapper "${hermes_target}" "${hermes_local}"
+                [ "$(cd "$(dirname "${hermes_local}")" && pwd)" != "$(cd "$(dirname "${hermes_entry}")" && pwd)" ] && ln -sf "${hermes_local}" "${hermes_entry}"
+            fi
+        fi
+    fi
+
+    if [ -e "${hermes_local}" ]; then
+        echo "Hermes found at ${hermes_local}"
         return 0
     fi
 
